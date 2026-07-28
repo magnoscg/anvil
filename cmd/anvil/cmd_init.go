@@ -41,7 +41,7 @@ Domain, Data, Features, Navigation, DI, and SwiftData persistence.`,
 			packRenderer,
 		)
 
-		tui.SetAppVersion(Version)
+		tui.SetAppVersion(resolveVersion())
 		model := tui.NewWizardModel(checker, gen)
 		p := tea.NewProgram(model)
 
