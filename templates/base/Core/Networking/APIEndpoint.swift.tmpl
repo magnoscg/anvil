@@ -1,0 +1,55 @@
+import Foundation
+
+// MARK: - APIEndpoint
+
+/// Protocol for external API endpoints where the base URL is fixed and known at compile time.
+/// Each external API defines its own conforming type with an embedded base URL.
+protocol APIEndpoint: Sendable {
+    // MARK: - Properties
+
+    var baseURL: URL { get }
+    var path: String { get }
+    var method: HTTPMethod { get }
+    var queryParameters: [String: any CustomStringConvertible & Sendable]? { get }
+    var headers: [String: String]? { get }
+    var body: Data? { get }
+    var contentType: ContentType { get }
+
+    // MARK: - Request Building
+
+    func buildRequest() -> URLRequest?
+}
+
+// MARK: - Default Implementations
+
+extension APIEndpoint {
+    var method: HTTPMethod { .get }
+    var queryParameters: [String: any CustomStringConvertible & Sendable]? { nil }
+    var headers: [String: String]? { nil }
+    var body: Data? { nil }
+    var contentType: ContentType { .json }
+
+    func buildRequest() -> URLRequest? {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: true)
+
+        if let queryParameters {
+            components?.queryItems = queryParameters.map { key, value in
+                URLQueryItem(name: key, value: String(describing: value))
+            }
+        }
+
+        guard let url = components?.url else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method.rawValue
+        request.setValue(contentType.rawValue, forHTTPHeaderField: "Content-Type")
+
+        headers?.forEach { key, value in
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        request.httpBody = body
+
+        return request
+    }
+}

@@ -1,0 +1,43 @@
+import SwiftUI
+{{ if .IncludeSwiftData }}import SwiftData
+{{ end }}
+// MARK: - {{ .ProjectName }}App
+
+@main
+struct {{ .ProjectName }}App: App {
+    // MARK: - Properties
+
+    @State
+    private var appRouter = AppRouterImpl()
+
+    private let dependencies: AppDependencies
+{{ if .IncludeSwiftData }}
+    private let swiftDataStack: SwiftDataStack
+{{ end }}
+    // MARK: - Init
+
+    init() {
+{{ if .IncludeSwiftData }}        let stack = SwiftDataStack()
+        swiftDataStack = stack
+        do {
+            dependencies = try AppDependencies(swiftDataStack: stack)
+        } catch {
+            preconditionFailure("Failed to initialize AppDependencies: \(error)")
+        }
+{{ else }}        do {
+            dependencies = try AppDependencies()
+        } catch {
+            preconditionFailure("Failed to initialize AppDependencies: \(error)")
+        }
+{{ end }}    }
+
+    // MARK: - Body
+
+    var body: some Scene {
+        WindowGroup {
+            RootNavigationView(appRouter: appRouter,
+                               dependencies: dependencies)
+        }
+{{ if .IncludeSwiftData }}        .modelContainer(swiftDataStack.container)
+{{ end }}    }
+}

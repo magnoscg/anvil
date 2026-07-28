@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  go-tests:
+    name: Go Tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - run: make test
+
+  swift-tests:
+    name: Swift Tests (Example)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          brew install swiftlint swiftformat xcbeautify
+
+      - name: Build Example project
+        run: |
+          xcodebuild build \
+            -project Example/Arquitectura.xcodeproj \
+            -scheme Arquitectura-Dev \
+            -destination "platform=iOS Simulator,OS=latest,name=iPhone 16 Pro" \
+            2>&1 | xcbeautify
+
+      - name: Run Swift tests
+        run: |
+          xcodebuild test \
+            -project Example/Arquitectura.xcodeproj \
+            -scheme Arquitectura-Dev \
+            -destination "platform=iOS Simulator,OS=latest,name=iPhone 16 Pro" \
+            2>&1 | xcbeautify

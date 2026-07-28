@@ -1,0 +1,56 @@
+import Testing
+import Foundation
+@testable import {{ .ProjectName }}
+
+@Suite("{{ .FeatureName }}UseCaseImpl Tests")
+struct {{ .FeatureName }}UseCaseImplTests {
+    // MARK: - Properties
+
+    private var mockRepository: {{ .FeatureName }}RepositoryMock
+    private var sut: {{ .FeatureName }}UseCaseImpl
+
+    // MARK: - Setup
+
+    init() {
+        mockRepository = {{ .FeatureName }}RepositoryMock()
+        sut = {{ .FeatureName }}UseCaseImpl(repository: mockRepository)
+    }
+
+    // MARK: - Success
+
+    @Test("Given repository returns models, when execute, then returns mapped models")
+    func execute_success_returnsMappedModels() async throws {
+        // Given
+        let expectedModels = [
+            {{ .FeatureName }}Model(id: "1", name: "First", description: "First item"),
+            {{ .FeatureName }}Model(id: "2", name: "Second", description: "Second item")
+        ]
+        mockRepository.fetchResult = .success(expectedModels)
+
+        // When
+        let result = try await sut.execute()
+
+        // Then
+        #expect(result.count == 2)
+        #expect(result[0].id == "1")
+        #expect(result[1].id == "2")
+        #expect(mockRepository.fetchCallCount == 1)
+    }
+
+    // MARK: - Error
+
+    @Test("Given repository throws error, when execute, then propagates error")
+    func execute_repositoryThrows_propagatesError() async {
+        // Given
+        let expectedError = NSError(domain: "test", code: 42)
+        mockRepository.fetchResult = .failure(expectedError)
+
+        // When / Then
+        do {
+            _ = try await sut.execute()
+            Issue.record("Expected error to be thrown")
+        } catch {
+            #expect(mockRepository.fetchCallCount == 1)
+        }
+    }
+}

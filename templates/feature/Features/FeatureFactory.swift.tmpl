@@ -1,0 +1,73 @@
+import SwiftUI
+
+// MARK: - {{ .FeatureName }}Factory
+
+/// Factory for creating {{ .FeatureName }} feature components with proper dependency injection
+@MainActor
+enum {{ .FeatureName }}Factory {
+    // MARK: - Public Methods
+
+    static func makeView(appRouter: AppRouter, dependencies: AppDependencies) -> some View {
+        let viewModel = makeViewModel(appRouter: appRouter, apiClient: dependencies.apiClient)
+        return {{ .FeatureName }}View(viewModel: viewModel)
+    }
+}
+
+// MARK: - Private Factory Methods
+
+private extension {{ .FeatureName }}Factory {
+    // MARK: - DataSources
+
+    static func makeRemoteDataSource(apiClient: APIClient) -> {{ .FeatureName }}RemoteDataSource {
+        {{ .FeatureName }}RemoteDataSourceImpl(apiClient: apiClient)
+    }
+{{ if .IncludeLocalDataSource }}
+    static func makeLocalDataSource() -> {{ .FeatureName }}LocalDataSource {
+        {{ .FeatureName }}LocalDataSourceImpl()
+    }
+{{ end }}{{ if .IncludeKeychain }}
+    static func makeKeychainDataSource() -> {{ .FeatureName }}KeychainDataSource {
+        {{ .FeatureName }}KeychainDataSourceImpl(keychainHelper: KeychainHelper())
+    }
+{{ end }}
+    // MARK: - Mappers
+
+    static func makeDTOMapper() -> {{ .FeatureName }}DTOMapper {
+        {{ .FeatureName }}DTOMapperImpl()
+    }
+
+    // MARK: - Repositories
+
+    static func makeRepository(apiClient: APIClient) -> {{ .FeatureName }}Repository {
+        {{ .FeatureName }}RepositoryImpl(remoteDataSource: makeRemoteDataSource(apiClient: apiClient),
+{{ "                                       " }}mapper: makeDTOMapper(){{ if .IncludeLocalDataSource }},
+{{ "                                       " }}localDataSource: makeLocalDataSource(){{ end }}{{ if .IncludeKeychain }},
+{{ "                                       " }}keychainDataSource: makeKeychainDataSource(){{ end }})
+    }
+
+    // MARK: - UseCases
+
+    static func makeUseCase(apiClient: APIClient) -> {{ .FeatureName }}UseCase {
+        {{ .FeatureName }}UseCaseImpl(repository: makeRepository(apiClient: apiClient))
+    }
+
+    // MARK: - Decorator Mappers
+
+    static func makeDecoratorMapper() -> {{ .FeatureName }}DecoratorMapper {
+        {{ .FeatureName }}DecoratorMapperImpl()
+    }
+
+    // MARK: - Navigation
+
+    static func makeRouter(appRouter: AppRouter) -> {{ .FeatureName }}Router {
+        {{ .FeatureName }}RouterImpl(appRouter: appRouter)
+    }
+
+    // MARK: - ViewModels
+
+    static func makeViewModel(appRouter: AppRouter, apiClient: APIClient) -> {{ .FeatureName }}ViewModel {
+        {{ .FeatureName }}ViewModel(useCase: makeUseCase(apiClient: apiClient),
+{{ "                                  " }}decoratorMapper: makeDecoratorMapper(),
+{{ "                                  " }}router: makeRouter(appRouter: appRouter))
+    }
+}

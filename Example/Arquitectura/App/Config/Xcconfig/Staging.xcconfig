@@ -1,0 +1,25 @@
+// Staging.xcconfig
+// Configuration for Staging environment
+
+#include "Base.xcconfig"
+
+// MARK: - Environment
+
+APP_ENVIRONMENT = staging
+
+// MARK: - API
+
+API_BASE_URL = https:/$()/api-staging.example.com
+
+// MARK: - Bundle Configuration
+
+PRODUCT_BUNDLE_IDENTIFIER = com.magnos.Arquitectura.staging
+PRODUCT_NAME = Arquitectura STG
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+
+// MARK: - SSL Pinning
+
+SSL_PINNING_ENABLED = NO
+// Add your staging public key hashes here (comma separated) and set SSL_PINNING_ENABLED = YES
+// Example: sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+SSL_PUBLIC_KEY_HASHES =

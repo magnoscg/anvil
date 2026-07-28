@@ -1,0 +1,40 @@
+import SwiftData
+
+// MARK: - PersistenceAssembly
+
+/// Registers SwiftData persistence dependencies at the composition root.
+///
+/// Pattern: each repository receives its own `ModelExecutor` created via
+/// `SwiftDataStack.makeBackgroundExecutor()`. This guarantees thread safety
+/// because every executor owns an isolated `ModelContext`.
+///
+/// Example (inside a feature factory):
+/// ```swift
+/// static func makeRepository(dependencies: AppDependencies) -> SomeRepository {
+///     SomeRepositoryImpl(
+///         modelExecutor: dependencies.swiftDataStack.makeBackgroundExecutor()
+///     )
+/// }
+/// ```
+@MainActor
+enum PersistenceAssembly {
+    // MARK: - Registration
+
+    /// Creates and configures the `SwiftDataStack` for production use.
+    static func makeSwiftDataStack() -> SwiftDataStack {
+        SwiftDataStack(container: .shared)
+    }
+
+    /// Creates an in-memory `SwiftDataStack` for SwiftUI previews and tests.
+    static func makePreviewSwiftDataStack() -> SwiftDataStack {
+        SwiftDataStack(container: .preview)
+    }
+
+    // MARK: - Executor Factory
+
+    /// Convenience method that creates a dedicated `ModelExecutor` from the given stack.
+    /// Call once per repository -- never reuse executors across repositories.
+    static func makeExecutor(from stack: SwiftDataStack) -> ModelExecutor {
+        stack.makeBackgroundExecutor()
+    }
+}

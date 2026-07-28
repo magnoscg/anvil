@@ -1,0 +1,91 @@
+import Foundation
+import os
+import SwiftUI
+
+// MARK: - AppNavigationCoordinator
+
+/// Coordinates navigation logic: deep link parsing, state persistence, and debounced saves.
+/// Extracted from RootNavigationView so the View remains a thin shell.
+@MainActor
+@Observable
+final class AppNavigationCoordinator {
+    // MARK: - Static
+
+    private nonisolated static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "{{ .BundleID }}",
+        category: "Navigation"
+    )
+
+    // MARK: - Properties
+
+    private var appRouter: AppRouter
+    private var saveTask: Task<Void, Never>?
+
+    // MARK: - Init
+
+    init(appRouter: AppRouter) {
+        self.appRouter = appRouter
+    }
+
+    // MARK: - Deep Linking
+
+    func handleDeepLink(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = components.host else {
+            Self.logger.warning("Deep link ignored: invalid URL components")
+            return
+        }
+
+        Self.logger.debug("Deep link received: \(host, privacy: .public)")
+    }
+
+    // MARK: - State Persistence
+
+    /// Restores navigation state from previously persisted data.
+    /// Failure is non-critical: an empty NavigationPath is used as fallback so the app
+    /// always starts in a valid state even when stored data is corrupt or incompatible.
+    func restoreNavigationState(from data: Data?) {
+        guard let data else { return }
+
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let codableRep = try decoder.decode(
+                NavigationPath.CodableRepresentation.self,
+                from: data
+            )
+            appRouter.path = NavigationPath(codableRep)
+            Self.logger.debug("Navigation state restored successfully")
+        } catch {
+            Self.logger.error("Failed to restore navigation state: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Encodes the current navigation path for persistence.
+    /// Returns nil on failure — the caller treats nil as "do not persist",
+    /// which is the safe fallback when the path contains non-codable routes.
+    func encodeNavigationState() -> Data? {
+        guard let codableRep = appRouter.path.codable else { return nil }
+
+        do {
+            return try JSONEncoder().encode(codableRep)
+        } catch {
+            Self.logger.error("Failed to save navigation state: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    func saveNavigationStateDebounced(persist: @escaping @MainActor (Data?) -> Void) {
+        saveTask?.cancel()
+        saveTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            let data = self.encodeNavigationState()
+            persist(data)
+        }
+    }
+}

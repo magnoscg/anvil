@@ -1,0 +1,22 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - Fixture{{ .FeatureName }}RemoteDataSource
+
+/// Fixture scenarios for {{ .FeatureName }} UI tests.
+/// Each case represents a deterministic test scenario.
+enum Fixture{{ .FeatureName }}RemoteDataSource: String {
+    // MARK: - Cases
+
+    case `default` = "default"
+    case empty = "empty"
+    case error = "error"
+
+    // MARK: - Sample Data
+
+    static let defaultItems: [{{ .FeatureName }}DTO] = [
+        {{ .FeatureName }}DTO(id: "stub-1", name: "Stub Item 1", description: "First stub item"),
+        {{ .FeatureName }}DTO(id: "stub-2", name: "Stub Item 2", description: "Second stub item"),
+        {{ .FeatureName }}DTO(id: "stub-3", name: "Stub Item 3", description: "Third stub item"),
+    ]
+}

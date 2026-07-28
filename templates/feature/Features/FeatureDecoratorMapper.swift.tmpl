@@ -1,0 +1,21 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}DecoratorMapper
+
+/// Protocol for mapping {{ .FeatureName }} domain models to UI decorators
+protocol {{ .FeatureName }}DecoratorMapper: Sendable {
+    func map(_ model: {{ .FeatureName }}Model) -> {{ .FeatureName }}Decorator
+}
+
+// MARK: - {{ .FeatureName }}DecoratorMapperImpl
+
+/// Implementation of {{ .FeatureName }}DecoratorMapper
+struct {{ .FeatureName }}DecoratorMapperImpl: {{ .FeatureName }}DecoratorMapper {
+    // MARK: - Public Methods
+
+    func map(_ model: {{ .FeatureName }}Model) -> {{ .FeatureName }}Decorator {
+        {{ .FeatureName }}Decorator(id: model.id,
+{{ "                                " }}displayName: model.name,
+{{ "                                " }}subtitle: model.description)
+    }
+}

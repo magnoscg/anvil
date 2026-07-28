@@ -1,0 +1,8 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}UseCase
+
+/// Use case protocol for fetching {{ .FeatureNameLower }} data
+protocol {{ .FeatureName }}UseCase: Sendable {
+    func execute() async throws -> [{{ .FeatureName }}Model]
+}

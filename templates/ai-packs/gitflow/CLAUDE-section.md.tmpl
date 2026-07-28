@@ -1,0 +1,14 @@
+## Git
+
+- **NEVER add Co-Authored-By Claude** in git commits. No co-author lines from Claude ever.
+- **Gitflow branching strategy**:
+  - `main` — production
+  - `develop` — integration
+  - `feature/*` — new features (branch from `develop`, merge back to `develop`)
+  - `release/*` — release prep (branch from `develop`, merge to `main` and `develop`)
+  - `hotfix/*` — urgent fixes (branch from `main`, merge to `main` and `develop`)
+- **Semantic version tags**: Tag releases on `main` with format `X.Y.Z` (e.g., `1.0.2`, `2.0.4`).
+- **Conventional Commits**: Use `<type>[scope]: <description>` format.
+  - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+  - Breaking change: Add `!` after type or `BREAKING CHANGE:` in footer.
+- **Branch naming**: `feature/TICKET-123-description`, `fix/TICKET-456-bug-name`, `release/1.2.0`, `hotfix/1.2.1-security-patch`.

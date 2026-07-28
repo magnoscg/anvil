@@ -1,0 +1,40 @@
+import SwiftUI
+
+// MARK: - AppColors
+
+/// Design system color tokens using semantic system colors where available.
+/// Brand-specific colors use hex values via `Color.adaptive(light:dark:)`.
+enum AppColors {
+    // MARK: - Brand / Accent
+
+    static let secondary = Color.adaptive(light: "5856D6", dark: "5E5CE6")
+    static let accent = Color.adaptive(light: "FF9500", dark: "FF9F0A")
+    static let primary = Color(.systemBlue)
+
+    // MARK: - Status
+
+    static let success = Color.adaptive(light: "34C759", dark: "30D158")
+    static let warning = Color.adaptive(light: "FFCC00", dark: "FFD60A")
+    static let error = Color(.systemRed)
+
+    // MARK: - Surfaces
+
+    static let background = Color(.systemBackground)
+    static let surface = Color(.secondarySystemBackground)
+    static let cardBackground = Color(.secondarySystemBackground)
+
+    // MARK: - Text
+
+    static let text = Color(.label)
+    static let textSecondary = Color(.secondaryLabel)
+    static let textTertiary = Color(.tertiaryLabel)
+
+    // MARK: - Borders & Dividers
+
+    static let cardBorder = Color(.separator)
+    static let divider = Color(.separator)
+
+    // MARK: - Shadows
+
+    static let shadowColor = Color(.label)
+}

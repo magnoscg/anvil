@@ -1,0 +1,26 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}DTOMapper
+
+/// Protocol for mapping {{ .FeatureName }} DTOs to domain models
+protocol {{ .FeatureName }}DTOMapper: Sendable {
+    func map(_ dto: {{ .FeatureName }}DTO) -> {{ .FeatureName }}Model
+    func map(_ dtos: [{{ .FeatureName }}DTO]) -> [{{ .FeatureName }}Model]
+}
+
+// MARK: - {{ .FeatureName }}DTOMapperImpl
+
+/// Implementation of {{ .FeatureName }}DTOMapper
+struct {{ .FeatureName }}DTOMapperImpl: {{ .FeatureName }}DTOMapper {
+    // MARK: - Public Methods
+
+    func map(_ dto: {{ .FeatureName }}DTO) -> {{ .FeatureName }}Model {
+        {{ .FeatureName }}Model(id: dto.id,
+{{ "                " }}name: dto.name,
+{{ "                " }}description: dto.description)
+    }
+
+    func map(_ dtos: [{{ .FeatureName }}DTO]) -> [{{ .FeatureName }}Model] {
+        dtos.map { map($0) }
+    }
+}

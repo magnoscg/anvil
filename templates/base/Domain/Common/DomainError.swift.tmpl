@@ -1,0 +1,25 @@
+import Foundation
+
+// MARK: - DomainError
+
+/// Domain-level error type used across all features.
+/// Maps from data layer errors and is mapped to ErrorDecorator in the presentation layer.
+enum DomainError: Error, Sendable, Equatable {
+    /// A network-related error occurred (connectivity, timeout, etc.)
+    case network
+
+    /// The requested resource was not found
+    case notFound
+
+    /// The user is not authorized
+    case unauthorized
+
+    /// The server returned an error
+    case server
+
+    /// Data could not be decoded or parsed
+    case parsing
+
+    /// An unknown or unexpected error occurred
+    case unknown
+}

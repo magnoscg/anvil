@@ -1,0 +1,78 @@
+import SwiftUI
+
+// MARK: - {{ .FeatureName }}View
+
+struct {{ .FeatureName }}View: View {
+    // MARK: - Properties
+
+    @State
+    private var viewModel: {{ .FeatureName }}ViewModel
+
+    @State
+    private var retryTrigger = false
+
+    // MARK: - Init
+
+    init(viewModel: {{ .FeatureName }}ViewModel) {
+        self._viewModel = State(initialValue: viewModel)
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        Group {
+            switch viewModel.state {
+            case .idle:
+                Color.clear
+
+            case .loading:
+                loadingView
+
+            case .loaded:
+                loadedView
+
+            case let .error(error):
+                errorView(error: error)
+            }
+        }
+        .navigationTitle(String(localized: "{{ .FeatureNameLower }}.title"))
+        .navigationBarTitleDisplayMode(.large)
+        .task(id: retryTrigger) {
+            await viewModel.load()
+        }
+    }
+}
+
+// MARK: - Private Views
+
+private extension {{ .FeatureName }}View {
+    var loadingView: some View {
+        LoadingStateView()
+    }
+
+    var loadedView: some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.md) {
+                ForEach(viewModel.items) { item in
+                    Button {
+                        viewModel.navigateToDetail(id: item.id)
+                    } label: {
+                        Text(item.displayName)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, Spacing.md)
+                }
+            }
+            .padding(.vertical, Spacing.md)
+        }
+    }
+
+    func errorView(error: ErrorDecorator) -> some View {
+        let retryError = ErrorDecorator(
+            title: error.title,
+            message: error.message,
+            retryAction: { retryTrigger.toggle() }
+        )
+        return ErrorView(error: retryError)
+    }
+}

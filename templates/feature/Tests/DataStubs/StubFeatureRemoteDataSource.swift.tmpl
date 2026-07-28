@@ -1,0 +1,33 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - Stub{{ .FeatureName }}RemoteDataSource
+
+/// Stub data source that returns predefined responses for UI tests.
+/// Injected via Factory when `ProcessInfo.isUITestMode` is true.
+struct Stub{{ .FeatureName }}RemoteDataSource: {{ .FeatureName }}RemoteDataSource {
+    // MARK: - Properties
+
+    private let fixture: Fixture{{ .FeatureName }}RemoteDataSource
+
+    // MARK: - Init
+
+    init(fixture: Fixture{{ .FeatureName }}RemoteDataSource = .default) {
+        self.fixture = fixture
+    }
+
+    // MARK: - Public Methods
+
+    func fetch() async throws -> [{{ .FeatureName }}DTO] {
+        switch fixture {
+        case .default:
+            return Fixture{{ .FeatureName }}RemoteDataSource.defaultItems
+        case .empty:
+            return []
+        case .error:
+            throw NSError(domain: "StubError", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Simulated error for UI testing"
+            ])
+        }
+    }
+}

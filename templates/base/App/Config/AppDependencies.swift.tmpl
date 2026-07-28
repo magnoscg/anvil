@@ -1,0 +1,19 @@
+import Foundation
+
+// MARK: - AppDependencies
+
+/// Shared app-level dependencies created at the composition root and injected through factories.
+struct AppDependencies {
+    // MARK: - Properties
+
+    let apiClient: APIClient
+{{ if .IncludeSwiftData }}    let swiftDataStack: SwiftDataStack
+{{ end }}
+    // MARK: - Init
+
+    init({{ if .IncludeSwiftData }}swiftDataStack: SwiftDataStack{{ end }}) throws {
+        let configuration = try EnvironmentConfigurationImpl()
+        apiClient = APIClientImpl(configuration: configuration)
+{{ if .IncludeSwiftData }}        self.swiftDataStack = swiftDataStack
+{{ end }}    }
+}

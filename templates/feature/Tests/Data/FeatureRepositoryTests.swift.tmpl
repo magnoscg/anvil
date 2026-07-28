@@ -1,0 +1,62 @@
+import Testing
+import Foundation
+@testable import {{ .ProjectName }}
+
+@Suite("{{ .FeatureName }}RepositoryImpl Tests")
+struct {{ .FeatureName }}RepositoryImplTests {
+    // MARK: - Properties
+
+    private var mockRemoteDataSource: {{ .FeatureName }}RemoteDataSourceMock
+    private var mockDTOMapper: {{ .FeatureName }}DTOMapperMock
+    private var sut: {{ .FeatureName }}RepositoryImpl
+
+    // MARK: - Setup
+
+    init() {
+        mockRemoteDataSource = {{ .FeatureName }}RemoteDataSourceMock()
+        mockDTOMapper = {{ .FeatureName }}DTOMapperMock()
+        sut = {{ .FeatureName }}RepositoryImpl(remoteDataSource: mockRemoteDataSource,
+{{ "                                              " }}mapper: mockDTOMapper)
+    }
+
+    // MARK: - Success
+
+    @Test("Given data source returns DTOs, when fetch, then returns mapped models")
+    func fetch_success_returnsMappedModels() async throws {
+        // Given
+        let dtos = [
+            {{ .FeatureName }}DTO(id: "1", name: "First", description: "First item"),
+            {{ .FeatureName }}DTO(id: "2", name: "Second", description: "Second item")
+        ]
+        mockRemoteDataSource.fetchResult = .success(dtos)
+
+        let expectedModel = {{ .FeatureName }}Model(id: "mapped", name: "Mapped", description: "Mapped item")
+        mockDTOMapper.mapSingleResult = expectedModel
+
+        // When
+        let result = try await sut.fetch()
+
+        // Then
+        #expect(result.count == 2)
+        #expect(mockRemoteDataSource.fetchCallCount == 1)
+        #expect(mockDTOMapper.mapMultipleCallCount == 1)
+    }
+
+    // MARK: - Error
+
+    @Test("Given data source throws error, when fetch, then propagates error")
+    func fetch_dataSourceThrows_propagatesError() async {
+        // Given
+        let expectedError = NSError(domain: "test", code: 42)
+        mockRemoteDataSource.fetchResult = .failure(expectedError)
+
+        // When / Then
+        do {
+            _ = try await sut.fetch()
+            Issue.record("Expected error to be thrown")
+        } catch {
+            #expect(mockRemoteDataSource.fetchCallCount == 1)
+            #expect(mockDTOMapper.mapMultipleCallCount == 0)
+        }
+    }
+}

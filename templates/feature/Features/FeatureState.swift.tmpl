@@ -1,0 +1,22 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}State
+
+/// State enum for the {{ .FeatureName }} feature screen
+enum {{ .FeatureName }}State: Equatable {
+    case idle
+    case loading
+    case loaded
+    case error(ErrorDecorator)
+
+    static func == (lhs: {{ .FeatureName }}State, rhs: {{ .FeatureName }}State) -> Bool {
+        switch (lhs, rhs) {
+        case (.idle, .idle), (.loading, .loading), (.loaded, .loaded):
+            true
+        case let (.error(l), .error(r)):
+            l.title == r.title && l.message == r.message
+        default:
+            false
+        }
+    }
+}

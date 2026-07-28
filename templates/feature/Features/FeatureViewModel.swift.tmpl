@@ -1,0 +1,53 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}ViewModel
+
+/// ViewModel for the {{ .FeatureName }} feature.
+@MainActor
+@Observable
+final class {{ .FeatureName }}ViewModel {
+    // MARK: - Properties
+
+    private(set) var state: {{ .FeatureName }}State = .idle
+    private(set) var items: [{{ .FeatureName }}Decorator] = []
+
+    private let useCase: {{ .FeatureName }}UseCase
+    private let decoratorMapper: {{ .FeatureName }}DecoratorMapper
+    private let router: {{ .FeatureName }}Router
+
+    // MARK: - Init
+
+    init(useCase: {{ .FeatureName }}UseCase,
+         decoratorMapper: {{ .FeatureName }}DecoratorMapper,
+         router: {{ .FeatureName }}Router) {
+        self.useCase = useCase
+        self.decoratorMapper = decoratorMapper
+        self.router = router
+    }
+
+    // MARK: - Public Methods
+
+    func load() async {
+        guard state != .loading else { return }
+
+        let previousState = state
+        state = .loading
+
+        do {
+            let models = try await useCase.execute()
+            let decorators = models.map { decoratorMapper.map($0) }
+            items = decorators
+            state = .loaded
+        } catch is CancellationError {
+            state = previousState
+        } catch let error as DomainError {
+            state = .error(ErrorDecorator.from(error))
+        } catch {
+            state = .error(.generic)
+        }
+    }
+
+    func navigateToDetail(id: String) {
+        router.navigateToDetail(id: id)
+    }
+}

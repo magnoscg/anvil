@@ -1,0 +1,47 @@
+version: 2
+
+project_name: anvil
+
+builds:
+  - id: anvil
+    main: ./cmd/anvilcli
+    binary: anvil
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+      - amd64
+    ldflags:
+      - -s -w
+      # NOTE: -X main.Version requires cmd/anvilcli/main.go to declare: var Version = "dev"
+      - -X main.Version={{.Version}}
+
+archives:
+  - id: anvil-archive
+    builds:
+      - anvil
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - install.sh
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  github:
+    owner: magnoscg
+    name: anvil
+  draft: true
+  prerelease: auto

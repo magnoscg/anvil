@@ -1,0 +1,15 @@
+import Foundation
+
+// MARK: - APIClient
+
+/// Core networking abstraction for making API requests.
+/// Uses a dual-endpoint system: `Endpoint` for internal APIs and `APIEndpoint` for external APIs.
+protocol APIClient: Sendable {
+    // MARK: - Internal Endpoints
+
+    func request<T: Decodable & Sendable>(_ endpoint: Endpoint) async throws -> T
+
+    // MARK: - External Endpoints
+
+    func request<T: Decodable & Sendable>(_ endpoint: some APIEndpoint) async throws -> T
+}

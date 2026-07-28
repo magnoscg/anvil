@@ -1,0 +1,89 @@
+import Foundation
+import Network
+import Observation
+
+// MARK: - ConnectionType
+
+/// Represents the type of network connection available.
+nonisolated enum ConnectionType: String, Sendable {
+    case wifi
+    case cellular
+    case wiredEthernet
+    case loopback
+    case other
+    case none
+}
+
+// MARK: - NetworkMonitor
+
+/// Protocol for monitoring network connectivity status.
+@MainActor
+protocol NetworkMonitor {
+    var isConnected: Bool { get }
+    var isExpensive: Bool { get }
+    var isConstrained: Bool { get }
+    var connectionType: ConnectionType { get }
+}
+
+// MARK: - NetworkMonitorImpl
+
+/// NWPathMonitor-based connectivity monitor with Observable support for SwiftUI binding.
+@MainActor
+@Observable
+final class NetworkMonitorImpl: NetworkMonitor {
+    // MARK: - Properties
+
+    private(set) var isConnected: Bool = true
+    private(set) var isExpensive: Bool = false
+    private(set) var isConstrained: Bool = false
+    private(set) var connectionType: ConnectionType = .wifi
+
+    private let monitor: NWPathMonitor
+    private let queue: DispatchQueue
+
+    // MARK: - Init
+
+    init() {
+        self.monitor = NWPathMonitor()
+        self.queue = DispatchQueue(label: "com.app.networkmonitor", qos: .utility)
+        startMonitoring()
+    }
+
+    deinit {
+        monitor.cancel()
+    }
+
+    // MARK: - Private
+
+    private func startMonitoring() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.isConnected = path.status == .satisfied
+                self.isExpensive = path.isExpensive
+                self.isConstrained = path.isConstrained
+                self.connectionType = Self.mapConnectionType(from: path)
+            }
+        }
+        monitor.start(queue: queue)
+    }
+
+    private nonisolated static func mapConnectionType(from path: NWPath) -> ConnectionType {
+        if path.usesInterfaceType(.wifi) { return .wifi }
+        if path.usesInterfaceType(.cellular) { return .cellular }
+        if path.usesInterfaceType(.wiredEthernet) { return .wiredEthernet }
+        if path.usesInterfaceType(.loopback) { return .loopback }
+        if path.status == .satisfied { return .other }
+        return .none
+    }
+}
+
+// MARK: - Convenience
+
+extension NetworkMonitor {
+    func canMakeRequest(respectLowDataMode: Bool = false) -> Bool {
+        guard isConnected else { return false }
+        if respectLowDataMode, isConstrained { return false }
+        return true
+    }
+}

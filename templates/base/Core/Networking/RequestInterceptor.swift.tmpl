@@ -1,0 +1,46 @@
+import Foundation
+
+// MARK: - RequestInterceptor
+
+/// Protocol for intercepting network requests and responses.
+/// Interceptors form a composable chain where each can modify the request,
+/// the response, or add cross-cutting behavior (logging, auth, retry).
+protocol RequestInterceptor: Sendable {
+    // MARK: - Intercept
+
+    func intercept(
+        request: URLRequest,
+        next: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
+    ) async throws -> (Data, HTTPURLResponse)
+}
+
+// MARK: - InterceptorChain
+
+/// Builds and executes a chain of interceptors around a core network executor.
+/// The last interceptor wraps the core executor, and the first interceptor is the outermost.
+nonisolated struct InterceptorChain: Sendable {
+    // MARK: - Types
+
+    typealias Executor = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
+
+    // MARK: - Properties
+
+    private let interceptors: [any RequestInterceptor]
+    private let coreExecutor: Executor
+
+    // MARK: - Init
+
+    init(interceptors: [any RequestInterceptor], coreExecutor: @escaping Executor) {
+        self.interceptors = interceptors
+        self.coreExecutor = coreExecutor
+    }
+
+    // MARK: - Execution
+
+    func execute(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let chain = interceptors.reversed().reduce(coreExecutor) { next, interceptor in
+            { request in try await interceptor.intercept(request: request, next: next) }
+        }
+        return try await chain(request)
+    }
+}

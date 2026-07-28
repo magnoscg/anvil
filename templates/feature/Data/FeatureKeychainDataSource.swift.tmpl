@@ -1,0 +1,39 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}KeychainDataSource
+
+/// Protocol for secure {{ .FeatureNameLower }} data storage using Keychain
+protocol {{ .FeatureName }}KeychainDataSource: Sendable {
+    func save(_ value: String, forKey key: String) throws
+    func read(forKey key: String) throws -> String?
+    func delete(forKey key: String) throws
+}
+
+// MARK: - {{ .FeatureName }}KeychainDataSourceImpl
+
+/// Implementation of {{ .FeatureName }}KeychainDataSource using KeychainHelper
+struct {{ .FeatureName }}KeychainDataSourceImpl: {{ .FeatureName }}KeychainDataSource {
+    // MARK: - Properties
+
+    private let keychainHelper: KeychainHelper
+
+    // MARK: - Init
+
+    init(keychainHelper: KeychainHelper) {
+        self.keychainHelper = keychainHelper
+    }
+
+    // MARK: - Public Methods
+
+    func save(_ value: String, forKey key: String) throws {
+        try keychainHelper.save(value, forKey: key)
+    }
+
+    func read(forKey key: String) throws -> String? {
+        try keychainHelper.read(forKey: key)
+    }
+
+    func delete(forKey key: String) throws {
+        try keychainHelper.delete(forKey: key)
+    }
+}

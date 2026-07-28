@@ -1,0 +1,52 @@
+import Foundation
+
+// MARK: - ErrorDecorator
+
+/// Decorator for displaying error state in UI.
+/// Shared across all features for consistent error presentation.
+struct ErrorDecorator: Sendable {
+    // MARK: - Properties
+
+    let title: String
+    let message: String
+    let retryAction: (@Sendable () -> Void)?
+
+    // MARK: - Static Factories
+
+    static let generic = ErrorDecorator(title: String(localized: "error.title.generic"),
+                                        message: String(localized: "error.message.generic"),
+                                        retryAction: nil)
+
+    static let notFound = ErrorDecorator(title: String(localized: "error.title.notFound"),
+                                         message: String(localized: "error.message.notFound"),
+                                         retryAction: nil)
+
+    static let network = ErrorDecorator(title: String(localized: "error.title.network"),
+                                        message: String(localized: "error.message.network"),
+                                        retryAction: nil)
+
+    static let server = ErrorDecorator(title: String(localized: "error.title.server"),
+                                       message: String(localized: "error.message.server"),
+                                       retryAction: nil)
+}
+
+// MARK: - DomainError Mapping
+
+extension ErrorDecorator {
+    static func from(_ error: DomainError) -> ErrorDecorator {
+        switch error {
+        case .network:
+            .network
+        case .notFound:
+            .notFound
+        case .server:
+            .server
+        case .parsing:
+            .generic
+        case .unknown:
+            .generic
+        case .unauthorized:
+            .generic
+        }
+    }
+}

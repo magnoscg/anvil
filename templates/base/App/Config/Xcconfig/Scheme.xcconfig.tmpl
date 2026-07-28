@@ -1,0 +1,23 @@
+// {{ .SchemeName }}.xcconfig
+// Configuration for {{ .SchemeName }} environment
+
+#include "Base.xcconfig"
+
+// MARK: - Environment
+
+APP_ENVIRONMENT = {{ .EnvironmentName }}
+
+// MARK: - API
+
+API_BASE_URL = https:/$()/api{{ .APISuffix }}.example.com
+
+// MARK: - Bundle Configuration
+
+PRODUCT_BUNDLE_IDENTIFIER = {{ .BundleID }}{{ .BundleIDSuffix }}
+PRODUCT_NAME = {{ .ProjectName }}{{ .ProductNameSuffix }}
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+
+// MARK: - SSL Pinning
+
+SSL_PINNING_ENABLED = {{ .SSLEnabled }}
+SSL_PUBLIC_KEY_HASHES = {{ .SSLHashes }}

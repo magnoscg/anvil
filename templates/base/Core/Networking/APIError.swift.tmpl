@@ -1,0 +1,59 @@
+import Foundation
+
+// MARK: - SendableError
+
+/// Type-erased error wrapper that conforms to Sendable.
+/// Used to wrap arbitrary errors while maintaining Sendable compliance.
+nonisolated struct SendableError: Error, Sendable {
+    // MARK: - Properties
+
+    let error: any Error
+
+    // MARK: - Init
+
+    init(_ error: any Error) {
+        self.error = error
+    }
+
+    var localizedDescription: String { error.localizedDescription }
+}
+
+// MARK: - APIError
+
+/// Typed error enum for all networking failures.
+/// Maps URLSession errors, HTTP status codes, and decoding failures into a unified type.
+nonisolated enum APIError: Error, Sendable {
+    case networkError(URLError)
+    case httpError(statusCode: Int, data: Data?)
+    case decodingError(DecodingError)
+    case invalidURL
+    case unknown(SendableError)
+}
+
+// MARK: - Retryable
+
+extension APIError {
+    var isRetryable: Bool {
+        switch self {
+        case let .networkError(urlError):
+            let retryableCodes: [URLError.Code] = [
+                .timedOut, .networkConnectionLost, .notConnectedToInternet,
+                .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
+            ]
+            return retryableCodes.contains(urlError.code)
+        case let .httpError(statusCode, _):
+            return statusCode >= 500 || statusCode == 429
+        case .decodingError, .invalidURL, .unknown:
+            return false
+        }
+    }
+}
+
+// MARK: - Server Error Access
+
+extension APIError {
+    var serverError: APIErrorResponse? {
+        guard case let .httpError(_, data) = self else { return nil }
+        return APIErrorResponse.decode(from: data)
+    }
+}

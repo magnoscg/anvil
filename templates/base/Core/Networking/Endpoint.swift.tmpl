@@ -1,0 +1,160 @@
+import Foundation
+
+// MARK: - HTTPMethod
+
+/// HTTP methods for API requests.
+enum HTTPMethod: String, Sendable {
+    case get = "GET"
+    case post = "POST"
+    case put = "PUT"
+    case patch = "PATCH"
+    case delete = "DELETE"
+}
+
+// MARK: - ContentType
+
+/// Content types for API request bodies.
+enum ContentType: String, Sendable {
+    case json = "application/json"
+    case formURLEncoded = "application/x-www-form-urlencoded"
+    case multipartFormData = "multipart/form-data"
+    case textPlain = "text/plain"
+}
+
+// MARK: - Endpoint
+
+/// Internal API endpoint struct. The base URL and API version come from `EnvironmentConfiguration`.
+/// Used within the Data layer to define concrete endpoints for the app's own backend.
+struct Endpoint: Sendable {
+    // MARK: - Properties
+
+    let path: String
+    let method: HTTPMethod
+    let queryParameters: [String: String]?
+    let headers: [String: String]?
+    let body: Data?
+    let contentType: ContentType
+    let requiresAuthentication: Bool
+
+    // MARK: - Init
+
+    init(
+        path: String,
+        method: HTTPMethod = .get,
+        queryParameters: [String: String]? = nil,
+        headers: [String: String]? = nil,
+        body: Data? = nil,
+        contentType: ContentType = .json,
+        requiresAuthentication: Bool = true
+    ) {
+        self.path = path
+        self.method = method
+        self.queryParameters = queryParameters
+        self.headers = headers
+        self.body = body
+        self.contentType = contentType
+        self.requiresAuthentication = requiresAuthentication
+    }
+
+    // MARK: - URL Building
+
+    func buildURL(baseURL: URL, apiVersion: String) -> URL? {
+        let versionedPath = "/\(apiVersion)\(path)"
+        var components = URLComponents(url: baseURL.appendingPathComponent(versionedPath), resolvingAgainstBaseURL: true)
+
+        if let queryParameters {
+            components?.queryItems = queryParameters.map { key, value in
+                URLQueryItem(name: key, value: value)
+            }
+        }
+
+        return components?.url
+    }
+
+    func buildRequest(baseURL: URL, apiVersion: String) -> URLRequest? {
+        guard let url = buildURL(baseURL: baseURL, apiVersion: apiVersion) else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method.rawValue
+        request.setValue(contentType.rawValue, forHTTPHeaderField: "Content-Type")
+
+        headers?.forEach { key, value in
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        request.httpBody = body
+
+        return request
+    }
+}
+
+// MARK: - Static Factory Methods
+
+extension Endpoint {
+    static func get(
+        path: String,
+        queryParameters: [String: String]? = nil,
+        requiresAuthentication: Bool = true
+    ) -> Endpoint {
+        Endpoint(
+            path: path,
+            method: .get,
+            queryParameters: queryParameters,
+            requiresAuthentication: requiresAuthentication
+        )
+    }
+
+    static func post<Body: Encodable>(
+        path: String,
+        body: Body,
+        encoder: JSONEncoder = JSONEncoder(),
+        requiresAuthentication: Bool = true
+    ) throws -> Endpoint {
+        Endpoint(
+            path: path,
+            method: .post,
+            body: try encoder.encode(body),
+            requiresAuthentication: requiresAuthentication
+        )
+    }
+
+    static func put<Body: Encodable>(
+        path: String,
+        body: Body,
+        encoder: JSONEncoder = JSONEncoder(),
+        requiresAuthentication: Bool = true
+    ) throws -> Endpoint {
+        Endpoint(
+            path: path,
+            method: .put,
+            body: try encoder.encode(body),
+            requiresAuthentication: requiresAuthentication
+        )
+    }
+
+    static func delete(
+        path: String,
+        requiresAuthentication: Bool = true
+    ) -> Endpoint {
+        Endpoint(
+            path: path,
+            method: .delete,
+            requiresAuthentication: requiresAuthentication
+        )
+    }
+
+    static func withBody<Body: Encodable>(
+        path: String,
+        method: HTTPMethod,
+        body: Body,
+        encoder: JSONEncoder = JSONEncoder(),
+        requiresAuthentication: Bool = true
+    ) throws -> Endpoint {
+        Endpoint(
+            path: path,
+            method: method,
+            body: try encoder.encode(body),
+            requiresAuthentication: requiresAuthentication
+        )
+    }
+}

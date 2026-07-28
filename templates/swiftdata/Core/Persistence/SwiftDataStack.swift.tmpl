@@ -1,0 +1,34 @@
+import SwiftData
+
+// MARK: - SwiftDataStack
+
+/// Central persistence entry point that owns the `ModelContainer` and vends
+/// isolated `ModelExecutor` instances for background repository operations.
+///
+/// Usage:
+/// - Create once at the composition root (`@main` App struct).
+/// - Pass to `AppDependencies` so factories can call `makeBackgroundExecutor()`.
+/// - Each repository receives its own `ModelExecutor` to ensure thread safety.
+@MainActor
+final class SwiftDataStack {
+    // MARK: - Properties
+
+    let container: ModelContainer
+
+    // MARK: - Init
+
+    init(container: ModelContainer = .shared) {
+        self.container = container
+    }
+
+    // MARK: - Executor Factory
+
+    /// Creates a dedicated `ModelExecutor` for a single repository.
+    /// Each repository MUST receive its own executor -- never share executors
+    /// or use the main `ModelContext` from background code.
+    func makeBackgroundExecutor() -> ModelExecutor {
+        DefaultSerialModelExecutor(
+            modelContext: ModelContext(container)
+        )
+    }
+}

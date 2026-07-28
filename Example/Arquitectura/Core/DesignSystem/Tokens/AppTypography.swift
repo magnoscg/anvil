@@ -1,0 +1,44 @@
+import SwiftUI
+
+// MARK: - AppTypography
+
+enum AppTypography {
+    case largeTitle
+    case title1
+    case title2
+    case title3
+    case headline
+    case body
+    case callout
+    case subheadline
+    case footnote
+    case caption1
+    case caption2
+
+    var font: Font {
+        switch self {
+        case .largeTitle:
+            .largeTitle
+        case .title1:
+            .title
+        case .title2:
+            .title2
+        case .title3:
+            .title3
+        case .headline:
+            .headline
+        case .body:
+            .body
+        case .callout:
+            .callout
+        case .subheadline:
+            .subheadline
+        case .footnote:
+            .footnote
+        case .caption1:
+            .caption
+        case .caption2:
+            .caption2
+        }
+    }
+}

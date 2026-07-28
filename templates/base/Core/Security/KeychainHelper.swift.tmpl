@@ -1,0 +1,97 @@
+import Foundation
+import Security
+
+// MARK: - KeychainError
+
+/// Typed errors for Keychain operations.
+enum KeychainError: Error, Sendable {
+    case itemNotFound
+    case duplicateItem
+    case encodingFailed
+    case decodingFailed
+    case unexpectedStatus(OSStatus)
+}
+
+// MARK: - KeychainHelper
+
+/// Generic Keychain wrapper using the Security framework directly.
+/// Stores data with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` for security.
+struct KeychainHelper: Sendable {
+    // MARK: - Save
+
+    func save(_ data: Data, for key: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+
+        SecItemDelete(query as CFDictionary)
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw KeychainError.unexpectedStatus(status)
+        }
+    }
+
+    // MARK: - Retrieve
+
+    func retrieve(for key: String) throws -> Data {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess, let data = result as? Data else {
+            if status == errSecItemNotFound {
+                throw KeychainError.itemNotFound
+            }
+            throw KeychainError.unexpectedStatus(status)
+        }
+
+        return data
+    }
+
+    // MARK: - Delete
+
+    func delete(for key: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.unexpectedStatus(status)
+        }
+    }
+}
+
+// MARK: - Codable Convenience
+
+extension KeychainHelper {
+    func save<T: Encodable>(_ item: T, for key: String) throws {
+        let data: Data
+        do {
+            data = try JSONEncoder().encode(item)
+        } catch {
+            throw KeychainError.encodingFailed
+        }
+        try save(data, for: key)
+    }
+
+    func read<T: Decodable>(for key: String) throws -> T {
+        let data = try retrieve(for: key)
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw KeychainError.decodingFailed
+        }
+    }
+}

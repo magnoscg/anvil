@@ -1,0 +1,21 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}DecoratorMapperMock
+
+/// Mock implementation of {{ .FeatureName }}DecoratorMapper for testing
+final class {{ .FeatureName }}DecoratorMapperMock: {{ .FeatureName }}DecoratorMapper, @unchecked Sendable {
+    // MARK: - Properties
+
+    var mapResult: {{ .FeatureName }}Decorator = {{ .FeatureName }}Decorator(id: "mock",
+{{ "                                                                        " }}displayName: "Mock",
+{{ "                                                                        " }}subtitle: "Mock subtitle")
+    var mapCallCount = 0
+
+    // MARK: - {{ .FeatureName }}DecoratorMapper
+
+    func map(_ model: {{ .FeatureName }}Model) -> {{ .FeatureName }}Decorator {
+        mapCallCount += 1
+        return mapResult
+    }
+}

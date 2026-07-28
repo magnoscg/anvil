@@ -1,0 +1,28 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}AccessibilityID
+
+/// Accessibility identifiers for {{ .FeatureName }} UI elements.
+/// Used by both production code (.accessibilityIdentifier) and UI tests (Page Objects).
+enum {{ .FeatureName }}AccessibilityID {
+    // MARK: - Screen
+
+    static let screen = "{{ .FeatureNameSnake }}_screen"
+
+    // MARK: - Navigation
+
+    static let navigationTitle = "{{ .FeatureNameSnake }}_navigation_title"
+
+    // MARK: - Content
+
+    static let loadingIndicator = "{{ .FeatureNameSnake }}_loading"
+    static let errorView = "{{ .FeatureNameSnake }}_error"
+    static let retryButton = "{{ .FeatureNameSnake }}_retry_button"
+    static let itemList = "{{ .FeatureNameSnake }}_item_list"
+
+    // MARK: - Items
+
+    static func itemRow(id: String) -> String {
+        "{{ .FeatureNameSnake }}_item_\(id)"
+    }
+}

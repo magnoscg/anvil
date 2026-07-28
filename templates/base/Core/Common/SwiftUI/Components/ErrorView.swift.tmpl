@@ -1,0 +1,77 @@
+import SwiftUI
+
+// MARK: - ErrorView
+
+/// Reusable error state view for displaying error information with optional retry action.
+/// Use this component for consistent error presentation across the app.
+struct ErrorView: View {
+    // MARK: - Properties
+
+    let error: ErrorDecorator
+
+    // MARK: - Init
+
+    init(error: ErrorDecorator) {
+        self.error = error
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        VStack(spacing: Spacing.lg) {
+            errorIcon
+            errorTitle
+            errorMessage
+            retryButton
+        }
+        .padding(Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Private Subviews
+
+private extension ErrorView {
+    var errorIcon: some View {
+        Image(systemName: "exclamationmark.triangle")
+            .font(.largeTitle)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+            .foregroundStyle(AppColors.error)
+    }
+
+    var errorTitle: some View {
+        Text(error.title)
+            .font(AppTypography.title2.font)
+    }
+
+    var errorMessage: some View {
+        Text(error.message)
+            .font(AppTypography.body.font)
+            .foregroundStyle(AppColors.textSecondary)
+            .multilineTextAlignment(.center)
+    }
+
+    @ViewBuilder
+    var retryButton: some View {
+        if let retryAction = error.retryAction {
+            Button(String(localized: "error.button.retry")) {
+                retryAction()
+            }
+            .primaryButtonStyle()
+        }
+    }
+}
+
+// MARK: - Preview
+
+#Preview("Retryable Error") {
+    ErrorView(error: ErrorDecorator(
+        title: String(localized: "error.title.generic"),
+        message: String(localized: "error.message.generic"),
+        retryAction: { print("Retry tapped") }
+    ))
+}
+
+#Preview("Non-Retryable Error") {
+    ErrorView(error: .notFound)
+}

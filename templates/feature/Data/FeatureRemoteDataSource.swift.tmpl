@@ -1,0 +1,29 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}RemoteDataSource
+
+/// Protocol for fetching {{ .FeatureNameLower }} data from the remote API
+protocol {{ .FeatureName }}RemoteDataSource: Sendable {
+    func fetch() async throws -> [{{ .FeatureName }}DTO]
+}
+
+// MARK: - {{ .FeatureName }}RemoteDataSourceImpl
+
+/// Implementation of {{ .FeatureName }}RemoteDataSource using APIClient
+struct {{ .FeatureName }}RemoteDataSourceImpl: {{ .FeatureName }}RemoteDataSource {
+    // MARK: - Properties
+
+    private let apiClient: APIClient
+
+    // MARK: - Init
+
+    init(apiClient: APIClient) {
+        self.apiClient = apiClient
+    }
+
+    // MARK: - Public Methods
+
+    func fetch() async throws -> [{{ .FeatureName }}DTO] {
+        fatalError("TODO: Implement with actual APIEndpoint")
+    }
+}

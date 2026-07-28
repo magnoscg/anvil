@@ -1,0 +1,94 @@
+import Testing
+import Foundation
+@testable import {{ .ProjectName }}
+
+@MainActor
+@Suite("{{ .FeatureName }}ViewModel Tests")
+struct {{ .FeatureName }}ViewModelTests {
+    // MARK: - Properties
+
+    private var mockUseCase: {{ .FeatureName }}UseCaseMock
+    private var mockDecoratorMapper: {{ .FeatureName }}DecoratorMapperMock
+    private var mockRouter: {{ .FeatureName }}RouterMock
+    private var sut: {{ .FeatureName }}ViewModel
+
+    // MARK: - Setup
+
+    init() {
+        mockUseCase = {{ .FeatureName }}UseCaseMock()
+        mockDecoratorMapper = {{ .FeatureName }}DecoratorMapperMock()
+        mockRouter = {{ .FeatureName }}RouterMock()
+        sut = {{ .FeatureName }}ViewModel(useCase: mockUseCase,
+{{ "                                      " }}decoratorMapper: mockDecoratorMapper,
+{{ "                                      " }}router: mockRouter)
+    }
+
+    // MARK: - Initial State
+
+    @Test("Given new view model, then initial state is idle")
+    func initialState_isIdle() {
+        // Given / When - ViewModel just created in init
+
+        // Then
+        #expect(sut.state == .idle)
+    }
+
+    // MARK: - Success
+
+    @Test("Given use case returns models, when load, then state is loaded")
+    func load_success_setsLoadedState() async {
+        // Given
+        let models = [
+            {{ .FeatureName }}Model(id: "1", name: "First", description: "First item")
+        ]
+        mockUseCase.executeResult = .success(models)
+
+        let expectedDecorator = {{ .FeatureName }}Decorator(id: "1",
+{{ "                                                          " }}displayName: "First",
+{{ "                                                          " }}subtitle: "First item")
+        mockDecoratorMapper.mapResult = expectedDecorator
+
+        // When
+        await sut.load()
+
+        // Then
+        #expect(sut.state == .loaded)
+        #expect(sut.items.count == 1)
+        #expect(sut.items[0].id == "1")
+        #expect(mockUseCase.executeCallCount == 1)
+    }
+
+    // MARK: - Error
+
+    @Test("Given use case throws error, when load, then state is error")
+    func load_failure_setsErrorState() async {
+        // Given
+        let expectedError = NSError(domain: "test", code: 42)
+        mockUseCase.executeResult = .failure(expectedError)
+
+        // When
+        await sut.load()
+
+        // Then
+        guard case .error = sut.state else {
+            Issue.record("Expected error state, got \(sut.state)")
+            return
+        }
+        #expect(mockUseCase.executeCallCount == 1)
+    }
+
+    // MARK: - Navigation
+
+    @Test("Given item id, when navigateToDetail, then router is called")
+    func navigateToDetail_callsRouter() {
+        // Given
+        let itemId = "test-id"
+
+        // When
+        sut.navigateToDetail(id: itemId)
+
+        // Then
+        #expect(mockRouter.navigateToDetailCallCount == 1)
+        #expect(mockRouter.navigateToDetailId == itemId)
+    }
+}

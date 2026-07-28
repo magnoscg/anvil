@@ -1,0 +1,23 @@
+// Development.xcconfig
+// Configuration for Development environment
+
+#include "Base.xcconfig"
+
+// MARK: - Environment
+
+APP_ENVIRONMENT = development
+
+// MARK: - API
+
+API_BASE_URL = https:/$()/api-dev.example.com
+
+// MARK: - Bundle Configuration
+
+PRODUCT_BUNDLE_IDENTIFIER = com.magnos.Arquitectura.dev
+PRODUCT_NAME = Arquitectura DEV
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+
+// MARK: - SSL Pinning (disabled in development)
+
+SSL_PINNING_ENABLED = NO
+SSL_PUBLIC_KEY_HASHES = 

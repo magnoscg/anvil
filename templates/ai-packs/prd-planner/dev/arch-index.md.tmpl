@@ -1,0 +1,158 @@
+# Architecture Index
+Generated: {{ .Date }}
+
+## Reference Documents
+
+> This index is auto-generated. It maps architecture docs to their usage context.
+> Read the relevant doc before implementing any task.
+
+{{ if .HasIosArchitecture -}}
+## ARCHITECTURE.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/ARCHITECTURE.md
+**Read when**: Any structural change, new layers, mappers, or error flow
+**Reglas criticas**:
+1. Presentation NEVER imports URLSession, DTOs, SwiftData, or JSON parsing
+2. Domain models MUST be pure — no framework imports
+3. Data layer MUST map DTOs to Domain models via Mappers
+4. DecoratorMappers transform Domain → Decorator (presentation models)
+5. Repository protocol lives in Data, NOT in Domain
+
+## PROJECT-STRUCTURE.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/PROJECT-STRUCTURE.md
+**Read when**: Creating new files, deciding where each file goes
+**Reglas criticas**:
+1. Domain/ and Data/ are GLOBAL layers (not inside Features/)
+2. Features/ contains ONLY presentation: DI, UI, Presentation, Navigation
+3. Core/ contains shared infrastructure: DesignSystem, Networking, Persistence, Common
+4. MUST follow exact folder hierarchy per feature
+
+## new-feature.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/new-feature.md
+**Read when**: Creating a new feature (complete checklist)
+**Reglas criticas**:
+1. MUST create files in three separate locations: Domain/, Data/, Features/
+2. MUST decide routes, states, errors, and data sources before coding
+3. MUST follow exact naming convention: [Feature]Model, [Feature]UseCase, etc.
+4. MUST create Factory in Features/[Feature]/DI/
+
+## swiftui-code-style.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/swiftui-code-style.md
+**Read when**: Creating/modifying Views or ViewModels
+**Reglas criticas**:
+1. MUST organize files: imports → MARK → properties → init → body → private → extension → previews
+2. MUST use // MARK: - for every section
+3. MUST keep body small — extract to private subviews/helpers
+4. Custom ViewModifiers MUST go in Core/Common/SwiftUI/Modifiers/
+
+## design-system.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/design-system.md
+**Read when**: Creating/modifying UI, colors, typography, accessibility
+**Reglas criticas**:
+1. MUST use semantic colors (Color(.systemBackground)), NEVER hardcoded Color.black/white
+2. MUST support Dynamic Type — NEVER use fixed font sizes
+3. MUST use system colors for accents (Color(.systemBlue))
+4. MUST test both Light and Dark Mode
+
+## swift-concurrency.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/swift-concurrency.md
+**Read when**: Async/await code, actors, Sendable, Task, Swift 6
+**Reglas criticas**:
+1. MUST make Domain Models, DTOs, UseCases, Repositories, Mappers Sendable
+2. ViewModels MUST NOT be Sendable (already @MainActor isolated)
+3. NEVER pass SwiftData models between actors — pass IDs
+4. MUST propagate CancellationError, NEVER swallow it
+
+## swiftdata.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/swiftdata.md
+**Read when**: Persistence, ModelContainer, ModelExecutor, migrations
+**Reglas criticas**:
+1. SwiftData MUST only be in Data layer — NEVER in Domain or Presentation
+2. Each repository MUST use its own ModelExecutor, NEVER the main ModelContext
+3. MUST use ModelContainer.shared for production, .preview for tests
+4. MUST map SwiftData models to Domain models, NEVER expose SD models
+
+## networking.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/networking.md
+**Read when**: Creating/modifying endpoints, APIClient, interceptors
+**Reglas criticas**:
+1. MUST use dual-endpoint system: Endpoint (internal) vs APIEndpoint (external)
+2. APIClient protocol MUST be Sendable
+3. MUST handle errors with typed APIError, NEVER swallow with try?
+4. APIClientImpl is final class (not struct) — holds URLSession reference
+
+## testing.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/testing.md
+**Read when**: Writing tests
+**Reglas criticas**:
+1. MUST use Swift Testing (import Testing), NEVER XCTest for new tests
+2. High priority: UseCase, ViewModel (state transitions), Error Mappers
+3. MUST mirror source structure in test folder: Tests/Domain, Tests/Data, Tests/Features
+4. MUST create Mock types in Tests/Mocks/ folder
+
+## create-tests.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/create-tests.md
+**Read when**: Quick test templates
+**Reglas criticas**:
+1. MUST use import Testing, NEVER XCTest
+2. MUST use @MainActor on ViewModel test suites
+3. MUST follow Given/When/Then structure in test bodies
+4. MUST create Mock types for all dependencies
+
+## performance.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/performance.md
+**Read when**: Profiling, optimization, memory management
+**Reglas criticas**:
+1. Use /axiom:profile for quick CPU profiling
+2. Use /axiom:audit swiftui-performance for view update issues
+3. Use /axiom:audit memory for leak detection
+
+## security-privacy.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/security-privacy.md
+**Read when**: Privacy Manifests, Keychain, secure storage
+**Reglas criticas**:
+1. MUST include PrivacyInfo.xcprivacy for App Store (iOS 17+)
+2. NEVER store secrets in UserDefaults or @AppStorage — use Keychain
+3. MUST declare Required Reason APIs in Privacy Manifest
+4. NEVER log sensitive data (tokens, passwords, PII)
+
+## diagnostics.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/diagnostics.md
+**Read when**: Crash analysis, build optimization, troubleshooting
+**Reglas criticas**:
+1. Check crash logs in ~/Library/Logs/DiagnosticReports/ for simulator
+2. Use MetricKit for field diagnostics
+3. Use Axiom skills for systematic crash analysis
+
+## ui-testing.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/ui-testing.md
+**Read when**: Writing or reviewing UI tests, XCUITest patterns, accessibility identifiers
+**Reglas criticas**:
+1. UI tests MUST use XCTest (import XCTest), NEVER Swift Testing
+2. Unit tests use Swift Testing, UI tests use XCTest
+3. UI tests run in separate process — cannot access app memory
+4. UI tests are optional — not every project needs them
+
+## create-ui-tests.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/create-ui-tests.md
+**Read when**: Creating UI tests (quick templates)
+**Reglas criticas**:
+1. UI tests MUST use XCTest, NOT Swift Testing
+2. MUST define AccessibilityID enum per feature
+3. MUST use Page Object pattern for screen interactions
+4. MUST wait for elements with XCTAssert + timeout
+
+## workflow-qa.md
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/workflow-qa.md
+**Read when**: Pre-PR checklist, QA workflow, release preparation
+**Reglas criticas**:
+1. Run build + test before every PR
+2. Follow pre-PR checklist with Axiom audits
+3. Adjust checks based on what changed
+
+## ast-patterns-ui-testing.yml
+**Path**: {{ if .IsToolsMode }}~/.claude/dev-verify-docs{{ else }}.claude/docs{{ end }}/ast-patterns-ui-testing.yml
+**Read when**: Verifying UI tests with ast-grep, auditing accessibility identifiers
+**Reglas criticas**:
+1. Use ast-grep scan --rule ast-patterns-ui-testing.yml for automated verification
+2. Complement with grep patterns for full coverage (SwiftUI modifier chaining limitations)
+{{ end -}}

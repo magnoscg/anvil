@@ -1,0 +1,68 @@
+import XCTest
+
+// MARK: - {{ .FeatureName }}Screen
+
+/// Page Object for the {{ .FeatureName }} screen.
+/// Encapsulates UI element queries and actions for readable UI tests.
+struct {{ .FeatureName }}Screen {
+    // MARK: - Properties
+
+    private let app: XCUIApplication
+
+    // MARK: - Init
+
+    init(app: XCUIApplication) {
+        self.app = app
+    }
+
+    // MARK: - Elements
+
+    var screenElement: XCUIElement {
+        app.otherElements[{{ .FeatureName }}AccessibilityID.screen]
+    }
+
+    var loadingIndicator: XCUIElement {
+        app.activityIndicators[{{ .FeatureName }}AccessibilityID.loadingIndicator]
+    }
+
+    var errorView: XCUIElement {
+        app.otherElements[{{ .FeatureName }}AccessibilityID.errorView]
+    }
+
+    var retryButton: XCUIElement {
+        app.buttons[{{ .FeatureName }}AccessibilityID.retryButton]
+    }
+
+    var itemList: XCUIElement {
+        app.scrollViews[{{ .FeatureName }}AccessibilityID.itemList]
+    }
+
+    // MARK: - Queries
+
+    var isLoaded: Bool {
+        screenElement.exists
+    }
+
+    var hasItems: Bool {
+        itemList.exists
+    }
+
+    // MARK: - Actions
+
+    func waitForScreen(timeout: TimeInterval = 5) {
+        _ = screenElement.waitForExistence(timeout: timeout)
+    }
+
+    func waitForItems(timeout: TimeInterval = 10) {
+        _ = itemList.waitForExistence(timeout: timeout)
+    }
+
+    func tapItem(id: String) {
+        let item = app.buttons[{{ .FeatureName }}AccessibilityID.itemRow(id: id)]
+        item.tap()
+    }
+
+    func tapRetry() {
+        retryButton.tap()
+    }
+}

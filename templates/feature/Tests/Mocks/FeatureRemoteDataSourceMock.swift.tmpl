@@ -1,0 +1,19 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}RemoteDataSourceMock
+
+/// Mock implementation of {{ .FeatureName }}RemoteDataSource for testing
+final class {{ .FeatureName }}RemoteDataSourceMock: {{ .FeatureName }}RemoteDataSource, @unchecked Sendable {
+    // MARK: - Properties
+
+    var fetchResult: Result<[{{ .FeatureName }}DTO], Error> = .success([])
+    var fetchCallCount = 0
+
+    // MARK: - {{ .FeatureName }}RemoteDataSource
+
+    func fetch() async throws -> [{{ .FeatureName }}DTO] {
+        fetchCallCount += 1
+        return try fetchResult.get()
+    }
+}

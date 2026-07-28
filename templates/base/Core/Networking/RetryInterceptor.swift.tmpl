@@ -1,0 +1,72 @@
+import Foundation
+
+// MARK: - RetryInterceptor
+
+/// Interceptor that retries failed requests with exponential backoff.
+/// Only retries transient errors (5xx, 429, network timeouts). Respects cancellation.
+struct RetryInterceptor: RequestInterceptor {
+    // MARK: - Properties
+
+    private let policy: RetryPolicy
+
+    // MARK: - Init
+
+    init(policy: RetryPolicy = .default) {
+        self.policy = policy
+    }
+
+    // MARK: - RequestInterceptor
+
+    func intercept(
+        request: URLRequest,
+        next: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
+    ) async throws -> (Data, HTTPURLResponse) {
+        var lastError: (any Error)?
+
+        for attempt in 0...policy.maxRetries {
+            try Task.checkCancellation()
+
+            do {
+                let (data, response) = try await next(request)
+
+                if isRetryableStatusCode(response.statusCode), policy.shouldRetry(attempt: attempt) {
+                    lastError = APIError.httpError(statusCode: response.statusCode, data: data)
+                    try await sleep(for: attempt)
+                    continue
+                }
+
+                return (data, response)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let urlError as URLError where isRetryableURLError(urlError) {
+                lastError = urlError
+                guard policy.shouldRetry(attempt: attempt) else { break }
+                try await sleep(for: attempt)
+                continue
+            } catch {
+                throw error
+            }
+        }
+
+        throw lastError ?? APIError.unknown(SendableError(URLError(.unknown)))
+    }
+
+    // MARK: - Private
+
+    private func isRetryableStatusCode(_ statusCode: Int) -> Bool {
+        statusCode >= 500 || statusCode == 429
+    }
+
+    private func isRetryableURLError(_ error: URLError) -> Bool {
+        let retryableCodes: [URLError.Code] = [
+            .timedOut, .networkConnectionLost, .notConnectedToInternet,
+            .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
+        ]
+        return retryableCodes.contains(error.code)
+    }
+
+    private func sleep(for attempt: Int) async throws {
+        let delay = policy.delay(for: attempt)
+        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    }
+}

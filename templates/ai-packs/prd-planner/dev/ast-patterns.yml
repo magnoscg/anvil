@@ -1,0 +1,38 @@
+rules:
+  # Anti-patterns (DEV-VERIFIER)
+  - id: published-property
+    language: swift
+    pattern: "@Published var $PROP"
+    message: "Usar @Observable en vez de @Published"
+    severity: error
+
+  - id: stateobject-usage
+    language: swift
+    pattern: "@StateObject var $PROP"
+    message: "Usar @State con @Observable"
+    severity: error
+
+  - id: swiftui-in-domain
+    language: swift
+    pattern: "import SwiftUI"
+    message: "Domain no debe importar SwiftUI (verificar path)"
+    severity: warning
+
+  - id: singleton-in-repo
+    language: swift
+    pattern: "static let shared"
+    message: "Usar DI en vez de singleton (verificar contexto)"
+    severity: warning
+
+  # Exploracion (DEV-EXPLORER)
+  - id: find-protocols
+    language: swift
+    pattern: "protocol $NAME { $$$ }"
+
+  - id: find-observable-classes
+    language: swift
+    pattern: "@Observable class $NAME { $$$ }"
+
+  - id: find-views
+    language: swift
+    pattern: "struct $NAME: View { $$$ }"

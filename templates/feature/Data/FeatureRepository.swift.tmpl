@@ -1,0 +1,8 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}Repository
+
+/// Repository protocol for {{ .FeatureNameLower }} data access
+protocol {{ .FeatureName }}Repository: Sendable {
+    func fetch() async throws -> [{{ .FeatureName }}Model]
+}

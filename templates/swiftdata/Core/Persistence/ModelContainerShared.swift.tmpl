@@ -1,0 +1,56 @@
+import SwiftData
+
+// MARK: - ModelContainer + Shared
+
+extension ModelContainer {
+    // MARK: - Production
+
+    /// Production container with persistent on-disk storage.
+    /// Add your `@Model` types to the schema array as you create them.
+    static let shared: ModelContainer = {
+        let schema = Schema([
+            // Add @Model types here, e.g.:
+            // ArticleSDModel.self,
+            // UserSDModel.self,
+        ])
+
+        let configuration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            allowsSave: true
+        )
+
+        do {
+            return try ModelContainer(
+                for: schema,
+                configurations: [configuration]
+            )
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
+    }()
+
+    // MARK: - Preview
+
+    /// In-memory container for SwiftUI previews and unit tests.
+    /// Uses the same schema but stores nothing on disk.
+    static let preview: ModelContainer = {
+        let schema = Schema([
+            // Keep in sync with the production schema above.
+        ])
+
+        let configuration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true
+        )
+
+        do {
+            return try ModelContainer(
+                for: schema,
+                configurations: [configuration]
+            )
+        } catch {
+            fatalError("Failed to create preview ModelContainer: \(error)")
+        }
+    }()
+}

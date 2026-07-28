@@ -1,0 +1,31 @@
+// Production.xcconfig
+// Configuration for Production environment
+
+#include "Base.xcconfig"
+
+// MARK: - Environment
+
+APP_ENVIRONMENT = production
+
+// MARK: - API
+
+API_BASE_URL = https:/$()/api.example.com
+
+// MARK: - Bundle Configuration
+
+PRODUCT_BUNDLE_IDENTIFIER = com.magnos.Arquitectura
+PRODUCT_NAME = Arquitectura
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+
+// MARK: - SSL Pinning
+
+// IMPORTANT: Enable before App Store submission!
+// To get the certificate hash, run:
+// openssl s_client -connect api.example.com:443 -servername api.example.com 2>/dev/null | \
+//   openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
+//
+// TODO: Replace with actual production certificate hash before release
+SSL_PINNING_ENABLED = YES
+// Add your production public key hashes here (comma separated)
+// Example: sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+SSL_PUBLIC_KEY_HASHES = sha256/REPLACE_WITH_YOUR_PRODUCTION_CERTIFICATE_HASH=

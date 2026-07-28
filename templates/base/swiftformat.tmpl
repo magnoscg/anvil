@@ -1,0 +1,48 @@
+# SwiftFormat configuration
+# Aligned with project coding style (4 spaces, K&R braces)
+
+# Swift version
+--swiftversion 6.0
+
+# Indentation
+--indent 4
+--indentcase false
+--ifdef no-indent
+
+# Whitespace
+--trimwhitespace always
+--emptybraces no-space
+
+# Line breaks
+--maxwidth 120
+--wraparguments after-first
+--wrapparameters after-first
+--wrapcollections after-first
+--closingparen same-line
+--linebreaks lf
+
+# Attributes
+--funcattributes prev-line
+--typeattributes prev-line
+--varattributes prev-line
+
+# Imports
+--importgrouping testable-last
+
+# Syntax
+--voidtype void
+--semicolons never
+--commas inline
+--stripunusedargs closure-only
+
+# Headers
+--header strip
+
+# Disabled rules
+--disable redundantSelf
+--disable trailingCommas
+--disable wrapMultilineStatementBraces
+--disable blankLinesBetweenImports
+
+# Exclusions
+--exclude DerivedData,.build,Pods,.swiftpm,Derived

@@ -1,0 +1,44 @@
+import Foundation
+
+// MARK: - RetryPolicy
+
+/// Configuration for retry behavior with exponential backoff and jitter.
+nonisolated struct RetryPolicy: Sendable, Equatable {
+    // MARK: - Properties
+
+    let maxRetries: Int
+    let baseDelay: TimeInterval
+    let maxDelay: TimeInterval
+    let jitterFactor: Double
+
+    // MARK: - Init
+
+    init(maxRetries: Int, baseDelay: TimeInterval, maxDelay: TimeInterval, jitterFactor: Double) {
+        self.maxRetries = maxRetries
+        self.baseDelay = baseDelay
+        self.maxDelay = maxDelay
+        self.jitterFactor = jitterFactor
+    }
+
+    // MARK: - Delay Calculation
+
+    func delay(for attempt: Int) -> TimeInterval {
+        let exponentialDelay = baseDelay * pow(2.0, Double(attempt))
+        let clampedDelay = min(exponentialDelay, maxDelay)
+        let jitter = clampedDelay * jitterFactor * Double.random(in: -1.0...1.0)
+        return max(0, clampedDelay + jitter)
+    }
+
+    func shouldRetry(attempt: Int) -> Bool {
+        attempt < maxRetries
+    }
+}
+
+// MARK: - Preset Policies
+
+extension RetryPolicy {
+    static let `default` = RetryPolicy(maxRetries: 3, baseDelay: 1.0, maxDelay: 30.0, jitterFactor: 0.3)
+    static let none = RetryPolicy(maxRetries: 0, baseDelay: 0, maxDelay: 0, jitterFactor: 0)
+    static let aggressive = RetryPolicy(maxRetries: 5, baseDelay: 2.0, maxDelay: 60.0, jitterFactor: 0.25)
+    static let quick = RetryPolicy(maxRetries: 2, baseDelay: 0.5, maxDelay: 5.0, jitterFactor: 0.2)
+}

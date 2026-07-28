@@ -1,0 +1,27 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}DTOMapperMock
+
+/// Mock implementation of {{ .FeatureName }}DTOMapper for testing
+final class {{ .FeatureName }}DTOMapperMock: {{ .FeatureName }}DTOMapper, @unchecked Sendable {
+    // MARK: - Properties
+
+    var mapSingleResult: {{ .FeatureName }}Model = {{ .FeatureName }}Model(id: "mock",
+{{ "                                                                      " }}name: "Mock",
+{{ "                                                                      " }}description: "Mock description")
+    var mapSingleCallCount = 0
+    var mapMultipleCallCount = 0
+
+    // MARK: - {{ .FeatureName }}DTOMapper
+
+    func map(_ dto: {{ .FeatureName }}DTO) -> {{ .FeatureName }}Model {
+        mapSingleCallCount += 1
+        return mapSingleResult
+    }
+
+    func map(_ dtos: [{{ .FeatureName }}DTO]) -> [{{ .FeatureName }}Model] {
+        mapMultipleCallCount += 1
+        return dtos.map { map($0) }
+    }
+}

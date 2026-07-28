@@ -1,0 +1,19 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}UseCaseMock
+
+/// Mock implementation of {{ .FeatureName }}UseCase for testing
+final class {{ .FeatureName }}UseCaseMock: {{ .FeatureName }}UseCase, @unchecked Sendable {
+    // MARK: - Properties
+
+    var executeResult: Result<[{{ .FeatureName }}Model], Error> = .success([])
+    var executeCallCount = 0
+
+    // MARK: - {{ .FeatureName }}UseCase
+
+    func execute() async throws -> [{{ .FeatureName }}Model] {
+        executeCallCount += 1
+        return try executeResult.get()
+    }
+}

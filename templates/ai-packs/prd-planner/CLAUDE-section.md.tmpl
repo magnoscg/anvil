@@ -1,0 +1,87 @@
+## Regla de oro
+Si algo es ambiguo o hay mas de una forma razonable de implementarlo:
+**para y preguntame antes de decidir.**
+
+Pregunta especialmente cuando:
+- Hay dos enfoques posibles
+- Necesitas cambiar algo fuera del PRP actual
+- Necesitas anadir una dependencia nueva
+- Un fichero previsto no existe
+
+## Workflow de desarrollo
+Este proyecto usa PRD -> PRP para planificar features.
+- Documentos en `/plan`
+- Comandos: `/dev-prd`, `/dev-plan`, `/dev-build`, `/dev-design`, `/dev-status`, `/dev-verify`, `/dev-ff`, `/dev-build-yolo`, `/dev-qa`, `/dev-profile`, `/dev-retro`, `/dev-archive`, `/dev-registry`, `/dev-init`, `/dev-search`, `/dev-registry-refresh`
+- No escribas codigo sin PRP aprobado
+- Marca checkboxes (`- [x]`) conforme completes tareas
+- Si una tarea queda bloqueada, marca `- [!]` con motivo
+- Features completadas se archivan en `plan/_archive/`
+- `.dev/` contiene indices generados (arch-index, skill-registry, ast-patterns)
+
+### Comandos disponibles
+
+| Comando | Proposito |
+|---------|-----------|
+| `/dev-prd <descripcion>` | Co-crear un PRD para una feature |
+| `/dev-plan` | Generar PRPs (planes por fases) a partir del PRD |
+| `/dev-build [N]` | Ejecutar la siguiente fase pendiente (o la fase N) |
+| `/dev-design [desc]` | Crea disenos visuales en Paper MCP / Figma |
+| `/dev-status` | Ver el estado actual de implementacion |
+| `/dev-search <query>` | Buscar PRDs/PRPs anteriores en el RAG |
+| `/dev-verify [N\|all]` | Verificar el codigo contra la arquitectura |
+| `/dev-ff <descripcion>` | Fast-forward: PRD + plan + build en un paso (bugfixes) |
+| `/dev-build-yolo` | Build YOLO — ejecuta /dev-build --auto para todas las features |
+| `/dev-qa [target]` | QA visual y funcional completo con AXe |
+| `/dev-profile [target]` | Perfilar la feature actual con xctrace |
+| `/dev-retro [N]` | Genera retrospectiva para una fase completada |
+| `/dev-archive [slug]` | Archiva una feature completada |
+| `/dev-registry` | Ver el registro de skills disponibles |
+| `/dev-registry-refresh` | Regenerar el registro de skills desde cero |
+| `/dev-init` | Inicializar el workflow PRD en el proyecto |
+
+### Flujo de trabajo
+
+1. **Definir** -- `/dev-prd` para crear PRD en `plan/<feature>/PRD.md`
+2. **Planificar** -- `/dev-plan` para generar PRPs en `plan/<feature>/prp-*.md`
+3. **Disenar** -- `/dev-design` para crear mockups visuales (Paper MCP / Figma)
+4. **Construir** -- `/dev-build` para ejecutar fase a fase
+5. **Verificar** -- `/dev-status` para ver progreso
+6. **Buscar** -- `/dev-search` para encontrar PRDs/PRPs de otros proyectos
+7. **Auditar** -- `/dev-verify` para verificacion arquitectonica
+8. **Fast-forward** -- `/dev-ff` para bugfixes rapidos (PRD+plan+build en un paso)
+9. **QA Visual** -- `/dev-qa` para testing visual automatizado con AXe
+10. **Perfilar** -- `/dev-profile` para analisis de rendimiento
+
+### Estructura de archivos
+
+```
+plan/
+  INDEX.md                    # Indice de todas las features
+  auth-system/                # Feature: sistema de autenticacion
+    PRD.md                    # Requisitos del producto
+    prp-01-models.md          # Plan fase 1
+    prp-02-ui.md              # Plan fase 2
+  _archive/                   # Features completadas
+    onboarding/
+      PRD.md
+      prp-01-screens.md
+```
+
+### Carpeta .dev/ (generada)
+
+```
+.dev/
+  arch-index.md               # Indice de docs de arquitectura
+  skill-registry.md           # Skills auto-descubiertas
+  ast-patterns.yml            # Patterns ast-grep para Swift
+```
+
+### Reglas
+
+- El PRD define el QUE, los PRPs definen el COMO.
+- Cada feature vive en su propia subcarpeta dentro de `plan/`.
+- Cada fase se ejecuta en orden. No saltar fases.
+- Los PRPs son el estado persistente. Al hacer `/clear`, se relee todo desde los ficheros.
+- Los PRDs/PRPs se indexan automaticamente en el RAG para busqueda cross-project.
+- Features completadas se archivan en `plan/_archive/`.
+- Si algo es ambiguo, preguntar antes de actuar.

@@ -1,0 +1,22 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}DTO
+
+/// Data Transfer Object for {{ .FeatureNameLower }} API responses
+struct {{ .FeatureName }}DTO: Sendable, Equatable {
+    // MARK: - Properties
+
+    let id: String
+    let name: String
+    let description: String
+}
+
+// MARK: - {{ .FeatureName }}DTO + Codable
+
+extension {{ .FeatureName }}DTO: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case description
+    }
+}

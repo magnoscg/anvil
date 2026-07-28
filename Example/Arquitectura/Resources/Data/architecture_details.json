@@ -1,0 +1,761 @@
+{
+  "features": [
+    {
+      "id": "clean-architecture",
+      "name": "Clean Architecture",
+      "icon": "building.2.crop.circle.fill",
+      "version": "v1.2.0",
+      "category": "architecture",
+      "subtitle": "Architecture & Structure",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Domain.swift", "icon": "doc.text.fill" },
+        { "name": "Repository.swift", "icon": "cylinder.split.1x2.fill" },
+        { "name": "UseCase.swift", "icon": "gearshape.fill" }
+      ],
+      "implementationDetails": "Separation of concerns using the Repository pattern and Use Cases. The domain layer remains independent of UI and Frameworks.",
+      "codeExample": {
+        "language": "swift",
+        "code": "protocol FetchUserUseCase {\n    func execute() async throws -> User\n}\n\nfinal class DefaultFetchUser: FetchUserUseCase {\n    private let repository: UserRepository\n    \n    init(repository: UserRepository) {\n        self.repository = repository\n    }\n    \n    func execute() async throws -> User {\n        return try await repository.get()\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "dependency-inversion",
+          "title": "Dependency Inversion",
+          "description": "High-level modules should not depend on low-level modules. Both should depend on abstractions."
+        },
+        {
+          "id": "single-responsibility",
+          "title": "Single Responsibility",
+          "description": "Each file and class should have one reason to change, ensuring focused code."
+        },
+        {
+          "id": "model-decoupling",
+          "title": "Model Decoupling",
+          "description": "Keep Domain entities pure. Use DTOs for networking and UI-specific models."
+        }
+      ]
+    },
+    {
+      "id": "mvvm",
+      "name": "MVVM Pattern",
+      "icon": "rectangle.3.group.fill",
+      "version": "v1.1.0",
+      "category": "architecture",
+      "subtitle": "Architecture & Structure",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "ViewModel.swift", "icon": "cpu.fill" },
+        { "name": "View.swift", "icon": "rectangle.fill" },
+        { "name": "State.swift", "icon": "list.bullet.rectangle.fill" }
+      ],
+      "implementationDetails": "Model-View-ViewModel architecture with @Observable for reactive state management. Views observe ViewModel state changes automatically.",
+      "codeExample": {
+        "language": "swift",
+        "code": "@MainActor\n@Observable\nfinal class ArticleViewModel {\n    private(set) var state: ArticleState = .idle\n    private let useCase: ArticleUseCase\n    \n    func load() async {\n        state = .loading\n        do {\n            let articles = try await useCase.execute()\n            state = .loaded(articles)\n        } catch {\n            state = .error(error)\n        }\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "observable-state",
+          "title": "Observable State",
+          "description": "Use @Observable macro instead of @Published for modern SwiftUI state management."
+        },
+        {
+          "id": "state-enum",
+          "title": "State Enum",
+          "description": "Define view states as an enum (idle, loading, loaded, error) for clear state handling."
+        },
+        {
+          "id": "no-business-logic-in-views",
+          "title": "No Business Logic in Views",
+          "description": "Keep Views declarative. All business logic belongs in ViewModels or UseCases."
+        }
+      ]
+    },
+    {
+      "id": "dependency-injection",
+      "name": "Dependency Injection",
+      "icon": "arrow.triangle.branch",
+      "version": "v1.0.0",
+      "category": "architecture",
+      "subtitle": "Architecture & Structure",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Factory.swift", "icon": "hammer.fill" },
+        { "name": "Protocol.swift", "icon": "doc.badge.gearshape.fill" },
+        { "name": "Impl.swift", "icon": "checkmark.seal.fill" }
+      ],
+      "implementationDetails": "Factory-based dependency injection without third-party frameworks. Each feature has its own factory that wires dependencies.",
+      "codeExample": {
+        "language": "swift",
+        "code": "@MainActor\nenum ArticleFactory {\n    static func makeView(\n        appRouter: AppRouter\n    ) -> ArticleView {\n        let repository = makeRepository()\n        let useCase = ArticleUseCaseImpl(\n            repository: repository\n        )\n        let viewModel = ArticleViewModel(\n            useCase: useCase\n        )\n        return ArticleView(viewModel: viewModel)\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "protocol-abstraction",
+          "title": "Protocol Abstraction",
+          "description": "Always inject protocols, not concrete implementations. This enables testing and flexibility."
+        },
+        {
+          "id": "no-singletons",
+          "title": "No Singletons",
+          "description": "Avoid singletons for repositories and use cases. Use dependency injection instead."
+        },
+        {
+          "id": "factory-encapsulation",
+          "title": "Factory Encapsulation",
+          "description": "Keep factory methods private except for view creation. Internal wiring stays hidden."
+        }
+      ]
+    },
+    {
+      "id": "router-pattern",
+      "name": "Router Navigation",
+      "icon": "arrow.triangle.turn.up.right.diamond.fill",
+      "version": "v1.0.0",
+      "category": "architecture",
+      "subtitle": "Navigation & Routing",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Router.swift", "icon": "arrow.right.circle.fill" },
+        { "name": "RouteResolver.swift", "icon": "map.fill" },
+        { "name": "AppRouter.swift", "icon": "house.fill" }
+      ],
+      "implementationDetails": "Type-erased router pattern with feature-specific route enums. AppRouter handles navigation stack, features define their own routes.",
+      "codeExample": {
+        "language": "swift",
+        "code": "enum ArticleRoute: Hashable, Codable {\n    case detail(id: String)\n    case comments(id: String)\n}\n\n@MainActor\nprotocol ArticleRouter {\n    func navigateToDetail(id: String)\n    func goBack()\n}\n\nstruct ArticleRouterImpl: ArticleRouter {\n    private let appRouter: AppRouter\n    \n    func navigateToDetail(id: String) {\n        appRouter.push(ArticleRoute.detail(id: id))\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "codable-routes",
+          "title": "Codable Routes",
+          "description": "Route enums must be Codable for NavigationPath state preservation."
+        },
+        {
+          "id": "feature-isolation",
+          "title": "Feature Isolation",
+          "description": "Each feature defines its own routes. AppRouter doesn't know about specific feature routes."
+        },
+        {
+          "id": "two-file-pattern",
+          "title": "Two File Pattern",
+          "description": "Navigation uses 2 files per feature: Router.swift (routes + protocol) and RouteResolver.swift."
+        }
+      ]
+    },
+    {
+      "id": "swiftui",
+      "name": "SwiftUI Views",
+      "icon": "rectangle.stack.fill",
+      "version": "v1.0.0",
+      "category": "ui",
+      "subtitle": "User Interface",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "View.swift", "icon": "rectangle.fill" },
+        { "name": "Components/", "icon": "folder.fill" },
+        { "name": "Modifiers/", "icon": "slider.horizontal.3" }
+      ],
+      "implementationDetails": "Declarative UI with SwiftUI. One View per file, custom ViewModifiers extracted to Core, feature components in dedicated folder.",
+      "codeExample": {
+        "language": "swift",
+        "code": "struct ArticleView: View {\n    @State private var viewModel: ArticleViewModel\n    \n    var body: some View {\n        content\n            .task { await viewModel.load() }\n    }\n    \n    @ViewBuilder\n    private var content: some View {\n        switch viewModel.state {\n        case .idle, .loading:\n            ProgressView()\n        case .loaded(let items):\n            ArticleList(items: items)\n        case .error(let error):\n            ErrorView(error: error)\n        }\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "small-body",
+          "title": "Small Body",
+          "description": "Keep body small. Extract complex layouts to private computed properties or subviews."
+        },
+        {
+          "id": "task-for-loading",
+          "title": "Task for Loading",
+          "description": "Use .task(id:) modifier for data loading, not loose Task { } blocks."
+        },
+        {
+          "id": "extracted-modifiers",
+          "title": "Extracted Modifiers",
+          "description": "Custom ViewModifiers go in Core/Common/SwiftUI/Modifiers/, never inline."
+        }
+      ]
+    },
+    {
+      "id": "design-tokens",
+      "name": "Design System",
+      "icon": "paintpalette.fill",
+      "version": "v1.0.0",
+      "category": "ui",
+      "subtitle": "User Interface",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "AppColors.swift", "icon": "paintbrush.fill" },
+        { "name": "AppTypography.swift", "icon": "textformat" },
+        { "name": "Spacing.swift", "icon": "ruler.fill" }
+      ],
+      "implementationDetails": "Centralized design tokens for colors, typography, spacing, and icons. Ensures visual consistency across the app.",
+      "codeExample": {
+        "language": "swift",
+        "code": "enum AppColors {\n    static let primary = Color(\"Primary\")\n    static let background = Color(\"Background\")\n    static let text = Color(\"Text\")\n}\n\nenum AppTypography {\n    case largeTitle\n    case headline\n    case body\n    \n    var font: Font {\n        switch self {\n        case .largeTitle: .largeTitle.bold()\n        case .headline: .headline\n        case .body: .body\n        }\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "semantic-colors",
+          "title": "Semantic Colors",
+          "description": "Use semantic color names (primary, background) not literal colors (blue, white)."
+        },
+        {
+          "id": "consistent-spacing",
+          "title": "Consistent Spacing",
+          "description": "Use Spacing enum values (xs, sm, md, lg) instead of magic numbers."
+        },
+        {
+          "id": "system-dark-mode",
+          "title": "System Dark Mode",
+          "description": "Respect system appearance preference. Don't create custom dark mode toggles."
+        }
+      ]
+    },
+    {
+      "id": "api-client",
+      "name": "Networking Layer",
+      "icon": "network",
+      "version": "v1.0.0",
+      "category": "networking",
+      "subtitle": "Data & Networking",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "APIClient.swift", "icon": "antenna.radiowaves.left.and.right" },
+        { "name": "Endpoint.swift", "icon": "link" },
+        { "name": "APIError.swift", "icon": "exclamationmark.triangle.fill" }
+      ],
+      "implementationDetails": "Generic API client with async/await. Endpoints define path, method, and response type. Centralized error handling.",
+      "codeExample": {
+        "language": "swift",
+        "code": "protocol APIClient: Sendable {\n    func request<T: Decodable>(\n        _ endpoint: Endpoint<T>\n    ) async throws -> T\n}\n\nstruct Endpoint<Response: Decodable> {\n    let path: String\n    let method: HTTPMethod\n    let headers: [String: String]\n}\n\nenum ArticleEndpoint {\n    static let list = Endpoint<[ArticleDTO]>(\n        path: \"/articles\",\n        method: .get\n    )\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "generic-endpoints",
+          "title": "Generic Endpoints",
+          "description": "Endpoints are generic over response type. Compile-time safety for API contracts."
+        },
+        {
+          "id": "error-mapping",
+          "title": "Error Mapping",
+          "description": "Map APIError to DomainError to ErrorDecorator. Each layer has its own error type."
+        },
+        {
+          "id": "sendable-compliance",
+          "title": "Sendable Compliance",
+          "description": "All networking types must be Sendable for Swift 6 concurrency safety."
+        }
+      ]
+    },
+    {
+      "id": "swiftdata",
+      "name": "SwiftData Persistence",
+      "icon": "cylinder.split.1x2.fill",
+      "version": "v1.0.0",
+      "category": "persistence",
+      "subtitle": "Data & Persistence",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "SDModel.swift", "icon": "tablecells.fill" },
+        { "name": "LocalDataSource.swift", "icon": "internaldrive.fill" },
+        { "name": "ModelContainer.swift", "icon": "shippingbox.fill" }
+      ],
+      "implementationDetails": "SwiftData for local persistence. SDModels stay in Data layer. Repositories use ModelExecutor for background access.",
+      "codeExample": {
+        "language": "swift",
+        "code": "@Model\nfinal class ArticleSDModel {\n    @Attribute(.unique) var id: String\n    var title: String\n    var body: String\n    var createdAt: Date\n    \n    init(id: String, title: String, body: String) {\n        self.id = id\n        self.title = title\n        self.body = body\n        self.createdAt = Date()\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "data-layer-only",
+          "title": "Data Layer Only",
+          "description": "SwiftData imports only in Data layer. Domain and Presentation never import SwiftData."
+        },
+        {
+          "id": "model-executor",
+          "title": "Model Executor",
+          "description": "Use ModelExecutor for background operations. Never access ModelContext from background threads."
+        },
+        {
+          "id": "id-based-references",
+          "title": "ID-Based References",
+          "description": "Don't pass SwiftData models between actors. Pass IDs and fetch on target context."
+        }
+      ]
+    },
+    {
+      "id": "ssl-pinning",
+      "name": "SSL Pinning",
+      "icon": "lock.shield.fill",
+      "version": "v1.0.0",
+      "category": "security",
+      "subtitle": "Security",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "SSLPinningDelegate.swift", "icon": "lock.fill" },
+        { "name": "URLSessionFactory.swift", "icon": "network.badge.shield.half.filled" },
+        { "name": "Certificates/", "icon": "folder.badge.plus" }
+      ],
+      "implementationDetails": "Certificate pinning using URLSessionDelegate. Validates server certificates against bundled public keys.",
+      "codeExample": {
+        "language": "swift",
+        "code": "final class SSLPinningDelegate: NSObject, URLSessionDelegate {\n    private let pinnedCertificates: [SecCertificate]\n    \n    func urlSession(\n        _ session: URLSession,\n        didReceive challenge: URLAuthenticationChallenge\n    ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {\n        guard let serverTrust = challenge.protectionSpace.serverTrust,\n              validateCertificate(serverTrust) else {\n            return (.cancelAuthenticationChallenge, nil)\n        }\n        return (.useCredential, URLCredential(trust: serverTrust))\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "public-key-pinning",
+          "title": "Public Key Pinning",
+          "description": "Pin to public keys, not full certificates. Allows certificate rotation without app updates."
+        },
+        {
+          "id": "backup-pins",
+          "title": "Backup Pins",
+          "description": "Include backup pins for certificate rotation scenarios. Prevents lockout."
+        },
+        {
+          "id": "debug-bypass",
+          "title": "Debug Bypass",
+          "description": "Consider debug-only bypass for development. Never ship with pinning disabled."
+        }
+      ]
+    },
+    {
+      "id": "swift-testing",
+      "name": "Swift Testing",
+      "icon": "checkmark.seal.fill",
+      "version": "v1.0.0",
+      "category": "testing",
+      "subtitle": "Testing",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "UseCaseTests.swift", "icon": "testtube.2" },
+        { "name": "ViewModelTests.swift", "icon": "cpu" },
+        { "name": "Mocks/", "icon": "folder.fill" }
+      ],
+      "implementationDetails": "Swift Testing framework (import Testing) for unit tests. Mocks for all protocols. Tests mirror source structure.",
+      "codeExample": {
+        "language": "swift",
+        "code": "import Testing\n\n@Suite(\"ArticleViewModel Tests\")\nstruct ArticleViewModelTests {\n    @Test(\"loads articles successfully\")\n    @MainActor\n    func loadArticlesSuccess() async {\n        let mockUseCase = MockArticleUseCase()\n        mockUseCase.result = .success([.stub()])\n        let sut = ArticleViewModel(useCase: mockUseCase)\n        \n        await sut.load()\n        \n        #expect(sut.state == .loaded([.stub()]))\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "swift-testing-framework",
+          "title": "Swift Testing Framework",
+          "description": "Use import Testing, not XCTest. Modern macros like @Test and #expect."
+        },
+        {
+          "id": "protocol-mocks",
+          "title": "Protocol Mocks",
+          "description": "Create mock implementations for all protocols. Store in Tests/Mocks/ folder."
+        },
+        {
+          "id": "test-structure-mirrors-source",
+          "title": "Test Structure Mirrors Source",
+          "description": "Test folder structure matches source. Tests/Features/Article/ViewModels/ArticleViewModelTests.swift."
+        }
+      ]
+    },
+    {
+      "id": "feature-based",
+      "name": "Feature-Based Structure",
+      "icon": "folder.fill.badge.gearshape",
+      "version": "v1.0.0",
+      "category": "architecture",
+      "subtitle": "Architecture & Structure",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Features/", "icon": "folder.fill" },
+        { "name": "DI/Factory.swift", "icon": "hammer.fill" },
+        { "name": "UI/", "icon": "rectangle.fill" },
+        { "name": "Presentation/", "icon": "cpu.fill" },
+        { "name": "Navigation/", "icon": "arrow.right.circle.fill" }
+      ],
+      "implementationDetails": "Modular organization where each feature is self-contained. Features own their UI, Presentation, DI, and Navigation layers. Domain and Data layers remain global but organized by feature name.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Features/Article/\n// +-- DI/\n// |   +-- ArticleFactory.swift\n// +-- UI/\n// |   +-- ArticleView.swift\n// |   +-- ArticleState.swift\n// |   +-- ArticleDecorator.swift\n// |   +-- Components/\n// +-- Presentation/\n// |   +-- ViewModels/ArticleViewModel.swift\n// |   +-- Mappers/ArticleDecoratorMapperImpl.swift\n// +-- Navigation/\n//     +-- ArticleRouter.swift\n//     +-- ArticleRouteResolver.swift"
+      },
+      "bestPractices": [
+        {
+          "id": "single-feature-ownership",
+          "title": "Single Feature Ownership",
+          "description": "Each feature folder owns all its presentation code. No cross-feature imports within Features/."
+        },
+        {
+          "id": "feature-isolation",
+          "title": "Feature Isolation",
+          "description": "Features communicate through navigation (routes) or shared Domain models, never directly."
+        },
+        {
+          "id": "vertical-slicing",
+          "title": "Vertical Slicing",
+          "description": "New features add vertical slices (new folders) rather than modifying existing horizontal layers."
+        }
+      ]
+    },
+    {
+      "id": "observable",
+      "name": "@Observable Macro",
+      "icon": "eye.circle.fill",
+      "version": "v1.0.0",
+      "category": "ui",
+      "subtitle": "State Management",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "ViewModel.swift", "icon": "cpu.fill" },
+        { "name": "View.swift", "icon": "rectangle.fill" }
+      ],
+      "implementationDetails": "Modern reactivity macro that replaces @Published and ObservableObject. Views use @State to hold @Observable classes. Automatic observation tracking without explicit property wrappers.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// ViewModel with @Observable\n@MainActor\n@Observable\nfinal class ArticleViewModel {\n    private(set) var state: ArticleState = .idle\n    \n    func load() async {\n        state = .loading\n        // ...\n    }\n}\n\n// View uses @State (not @StateObject)\nstruct ArticleView: View {\n    @State private var viewModel: ArticleViewModel\n    \n    init(viewModel: ArticleViewModel) {\n        _viewModel = State(initialValue: viewModel)\n    }\n    \n    var body: some View {\n        // Automatic observation\n        Text(viewModel.state.description)\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "no-stateobject",
+          "title": "No @StateObject",
+          "description": "Never use @StateObject or @ObservedObject with @Observable. Use @State instead."
+        },
+        {
+          "id": "mainactor-isolation",
+          "title": "@MainActor Isolation",
+          "description": "Always mark ViewModels with @MainActor for thread-safe UI state updates."
+        },
+        {
+          "id": "private-set",
+          "title": "Private(set) Properties",
+          "description": "Use private(set) for state properties. Views should not mutate ViewModel state directly."
+        }
+      ]
+    },
+    {
+      "id": "view-modifiers",
+      "name": "Custom ViewModifiers",
+      "icon": "slider.horizontal.3",
+      "version": "v1.0.0",
+      "category": "ui",
+      "subtitle": "UI Patterns",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Core/Common/SwiftUI/Modifiers/", "icon": "folder.fill" },
+        { "name": "CardModifier.swift", "icon": "doc.text.fill" },
+        { "name": "LoadingModifier.swift", "icon": "doc.text.fill" }
+      ],
+      "implementationDetails": "All custom ViewModifiers are extracted to Core/Common/SwiftUI/Modifiers/. Never define modifiers inline in Views. Promotes reusability and keeps Views clean.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Core/Common/SwiftUI/Modifiers/CardModifier.swift\nstruct CardModifier: ViewModifier {\n    let cornerRadius: CGFloat\n    let shadowRadius: CGFloat\n    \n    func body(content: Content) -> some View {\n        content\n            .background(AppColors.cardBackground)\n            .cornerRadius(cornerRadius)\n            .shadow(radius: shadowRadius)\n    }\n}\n\nextension View {\n    func cardStyle(\n        cornerRadius: CGFloat = 12,\n        shadowRadius: CGFloat = 4\n    ) -> some View {\n        modifier(CardModifier(\n            cornerRadius: cornerRadius,\n            shadowRadius: shadowRadius\n        ))\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "extract-inline-modifiers",
+          "title": "Extract Inline Modifiers",
+          "description": "If you chain more than 3-4 modifiers repeatedly, extract to a custom ViewModifier."
+        },
+        {
+          "id": "core-location",
+          "title": "Core Location",
+          "description": "All reusable modifiers live in Core/Common/SwiftUI/Modifiers/, not in feature folders."
+        },
+        {
+          "id": "composable-design",
+          "title": "Composable Design",
+          "description": "Design modifiers to be composable. Each modifier should do one thing well."
+        }
+      ]
+    },
+    {
+      "id": "state-separation",
+      "name": "State Separation",
+      "icon": "rectangle.split.2x1.fill",
+      "version": "v1.0.0",
+      "category": "ui",
+      "subtitle": "ViewModel Patterns",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "ArticleState.swift", "icon": "list.bullet.rectangle.fill" },
+        { "name": "ArticleDecorator.swift", "icon": "paintbrush.fill" },
+        { "name": "ArticleViewModel.swift", "icon": "cpu.fill" }
+      ],
+      "implementationDetails": "State enum and Decorator structs are in separate files from ViewModel. State enum represents view states (idle, loading, loaded, error). Decorators are UI-ready models with formatted data.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// UI/ArticleState.swift\nenum ArticleState: Equatable {\n    case idle\n    case loading\n    case loaded([ArticleSectionDecorator])\n    case error(ErrorDecorator)\n}\n\n// UI/ArticleDecorator.swift\nstruct ArticleSectionDecorator: Identifiable, Equatable {\n    let id: String\n    let title: String\n    let items: [ArticleItemDecorator]\n}\n\nstruct ArticleItemDecorator: Identifiable, Equatable {\n    let id: String\n    let title: String\n    let formattedDate: String\n}\n\nstruct ErrorDecorator: Equatable {\n    let title: String\n    let message: String\n    let isRetryable: Bool\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "state-enum-only",
+          "title": "State Enum Only",
+          "description": "State file contains only the state enum. No Action or Event enums."
+        },
+        {
+          "id": "no-action-enums",
+          "title": "No Action Enums",
+          "description": "Actions are direct methods on ViewModel, not enum cases to dispatch."
+        },
+        {
+          "id": "decorators-for-ui",
+          "title": "Decorators for UI",
+          "description": "Decorators contain formatted, localized, UI-ready data. No formatting logic in Views."
+        }
+      ]
+    },
+    {
+      "id": "endpoint-builder",
+      "name": "Endpoint Builder",
+      "icon": "link.circle.fill",
+      "version": "v1.0.0",
+      "category": "networking",
+      "subtitle": "API Patterns",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Endpoint.swift", "icon": "link" },
+        { "name": "HTTPMethod.swift", "icon": "arrow.up.arrow.down" },
+        { "name": "APIClient.swift", "icon": "antenna.radiowaves.left.and.right" }
+      ],
+      "implementationDetails": "Generic Endpoint struct parameterized by Response type. Compile-time type safety ensures correct response decoding. Static endpoint definitions per feature.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Core/Networking/Endpoint.swift\nstruct Endpoint<Response: Decodable>: Sendable {\n    let path: String\n    let method: HTTPMethod\n    let headers: [String: String]\n    let queryItems: [URLQueryItem]\n    let body: Data?\n    \n    init(\n        path: String,\n        method: HTTPMethod = .get,\n        headers: [String: String] = [:],\n        queryItems: [URLQueryItem] = [],\n        body: Data? = nil\n    ) {\n        self.path = path\n        self.method = method\n        self.headers = headers\n        self.queryItems = queryItems\n        self.body = body\n    }\n}\n\n// Feature-specific endpoints\nenum ArticleEndpoints {\n    static let list = Endpoint<[ArticleDTO]>(path: \"/articles\")\n    \n    static func detail(id: String) -> Endpoint<ArticleDTO> {\n        Endpoint(path: \"/articles/\\(id)\")\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "generic-over-response",
+          "title": "Generic Over Response",
+          "description": "Endpoint is generic over Response type. This provides compile-time safety for API contracts."
+        },
+        {
+          "id": "static-endpoint-definitions",
+          "title": "Static Endpoint Definitions",
+          "description": "Define endpoints as static properties or functions in a namespace enum per feature."
+        },
+        {
+          "id": "type-safe-contracts",
+          "title": "Type-Safe Contracts",
+          "description": "The generic type ensures APIClient.request returns the correct type without casting."
+        }
+      ]
+    },
+    {
+      "id": "typed-errors",
+      "name": "Typed Errors",
+      "icon": "exclamationmark.triangle.fill",
+      "version": "v1.0.0",
+      "category": "networking",
+      "subtitle": "Error Handling",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "APIError.swift", "icon": "exclamationmark.triangle.fill" },
+        { "name": "ArticleError.swift", "icon": "xmark.octagon.fill" }
+      ],
+      "implementationDetails": "Each layer has its own typed error enum. Data layer uses APIError, Domain layer uses feature-specific errors. No generic String errors or untyped throws.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Core/Networking/APIError.swift\nenum APIError: Error, Equatable, Sendable {\n    case networkUnavailable\n    case httpError(statusCode: Int)\n    case decodingFailed\n    case unauthorized\n    case timeout\n    case unknown(String)\n    \n    var isRetryable: Bool {\n        switch self {\n        case .networkUnavailable, .timeout:\n            return true\n        case .httpError(let code):\n            return code >= 500\n        default:\n            return false\n        }\n    }\n}\n\n// Domain/Article/ArticleError.swift\nenum ArticleError: Error, Equatable, Sendable {\n    case notFound\n    case unauthorized\n    case unavailable\n    case unknown\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "layer-specific-errors",
+          "title": "Layer-Specific Errors",
+          "description": "Each layer defines its own error types. Don't leak APIError to Domain or Presentation."
+        },
+        {
+          "id": "no-try-question",
+          "title": "No try?",
+          "description": "Avoid try? which silences errors. Always handle errors explicitly or propagate them."
+        },
+        {
+          "id": "equatable-errors",
+          "title": "Equatable Errors",
+          "description": "Make errors Equatable for easy testing and state comparison."
+        }
+      ]
+    },
+    {
+      "id": "error-mapping",
+      "name": "Error Mapping",
+      "icon": "arrow.triangle.2.circlepath",
+      "version": "v1.0.0",
+      "category": "networking",
+      "subtitle": "Error Flow",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Repository.swift", "icon": "cylinder.split.1x2.fill" },
+        { "name": "ViewModel.swift", "icon": "cpu.fill" },
+        { "name": "ErrorDecorator.swift", "icon": "paintbrush.fill" }
+      ],
+      "implementationDetails": "Errors transform at layer boundaries: APIError → DomainError in Repository, DomainError → ErrorDecorator in ViewModel. Each transformation adds context appropriate to that layer.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Domain error initialized from API error\nextension ArticleError {\n    init(from apiError: APIError) {\n        switch apiError {\n        case .unauthorized:\n            self = .unauthorized\n        case .httpError(404):\n            self = .notFound\n        case .networkUnavailable, .timeout:\n            self = .unavailable\n        default:\n            self = .unknown\n        }\n    }\n}\n\n// Error decorator from domain error\nextension ArticleError {\n    func toDecorator() -> ErrorDecorator {\n        switch self {\n        case .notFound:\n            return ErrorDecorator(\n                title: String(localized: \"error.notfound.title\"),\n                message: String(localized: \"error.notfound.message\"),\n                isRetryable: false\n            )\n        case .unavailable:\n            return .network\n        default:\n            return .generic\n        }\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "transform-at-boundaries",
+          "title": "Transform at Boundaries",
+          "description": "Map errors when crossing layer boundaries (Repository, ViewModel), not inline."
+        },
+        {
+          "id": "localized-messages-in-ui",
+          "title": "Localized Messages in UI",
+          "description": "Only ErrorDecorator contains localized user-facing messages. Domain errors are technical."
+        },
+        {
+          "id": "isretryable-flag",
+          "title": "isRetryable Flag",
+          "description": "Include isRetryable in ErrorDecorator so Views can show/hide retry buttons."
+        }
+      ]
+    },
+    {
+      "id": "pokemon-api",
+      "name": "Pokemon API Example",
+      "icon": "network",
+      "version": "v1.0.0",
+      "category": "networking",
+      "subtitle": "API Integration",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "PokeAPIEndpoint.swift", "icon": "link" },
+        { "name": "PokemonListRemoteDataSourceImpl.swift", "icon": "antenna.radiowaves.left.and.right" },
+        { "name": "PokemonListRepositoryImpl.swift", "icon": "cylinder.split.1x2.fill" },
+        { "name": "PokemonListUseCaseImpl.swift", "icon": "gearshape.fill" }
+      ],
+      "implementationDetails": "Real-world API integration with PokeAPI. Uses paginated endpoint with limit/offset, parallel detail fetching via TaskGroup, and DTO-to-Domain mapping. Demonstrates the full Data layer flow: Endpoint → RemoteDataSource → Repository → UseCase.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Parallel detail fetching in Repository\nfunc getPokemonList(limit: Int, offset: Int) async throws -> PokemonListRepositoryResult {\n    let listResponse = try await remoteDataSource.fetchPokemonList(limit: limit, offset: offset)\n    let pokemon = try await withThrowingTaskGroup(of: PokemonListModel?.self) { group in\n        for result in listResponse.results {\n            guard let id = result.extractedID else { continue }\n            group.addTask {\n                let detail = try await self.remoteDataSource.fetchPokemonDetail(id: id)\n                return self.dtoMapper.mapToDomain(detail)\n            }\n        }\n        var models: [PokemonListModel] = []\n        for try await model in group {\n            if let model { models.append(model) }\n        }\n        return models.sorted { $0.id < $1.id }\n    }\n    return PokemonListRepositoryResult(pokemon: pokemon, totalCount: listResponse.count, hasMore: listResponse.next != nil)\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "paginated-fetching",
+          "title": "Paginated Fetching",
+          "description": "Use limit/offset pagination to load data incrementally. Avoid loading all data at once."
+        },
+        {
+          "id": "parallel-requests",
+          "title": "Parallel Requests",
+          "description": "Use TaskGroup for concurrent detail fetches. Handle individual failures gracefully without failing the batch."
+        },
+        {
+          "id": "cancellation-propagation",
+          "title": "Cancellation Propagation",
+          "description": "Always propagate CancellationError. Log non-fatal errors but don't swallow cancellation."
+        }
+      ]
+    },
+    {
+      "id": "background-executor",
+      "name": "Background Executor",
+      "icon": "gearshape.2.fill",
+      "version": "v1.0.0",
+      "category": "persistence",
+      "subtitle": "SwiftData Concurrency",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "ModelContainer+Shared.swift", "icon": "shippingbox.fill" },
+        { "name": "LocalDataSource.swift", "icon": "internaldrive.fill" },
+        { "name": "SwiftDataStack.swift", "icon": "square.stack.3d.up.fill" }
+      ],
+      "implementationDetails": "SwiftData repositories use ModelExecutor for background operations. Never access the main ModelContext from background threads. Each repository receives its own executor instance from the factory.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Core/Persistence/SwiftDataStack.swift\n@MainActor\nfinal class SwiftDataStack {\n    let container: ModelContainer\n    \n    init(container: ModelContainer) {\n        self.container = container\n    }\n    \n    func makeExecutor() -> any ModelExecutor {\n        DefaultSerialModelExecutor(\n            modelContext: ModelContext(container)\n        )\n    }\n}\n\n// Data/Article/DataSources/ArticleLocalDataSourceImpl.swift\nstruct ArticleLocalDataSourceImpl: ArticleLocalDataSource {\n    private let executor: any ModelExecutor\n    \n    init(executor: any ModelExecutor) {\n        self.executor = executor\n    }\n    \n    func fetchAll() async throws -> [ArticleModel] {\n        try await executor.perform {\n            let descriptor = FetchDescriptor<ArticleSDModel>()\n            let models = try executor.modelContext.fetch(descriptor)\n            return models.map { $0.toDomain() }\n        }\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "never-main-context",
+          "title": "Never Main Context",
+          "description": "Background operations must use ModelExecutor, never the main ModelContext."
+        },
+        {
+          "id": "pass-ids-not-models",
+          "title": "Pass IDs Not Models",
+          "description": "Don't pass SwiftData models between actors. Pass IDs and fetch on the target context."
+        },
+        {
+          "id": "dedicated-executor-per-repo",
+          "title": "Dedicated Executor Per Repo",
+          "description": "Each repository gets its own executor instance to avoid context conflicts."
+        }
+      ]
+    },
+    {
+      "id": "environment-config",
+      "name": "Environment Config",
+      "icon": "gearshape.fill",
+      "version": "v1.0.0",
+      "category": "security",
+      "subtitle": "Build Configuration",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "AppEnvironment.swift", "icon": "gearshape.fill" },
+        { "name": "Dev.xcconfig", "icon": "doc.badge.gearshape.fill" },
+        { "name": "Prod.xcconfig", "icon": "doc.badge.gearshape.fill" }
+      ],
+      "implementationDetails": "Environment-specific configuration using xcconfig files. Different base URLs, feature flags, and API keys per build scheme (Dev, Staging, Prod). No hardcoded values in code.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// App/Config/AppEnvironment.swift\nenum AppEnvironment: String {\n    case development\n    case staging\n    case production\n    \n    static var current: AppEnvironment {\n        #if DEBUG\n        return .development\n        #else\n        guard let env = Bundle.main.infoDictionary?[\"APP_ENVIRONMENT\"] as? String,\n              let environment = AppEnvironment(rawValue: env) else {\n            return .production\n        }\n        return environment\n        #endif\n    }\n    \n    var baseURL: URL {\n        switch self {\n        case .development:\n            return URL(string: \"https://dev-api.example.com\")!\n        case .staging:\n            return URL(string: \"https://staging-api.example.com\")!\n        case .production:\n            return URL(string: \"https://api.example.com\")!\n        }\n    }\n    \n    var isLoggingEnabled: Bool {\n        self != .production\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "no-hardcoded-urls",
+          "title": "No Hardcoded URLs",
+          "description": "Never hardcode API URLs in code. Use Environment or xcconfig values."
+        },
+        {
+          "id": "xcconfig-for-secrets",
+          "title": "Xcconfig for Secrets",
+          "description": "Store API keys in xcconfig files excluded from git. Reference via Info.plist."
+        },
+        {
+          "id": "current-environment-pattern",
+          "title": "Current Environment Pattern",
+          "description": "Access current config via AppEnvironment.current. Single source of truth."
+        }
+      ]
+    },
+    {
+      "id": "testable-arch",
+      "name": "Testable Architecture",
+      "icon": "testtube.2",
+      "version": "v1.0.0",
+      "category": "testing",
+      "subtitle": "Testing Patterns",
+      "isImplemented": true,
+      "filesInvolved": [
+        { "name": "Tests/Mocks/", "icon": "folder.fill" },
+        { "name": "Protocol.swift", "icon": "doc.badge.gearshape.fill" },
+        { "name": "Tests/Features/", "icon": "folder.fill" }
+      ],
+      "implementationDetails": "Architecture designed for testability. Every dependency has a protocol. Mocks implement protocols with configurable behavior. Test folder structure mirrors source structure.",
+      "codeExample": {
+        "language": "swift",
+        "code": "// Protocol enables mocking\nprotocol ArticleRepository: Sendable {\n    func fetchAll() async throws -> [ArticleModel]\n}\n\n// Tests/Mocks/MockArticleRepository.swift\nfinal class MockArticleRepository: ArticleRepository, @unchecked Sendable {\n    var fetchAllResult: Result<[ArticleModel], Error> = .success([])\n    var fetchAllCallCount = 0\n    \n    func fetchAll() async throws -> [ArticleModel] {\n        fetchAllCallCount += 1\n        return try fetchAllResult.get()\n    }\n}\n\n// Domain model stub\nextension ArticleModel {\n    static func stub(\n        id: String = \"1\",\n        title: String = \"Test Article\"\n    ) -> ArticleModel {\n        ArticleModel(id: id, title: title, body: \"Body\")\n    }\n}"
+      },
+      "bestPractices": [
+        {
+          "id": "protocol-for-every-dependency",
+          "title": "Protocol for Every Dependency",
+          "description": "Every injected dependency has a protocol. This enables mock injection in tests."
+        },
+        {
+          "id": "stub-factory-methods",
+          "title": "Stub Factory Methods",
+          "description": "Add static .stub() methods to domain models for easy test data creation."
+        },
+        {
+          "id": "mirror-folder-structure",
+          "title": "Mirror Folder Structure",
+          "description": "Tests/Features/Article/ViewModels/ mirrors Features/Article/Presentation/ViewModels/."
+        }
+      ]
+    }
+  ]
+}

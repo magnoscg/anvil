@@ -1,0 +1,40 @@
+import Foundation
+
+// MARK: - DomainError + Error Mapping
+
+extension DomainError {
+    /// Maps any error to a typed DomainError.
+    /// Use this in UseCases to convert data layer errors into domain-level errors.
+    static func map(_ error: Error) -> DomainError {
+        if let domainError = error as? DomainError {
+            return domainError
+        }
+
+        if let apiError = error as? APIError {
+            return mapAPIError(apiError)
+        }
+
+        return .unknown
+    }
+
+    // MARK: - Private
+
+    private static func mapAPIError(_ error: APIError) -> DomainError {
+        switch error {
+        case .networkError:
+            .network
+        case let .httpError(statusCode, _):
+            switch statusCode {
+            case 401: .unauthorized
+            case 404: .notFound
+            default: .server
+            }
+        case .decodingError:
+            .parsing
+        case .invalidURL:
+            .network
+        case .unknown:
+            .unknown
+        }
+    }
+}

@@ -1,0 +1,42 @@
+import SwiftUI
+
+// MARK: - LoadingStateView
+
+/// Reusable loading state view for displaying a centered progress indicator.
+/// Use this component for consistent loading presentation across the app.
+struct LoadingStateView: View {
+    // MARK: - Properties
+
+    let message: String?
+
+    // MARK: - Init
+
+    init(message: String? = nil) {
+        self.message = message
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        VStack(spacing: Spacing.md) {
+            ProgressView()
+
+            if let message {
+                Text(message)
+                    .font(AppTypography.footnote.font)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Preview
+
+#Preview("Default") {
+    LoadingStateView()
+}
+
+#Preview("With Message") {
+    LoadingStateView(message: "Loading...")
+}

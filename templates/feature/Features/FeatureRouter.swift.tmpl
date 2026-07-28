@@ -1,0 +1,43 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}Route
+
+/// Routes available within the {{ .FeatureName }} feature
+enum {{ .FeatureName }}Route: Hashable, Codable {
+    case detail(id: String)
+}
+
+// MARK: - {{ .FeatureName }}Router
+
+/// Protocol for {{ .FeatureName }} feature navigation
+@MainActor
+protocol {{ .FeatureName }}Router: Sendable {
+    func navigateToDetail(id: String)
+    func goBack()
+}
+
+// MARK: - {{ .FeatureName }}RouterImpl
+
+/// Implementation of {{ .FeatureName }}Router using AppRouter
+@MainActor
+struct {{ .FeatureName }}RouterImpl: {{ .FeatureName }}Router {
+    // MARK: - Properties
+
+    private let appRouter: AppRouter
+
+    // MARK: - Init
+
+    init(appRouter: AppRouter) {
+        self.appRouter = appRouter
+    }
+
+    // MARK: - Public Methods
+
+    func navigateToDetail(id: String) {
+        appRouter.push({{ .FeatureName }}Route.detail(id: id))
+    }
+
+    func goBack() {
+        appRouter.pop()
+    }
+}

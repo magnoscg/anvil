@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "DF46A4D1-BC8A-4543-91F7-C29149F03D0E",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Arquitectura.xcodeproj",
+        "identifier" : "3AEDC3A72F0AF98200F415A0",
+        "name" : "ArquitecturaTests"
+      }
+    }
+  ],
+  "version" : 1
+}

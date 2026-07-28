@@ -1,0 +1,25 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}RouterMock
+
+/// Mock implementation of {{ .FeatureName }}Router for testing
+@MainActor
+final class {{ .FeatureName }}RouterMock: {{ .FeatureName }}Router {
+    // MARK: - Properties
+
+    var navigateToDetailId: String?
+    var navigateToDetailCallCount = 0
+    var goBackCallCount = 0
+
+    // MARK: - {{ .FeatureName }}Router
+
+    func navigateToDetail(id: String) {
+        navigateToDetailId = id
+        navigateToDetailCallCount += 1
+    }
+
+    func goBack() {
+        goBackCallCount += 1
+    }
+}

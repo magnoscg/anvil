@@ -1,0 +1,85 @@
+## Axiom iOS Tools
+
+### Quick Commands
+
+| Action | Command |
+|--------|---------|
+| **Screenshot** | Skill: `/axiom:screenshot` (preferred) or `axe screenshot --udid ...` |
+| **Visual Test** | Skill: `/axiom:test-simulator` (complete scenarios with verification) |
+| **Describe UI** | `axe describe-ui --udid <SIMULATOR_UDID>` |
+| **Tap element** | `axe tap --label "text" --udid <SIMULATOR_UDID>` |
+| **Swipe** | `axe swipe --start-x 200 --start-y 600 --end-x 200 --end-y 200 --udid <SIMULATOR_UDID>` |
+
+### Axiom Skills for Visual Testing
+
+> **Use Axiom skills first** for visual testing. They are smarter than raw commands.
+
+| Situation | Skill/Agent |
+|-----------|-------------|
+| Quick screenshot | `/axiom:screenshot` |
+| Full visual test (scenarios, verification) | `/axiom:test-simulator` |
+| Iterative debugging with screenshots | `axiom:simulator-tester` agent |
+
+### Axiom Agents (Complex problems only)
+
+| Situation | Agent |
+|-----------|-------|
+| Build fails repeatedly | `axiom:build-fixer` |
+| Tests fail without clear reason | `axiom:test-debugger` |
+| Flaky tests in CI | `axiom:test-failure-analyzer` |
+
+### Axiom Skills Reference
+
+> Consult the detailed documentation in `.claude/docs/` for each area.
+
+#### Pre-commit Audits (Run before PR)
+
+| Situation | Skill | Doc |
+|-----------|-------|-----|
+| New SwiftUI code | `/axiom:audit swiftui-architecture` | `swiftui-code-style.md` |
+| New async/await code | `/axiom:audit concurrency` | `swift-concurrency.md` |
+| Persistence changes | `/axiom:audit core-data` | `swiftdata.md` |
+| New networking | `/axiom:audit networking` | `networking.md` |
+| New UI | `/axiom:audit accessibility` | `design-system.md` |
+| Codable/JSON code | `/axiom:audit codable` | `new-feature.md` |
+| Before release | `/axiom:audit security` | `security-privacy.md` |
+
+#### Problem Diagnosis
+
+| Symptom | Skill | Doc |
+|---------|-------|-----|
+| Random build failures | `axiom:build-fixer` agent | `diagnostics.md` |
+| App slow/jank | `/axiom:audit swiftui-performance` | `performance.md` |
+| Memory warnings | `/axiom:audit memory` | `performance.md` |
+| Battery drain | `/axiom:audit energy` | `performance.md` |
+| Production crash | `/axiom:analyze-crash` | `diagnostics.md` |
+| Slow build times | `/axiom:optimize-build` | `diagnostics.md` |
+
+#### Profiling and Performance
+
+| Need | Skill | Doc |
+|------|-------|-----|
+| Profile CPU/Memory | `/axiom:profile` | `performance.md` |
+| SwiftUI view updates | `/axiom:audit swiftui-performance` | `performance.md` |
+| Swift code hotspots | `/axiom:audit swift-performance` | `performance.md` |
+
+#### Modernization
+
+| Need | Skill | Doc |
+|------|-------|-----|
+| Migrate to iOS 17/18 patterns | `/axiom:modernize` | `swiftui-code-style.md` |
+| Update to Liquid Glass (iOS 26+) | `/axiom:audit liquid-glass` | `design-system.md` |
+
+### Apple Documentation Lookup
+
+Use **sosumi MCP** to search and fetch official Apple documentation:
+
+```bash
+# Search Apple docs
+mcp__sosumi__searchAppleDocumentation(query: "@Observable State SwiftUI")
+
+# Fetch specific doc
+mcp__sosumi__fetchAppleDocumentation(path: "/documentation/swiftui/state")
+```
+
+**When to use**: Before making architectural decisions, verify patterns with official Apple documentation.

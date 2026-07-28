@@ -1,0 +1,112 @@
+import Foundation
+
+// MARK: - APIClientImpl
+
+/// Default implementation of `APIClient`.
+/// Holds a `URLSession` reference and manages its lifecycle.
+/// Uses an interceptor chain for cross-cutting concerns (logging, retry, auth).
+final class APIClientImpl: APIClient, @unchecked Sendable {
+    // MARK: - Properties
+
+    private let session: URLSession
+    private let decoder: JSONDecoder
+    private let interceptorChain: InterceptorChain
+    private let configuration: EnvironmentConfiguration
+
+    // MARK: - Init
+
+    init(
+        configuration: EnvironmentConfiguration,
+        session: URLSession? = nil,
+        decoder: JSONDecoder = JSONDecoder(),
+        interceptors: [any RequestInterceptor]? = nil
+    ) {
+        self.configuration = configuration
+        // TODO: In a real project, use URLSessionFactory.makeSession(configuration:) here
+        let resolvedSession: URLSession
+        if let session {
+            resolvedSession = session
+        } else {
+            let sessionConfig = URLSessionConfiguration.default
+            sessionConfig.timeoutIntervalForRequest = configuration.requestTimeout
+            sessionConfig.timeoutIntervalForResource = configuration.resourceTimeout
+            resolvedSession = URLSession(configuration: sessionConfig)
+        }
+        self.session = resolvedSession
+        self.decoder = decoder
+        self.interceptorChain = InterceptorChain(
+            interceptors: interceptors ?? Self.defaultInterceptors(),
+            coreExecutor: { [resolvedSession] request in
+                let (data, response) = try await resolvedSession.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.unknown(SendableError(URLError(.badServerResponse)))
+                }
+                return (data, httpResponse)
+            }
+        )
+    }
+
+    deinit {
+        session.invalidateAndCancel()
+    }
+
+    // MARK: - APIClient (Internal Endpoints)
+
+    func request<T: Decodable & Sendable>(_ endpoint: Endpoint) async throws -> T {
+        guard let request = endpoint.buildRequest(baseURL: configuration.baseURL, apiVersion: configuration.apiVersion) else {
+            throw APIError.invalidURL
+        }
+        return try await execute(request)
+    }
+
+    // MARK: - APIClient (External Endpoints)
+
+    func request<T: Decodable & Sendable>(_ endpoint: some APIEndpoint) async throws -> T {
+        guard let request = endpoint.buildRequest() else {
+            throw APIError.invalidURL
+        }
+        return try await execute(request)
+    }
+
+    // MARK: - Private
+
+    private func execute<T: Decodable & Sendable>(_ request: URLRequest) async throws -> T {
+        let (data, response) = try await performRequest(request)
+
+        guard (200...299).contains(response.statusCode) else {
+            throw APIError.httpError(statusCode: response.statusCode, data: data)
+        }
+
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch let decodingError as DecodingError {
+            throw APIError.decodingError(decodingError)
+        }
+    }
+
+    private func performRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        do {
+            return try await interceptorChain.execute(request)
+        } catch let apiError as APIError {
+            throw apiError
+        } catch let urlError as URLError {
+            throw APIError.networkError(urlError)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw APIError.unknown(SendableError(error))
+        }
+    }
+}
+
+// MARK: - Interceptor Presets
+
+extension APIClientImpl {
+    static func defaultInterceptors() -> [any RequestInterceptor] {
+        [RetryInterceptor()]
+    }
+
+    static func minimalInterceptors() -> [any RequestInterceptor] {
+        []
+    }
+}

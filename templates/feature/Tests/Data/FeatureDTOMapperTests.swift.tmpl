@@ -1,0 +1,56 @@
+import Testing
+import Foundation
+@testable import {{ .ProjectName }}
+
+@Suite("{{ .FeatureName }}DTOMapperImpl Tests")
+struct {{ .FeatureName }}DTOMapperImplTests {
+    // MARK: - Properties
+
+    private var sut: {{ .FeatureName }}DTOMapperImpl
+
+    // MARK: - Setup
+
+    init() {
+        sut = {{ .FeatureName }}DTOMapperImpl()
+    }
+
+    // MARK: - Single Mapping
+
+    @Test("Given a single DTO, when map, then returns correct model")
+    func map_singleDTO_returnsCorrectModel() {
+        // Given
+        let dto = {{ .FeatureName }}DTO(id: "1", name: "Test Name", description: "Test Description")
+
+        // When
+        let model = sut.map(dto)
+
+        // Then
+        #expect(model.id == "1")
+        #expect(model.name == "Test Name")
+        #expect(model.description == "Test Description")
+    }
+
+    // MARK: - Multiple Mapping
+
+    @Test("Given multiple DTOs, when map, then returns correct models")
+    func map_multipleDTOs_returnsCorrectModels() {
+        // Given
+        let dtos = [
+            {{ .FeatureName }}DTO(id: "1", name: "First", description: "First item"),
+            {{ .FeatureName }}DTO(id: "2", name: "Second", description: "Second item"),
+            {{ .FeatureName }}DTO(id: "3", name: "Third", description: "Third item")
+        ]
+
+        // When
+        let models = sut.map(dtos)
+
+        // Then
+        #expect(models.count == 3)
+        #expect(models[0].id == "1")
+        #expect(models[0].name == "First")
+        #expect(models[1].id == "2")
+        #expect(models[1].name == "Second")
+        #expect(models[2].id == "3")
+        #expect(models[2].name == "Third")
+    }
+}

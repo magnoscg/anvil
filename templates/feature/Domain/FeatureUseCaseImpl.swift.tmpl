@@ -1,0 +1,28 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}UseCaseImpl
+
+/// Implementation of {{ .FeatureName }}UseCase
+struct {{ .FeatureName }}UseCaseImpl: {{ .FeatureName }}UseCase, Sendable {
+    // MARK: - Properties
+
+    private let repository: {{ .FeatureName }}Repository
+
+    // MARK: - Init
+
+    init(repository: {{ .FeatureName }}Repository) {
+        self.repository = repository
+    }
+
+    // MARK: - Public Methods
+
+    func execute() async throws -> [{{ .FeatureName }}Model] {
+        do {
+            return try await repository.fetch()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw DomainError.map(error)
+        }
+    }
+}

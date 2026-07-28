@@ -1,0 +1,55 @@
+import Foundation
+
+// MARK: - APIErrorResponse
+
+/// Decodable representation of a server error response body.
+/// Attempts multiple common JSON key patterns to extract error information.
+nonisolated struct APIErrorResponse: Sendable, Equatable {
+    // MARK: - Properties
+
+    let message: String?
+    let code: String?
+    let details: String?
+    let errors: [String: [String]]?
+
+    // MARK: - Decoding
+
+    static func decode(from data: Data?) -> APIErrorResponse? {
+        guard let data, !data.isEmpty else { return nil }
+        // Intentional: server error body decoding is best-effort; malformed JSON means no structured error info
+        return try? JSONDecoder().decode(APIErrorResponse.self, from: data)
+    }
+}
+
+// MARK: - Decodable
+
+extension APIErrorResponse: Decodable {
+    // MARK: - CodingKeys
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+        case error
+        case errorMessage = "error_message"
+        case code
+        case errorCode = "error_code"
+        case details
+        case errorDescription = "error_description"
+        case errors
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+            ?? container.decodeIfPresent(String.self, forKey: .error)
+            ?? container.decodeIfPresent(String.self, forKey: .errorMessage)
+
+        code = try container.decodeIfPresent(String.self, forKey: .code)
+            ?? container.decodeIfPresent(String.self, forKey: .errorCode)
+
+        details = try container.decodeIfPresent(String.self, forKey: .details)
+            ?? container.decodeIfPresent(String.self, forKey: .errorDescription)
+
+        errors = try container.decodeIfPresent([String: [String]].self, forKey: .errors)
+    }
+}

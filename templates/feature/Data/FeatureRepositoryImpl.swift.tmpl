@@ -1,0 +1,32 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}RepositoryImpl
+
+/// Implementation of {{ .FeatureName }}Repository
+struct {{ .FeatureName }}RepositoryImpl: {{ .FeatureName }}Repository {
+    // MARK: - Properties
+
+    private let remoteDataSource: {{ .FeatureName }}RemoteDataSource
+    private let mapper: {{ .FeatureName }}DTOMapper
+{{ if .IncludeLocalDataSource }}    private let localDataSource: {{ .FeatureName }}LocalDataSource
+{{ end }}{{ if .IncludeKeychain }}    private let keychainDataSource: {{ .FeatureName }}KeychainDataSource
+{{ end }}
+    // MARK: - Init
+
+    init(remoteDataSource: {{ .FeatureName }}RemoteDataSource,
+         mapper: {{ .FeatureName }}DTOMapper{{ if .IncludeLocalDataSource }},
+         localDataSource: {{ .FeatureName }}LocalDataSource{{ end }}{{ if .IncludeKeychain }},
+         keychainDataSource: {{ .FeatureName }}KeychainDataSource{{ end }}) {
+        self.remoteDataSource = remoteDataSource
+        self.mapper = mapper
+{{ if .IncludeLocalDataSource }}        self.localDataSource = localDataSource
+{{ end }}{{ if .IncludeKeychain }}        self.keychainDataSource = keychainDataSource
+{{ end }}    }
+
+    // MARK: - Public Methods
+
+    func fetch() async throws -> [{{ .FeatureName }}Model] {
+        let dtos = try await remoteDataSource.fetch()
+        return mapper.map(dtos)
+    }
+}

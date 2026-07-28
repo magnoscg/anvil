@@ -1,0 +1,51 @@
+import Testing
+import Foundation
+@testable import {{ .ProjectName }}
+
+@Suite("{{ .FeatureName }}DecoratorMapperImpl Tests")
+struct {{ .FeatureName }}DecoratorMapperImplTests {
+    // MARK: - Properties
+
+    private var sut: {{ .FeatureName }}DecoratorMapperImpl
+
+    // MARK: - Setup
+
+    init() {
+        sut = {{ .FeatureName }}DecoratorMapperImpl()
+    }
+
+    // MARK: - Mapping
+
+    @Test("Given a domain model, when map, then returns correct decorator")
+    func map_model_returnsCorrectDecorator() {
+        // Given
+        let model = {{ .FeatureName }}Model(id: "1",
+{{ "                                          " }}name: "Test Name",
+{{ "                                          " }}description: "Test Description")
+
+        // When
+        let decorator = sut.map(model)
+
+        // Then
+        #expect(decorator.id == "1")
+        #expect(decorator.displayName == "Test Name")
+        #expect(decorator.subtitle == "Test Description")
+    }
+
+    @Test("Given multiple models, when map each, then all decorators are correct")
+    func map_multipleModels_returnsCorrectDecorators() {
+        // Given
+        let models = [
+            {{ .FeatureName }}Model(id: "1", name: "First", description: "First desc"),
+            {{ .FeatureName }}Model(id: "2", name: "Second", description: "Second desc")
+        ]
+
+        // When
+        let decorators = models.map { sut.map($0) }
+
+        // Then
+        #expect(decorators.count == 2)
+        #expect(decorators[0].displayName == "First")
+        #expect(decorators[1].displayName == "Second")
+    }
+}

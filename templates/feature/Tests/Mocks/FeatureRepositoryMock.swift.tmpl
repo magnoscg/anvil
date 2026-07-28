@@ -1,0 +1,19 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}RepositoryMock
+
+/// Mock implementation of {{ .FeatureName }}Repository for testing
+final class {{ .FeatureName }}RepositoryMock: {{ .FeatureName }}Repository, @unchecked Sendable {
+    // MARK: - Properties
+
+    var fetchResult: Result<[{{ .FeatureName }}Model], Error> = .success([])
+    var fetchCallCount = 0
+
+    // MARK: - {{ .FeatureName }}Repository
+
+    func fetch() async throws -> [{{ .FeatureName }}Model] {
+        fetchCallCount += 1
+        return try fetchResult.get()
+    }
+}
