@@ -78,6 +78,10 @@ The wizard can drop optional "AI packs" into the generated project — conventio
 
 ![The AI Coding Packs step of the wizard, listing the seven selectable packs with their contents](docs/images/anvil-packs.png)
 
+Picking packs on an existing project writes them straight into it:
+
+![The wizard reporting that the AI coding tools were installed successfully, 39 files written](docs/images/anvil-done.png)
+
 | Pack | Contents |
 |------|----------|
 | `ios-architecture` | Clean Architecture rules, anti-patterns, 13 reference docs |
