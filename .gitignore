@@ -14,7 +14,8 @@ lancedb/
 
 # Go
 /bin/
-/anvilcli
+/dist/
+/anvil
 *.exe
 *.exe~
 *.dll

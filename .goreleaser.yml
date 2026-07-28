@@ -15,14 +15,15 @@ builds:
       - amd64
     ldflags:
       - -s -w
-      # NOTE: -X main.Version requires cmd/anvil/main.go to declare: var Version = "dev"
+      # NOTE: -X main.Version targets `var Version` in cmd/anvil/version.go
       - -X main.Version={{.Version}}
 
 archives:
   - id: anvil-archive
-    builds:
+    ids:
       - anvil
-    format: tar.gz
+    formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - install.sh
@@ -43,5 +44,5 @@ release:
   github:
     owner: magnoscg
     name: anvil
-  draft: true
+  draft: false
   prerelease: auto
