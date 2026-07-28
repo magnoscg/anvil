@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/internal/deps"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/internal/deps"
 )
 
 var validDirName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)

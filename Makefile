@@ -7,7 +7,7 @@ LDFLAGS := -ldflags "-X main.Version=$(VERSION)"
 
 ## build: Compile the binary with version info
 build:
-	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/anvilcli
+	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/anvil
 
 ## test: Run unit tests
 test:
@@ -19,7 +19,7 @@ test-integration:
 
 ## install: Install binary to GOPATH/bin
 install:
-	go install $(LDFLAGS) ./cmd/anvilcli
+	go install $(LDFLAGS) ./cmd/anvil
 
 ## clean: Remove build artifacts and test caches
 clean:

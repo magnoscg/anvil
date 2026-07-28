@@ -3,7 +3,7 @@ package feature
 import (
 	"path/filepath"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // FileJob represents a single template-to-destination file mapping.

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/internal/generator"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/internal/generator"
 )
 
 // stubRenderer is a test double for generator.TemplateRenderer.

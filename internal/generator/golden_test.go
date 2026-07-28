@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/templates"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/templates"
 )
 
 var update = flag.Bool("update", false, "update golden files")

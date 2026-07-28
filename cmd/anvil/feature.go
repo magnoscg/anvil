@@ -5,9 +5,9 @@ import (
 	"os"
 
 	"github.com/charmbracelet/huh"
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/internal/feature"
-	"github.com/oscarcanton/anvilcli/internal/generator"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/internal/feature"
+	"github.com/magnoscg/anvil/internal/generator"
 	"github.com/spf13/cobra"
 )
 

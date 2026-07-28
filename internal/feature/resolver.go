@@ -3,7 +3,7 @@ package feature
 import (
 	"fmt"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // WiringInstructions generates human-readable instructions for integrating a

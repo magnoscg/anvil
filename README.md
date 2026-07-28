@@ -7,15 +7,25 @@
 
 CLI tool that scaffolds new iOS projects following **Clean Architecture + MVVM + Router**. Written in Go with a BubbleTea TUI wizard. Generates production-ready Xcode projects with all layers wired up and ready to build.
 
+> **Requirements:** macOS with Xcode (the generated projects are Xcode projects). Go 1.26+ only if you install from source.
+
 ## Quick Start
 
-### Download from GitHub Releases (recommended)
+### Install with Go (recommended)
+
+```bash
+go install github.com/magnoscg/anvil/cmd/anvil@latest
+```
+
+The binary lands in `$(go env GOPATH)/bin` — make sure that's on your `PATH`.
+
+### Download a prebuilt binary
 
 ```bash
 # Download the latest release
 gh release download --repo magnoscg/anvil --pattern "anvil_*_darwin_arm64.tar.gz"
 
-# Extract and install
+# Extract and install to /usr/local/bin
 tar xzf anvil_*_darwin_arm64.tar.gz
 ./install.sh
 ```
@@ -104,7 +114,7 @@ go test ./internal/generator/ -run TestGolden -update
 AnvilCLI is organized as a standard Go project:
 
 ```
-cmd/anvilcli/       CLI entry point (Cobra commands)
+cmd/anvil/       CLI entry point (Cobra commands)
 internal/
   config/           Data models, configuration, naming utilities
   deps/             System dependency detection

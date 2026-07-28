@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // FileJob describes a single file to render or copy during project generation.

@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // OpenPacksMsg is sent when the user navigates to the pack selection screen.

@@ -10,8 +10,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/templates"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/templates"
 )
 
 // -- Helpers --

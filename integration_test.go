@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/internal/feature"
-	"github.com/oscarcanton/anvilcli/internal/generator"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/internal/feature"
+	"github.com/magnoscg/anvil/internal/generator"
 )
 
 // testProjectConfig returns a minimal ProjectConfig suitable for integration tests.

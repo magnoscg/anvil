@@ -8,7 +8,7 @@ import (
 
 // Version is set at build time via ldflags:
 //
-//	go build -ldflags "-X main.Version=1.0.0" ./cmd/anvilcli
+//	go build -ldflags "-X main.Version=1.0.0" ./cmd/anvil
 var Version = "dev"
 
 var versionCmd = &cobra.Command{

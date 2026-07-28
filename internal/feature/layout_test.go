@@ -3,7 +3,7 @@ package feature
 import (
 	"testing"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 func TestFeatureLayoutBaseFeature(t *testing.T) {

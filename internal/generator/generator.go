@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // ProjectGenerator orchestrates the full project creation pipeline for `anvil init`.

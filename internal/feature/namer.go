@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // swiftKeywords lists reserved Swift keywords that cannot be used as feature names.

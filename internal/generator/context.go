@@ -3,7 +3,7 @@ package generator
 import (
 	"strings"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // ProjectTemplateContext holds ALL variables available to project templates.

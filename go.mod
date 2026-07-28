@@ -1,4 +1,4 @@
-module github.com/oscarcanton/anvilcli
+module github.com/magnoscg/anvil
 
 go 1.26.1
 

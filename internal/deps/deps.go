@@ -6,7 +6,7 @@ package deps
 import (
 	"context"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // CommandResult holds the output and exit status of an executed command.

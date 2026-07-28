@@ -9,7 +9,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // PackRenderer renders AI coding packs into a project directory.

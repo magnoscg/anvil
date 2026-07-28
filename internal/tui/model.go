@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/internal/deps"
-	"github.com/oscarcanton/anvilcli/internal/generator"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/internal/deps"
+	"github.com/magnoscg/anvil/internal/generator"
 )
 
 // Screen enumerates the wizard screens.

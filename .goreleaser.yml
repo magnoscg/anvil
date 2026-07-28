@@ -4,7 +4,7 @@ project_name: anvil
 
 builds:
   - id: anvil
-    main: ./cmd/anvilcli
+    main: ./cmd/anvil
     binary: anvil
     env:
       - CGO_ENABLED=0
@@ -15,7 +15,7 @@ builds:
       - amd64
     ldflags:
       - -s -w
-      # NOTE: -X main.Version requires cmd/anvilcli/main.go to declare: var Version = "dev"
+      # NOTE: -X main.Version requires cmd/anvil/main.go to declare: var Version = "dev"
       - -X main.Version={{.Version}}
 
 archives:

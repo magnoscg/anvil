@@ -3,7 +3,7 @@ package generator
 import (
 	"context"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // MARK: - Test Mocks

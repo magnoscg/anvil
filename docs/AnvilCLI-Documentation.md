@@ -57,6 +57,14 @@ anvil feature <name>          # Add feature to existing project
 anvil version                 # Print version
 ```
 
+### With `go install`
+
+```bash
+go install github.com/magnoscg/anvil/cmd/anvil@latest
+```
+
+Installs to `$(go env GOPATH)/bin`. Requires Go 1.26+.
+
 ### From GitHub Release
 
 ```bash
@@ -83,7 +91,7 @@ curl -L https://github.com/magnoscg/anvil/releases/latest/download/anvil_<versio
 ## Project Structure
 
 ```
-cmd/anvilcli/                          # CLI entry points
+cmd/anvil/                          # CLI entry points
     main.go                            # Program entry
     root.go                            # Root cobra command
     cmd_init.go                        # `anvil init` — assembles dependencies, launches TUI
@@ -181,7 +189,7 @@ Adds a new feature to an existing AnvilCLI-generated project.
 
 Prints the CLI version. Version is set at build time via ldflags:
 ```bash
-go build -ldflags "-X main.Version=0.2.0" ./cmd/anvilcli
+go build -ldflags "-X main.Version=0.2.0" ./cmd/anvil
 ```
 
 ---
@@ -781,7 +789,7 @@ project_name: anvil
 
 builds:
   - id: anvil
-    main: ./cmd/anvilcli
+    main: ./cmd/anvil
     binary: anvil
     env: [CGO_ENABLED=0]
     goos: [darwin]

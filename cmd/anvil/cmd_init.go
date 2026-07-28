@@ -5,11 +5,11 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/oscarcanton/anvilcli/internal/config"
-	"github.com/oscarcanton/anvilcli/internal/deps"
-	"github.com/oscarcanton/anvilcli/internal/feature"
-	"github.com/oscarcanton/anvilcli/internal/generator"
-	"github.com/oscarcanton/anvilcli/internal/tui"
+	"github.com/magnoscg/anvil/internal/config"
+	"github.com/magnoscg/anvil/internal/deps"
+	"github.com/magnoscg/anvil/internal/feature"
+	"github.com/magnoscg/anvil/internal/generator"
+	"github.com/magnoscg/anvil/internal/tui"
 	"github.com/spf13/cobra"
 )
 

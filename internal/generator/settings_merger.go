@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // SettingsMerger merges a JSON fragment from the embedded FS into an existing

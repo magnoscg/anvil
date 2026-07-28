@@ -5,7 +5,7 @@ package generator
 import (
 	"embed"
 
-	"github.com/oscarcanton/anvilcli/templates"
+	"github.com/magnoscg/anvil/templates"
 )
 
 // TemplateFS is the embedded filesystem containing all template files.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/oscarcanton/anvilcli/internal/config"
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // TemplateRenderer renders Go text/template files from the embedded FS.
