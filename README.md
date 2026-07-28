@@ -70,6 +70,34 @@ anvil feature Auth
 
 `anvil feature` scaffolds all files for a new feature across Domain, Data, and Features layers, including tests and mocks. Must be run inside a project created with `anvil init`.
 
+## AI packs
+
+The wizard can drop optional "AI packs" into the generated project — conventions, skills and agent definitions for Claude Code and OpenCode:
+
+| Pack | Contents |
+|------|----------|
+| `ios-architecture` | Clean Architecture rules, anti-patterns, 13 reference docs |
+| `prd-planner` | 10 agents + 16 commands (dev-prd, dev-plan, dev-build, dev-qa…) |
+| `axiom-ios` | Wiring for the Axiom simulator skills, audits and debugging agents |
+| `swift-design-patterns` | 22 design pattern skills + 3 overview skills |
+| `ios-skills` | 7 skills: Swift Charts, Concurrency, SwiftUI Expert, Glass UI, Tech Docs |
+| `gitflow` | Git branching conventions and workflow skill |
+| `github-actions` | CI/CD workflows for Go + Swift |
+
+### Third-party prerequisites
+
+Some packs configure the project to use tools that are **not bundled here** and must be installed separately:
+
+- **[Axiom](https://github.com/CharlesWiltgen/Axiom)** by Charles Wiltgen (MIT) — the `axiom-ios` pack writes conventions for its skills and agents, but ships none of its code. Install it with:
+  ```bash
+  claude plugin marketplace add CharlesWiltgen/Axiom
+  claude plugin install axiom@axiom-marketplace
+  ```
+- **sosumi MCP** — referenced by `axiom-ios` for Apple documentation lookups.
+- **ui-ux-pro-max** — referenced by the `prd-planner` design agent.
+
+Packs that reference a missing tool still generate fine; those particular commands simply won't resolve.
+
 ## Development
 
 ### Build

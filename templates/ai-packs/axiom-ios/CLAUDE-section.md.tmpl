@@ -1,5 +1,18 @@
 ## Axiom iOS Tools
 
+> **Axiom is a third-party plugin and is not bundled with this project.**
+> It is [Axiom](https://github.com/CharlesWiltgen/Axiom) by Charles Wiltgen,
+> MIT licensed. This pack only configures the project to use it — every
+> `/axiom:*` command below requires Axiom to be installed first:
+>
+> ```bash
+> claude plugin marketplace add CharlesWiltgen/Axiom
+> claude plugin install axiom@axiom-marketplace
+> ```
+>
+> Restart Claude Code afterwards so the plugin loads. Without it, the commands
+> in this section will not resolve.
+
 ### Quick Commands
 
 | Action | Command |
@@ -72,7 +85,9 @@
 
 ### Apple Documentation Lookup
 
-Use **sosumi MCP** to search and fetch official Apple documentation:
+Use **sosumi MCP** to search and fetch official Apple documentation. This is a
+separate third-party MCP server, also not bundled — configure it yourself if
+you want these lookups:
 
 ```bash
 # Search Apple docs
