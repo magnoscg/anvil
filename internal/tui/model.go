@@ -67,6 +67,16 @@ func (m WizardModel) Init() tea.Cmd {
 	return nil
 }
 
+// InstalledPacks reports the AI packs that were written to disk. It returns nil
+// when the wizard exited before generation finished, so callers do not act on a
+// selection that never landed.
+func (m WizardModel) InstalledPacks() []string {
+	if !m.generateView.done || m.generateView.err != nil {
+		return nil
+	}
+	return m.cfg.AIPacks
+}
+
 // Update implements tea.Model.
 func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {

@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/magnoscg/anvil/internal/config"
@@ -45,13 +47,39 @@ Domain, Data, Features, Navigation, DI, and SwiftData persistence.`,
 		model := tui.NewWizardModel(checker, gen)
 		p := tea.NewProgram(model)
 
-		if _, err := p.Run(); err != nil {
+		finalModel, err := p.Run()
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error running wizard: %v\n", err)
 			return err
 		}
 
+		if wizard, ok := finalModel.(tui.WizardModel); ok {
+			warnMissingAxiom(os.Stdout, wizard.InstalledPacks())
+		}
+
 		return nil
 	},
+}
+
+// warnMissingAxiom points the user at Axiom's install commands when they
+// scaffolded the axiom-ios pack without having the plugin. The pack only writes
+// conventions for Axiom, so without it the generated /axiom:* commands are dead.
+func warnMissingAxiom(w io.Writer, packs []string) {
+	if !slices.Contains(packs, deps.AxiomPackSlug) || deps.AxiomInstalled() {
+		return
+	}
+
+	fmt.Fprint(w, `
+Note: the axiom-ios pack is configured, but Axiom is not installed, so its
+/axiom:* commands will not resolve. Install it with:
+
+  claude plugin marketplace add CharlesWiltgen/Axiom
+  claude plugin install axiom@axiom-marketplace
+
+Then restart Claude Code. Axiom is by Charles Wiltgen, MIT licensed:
+https://github.com/CharlesWiltgen/Axiom
+
+`)
 }
 
 func init() {
