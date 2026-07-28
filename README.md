@@ -1,13 +1,6 @@
 # AnvilCLI
 
-```
- █████╗  ███╗   ██╗ ██╗   ██╗ ██╗ ██╗
-██╔══██╗ ████╗  ██║ ██║   ██║ ██║ ██║
-███████║ ██╔██╗ ██║ ██║   ██║ ██║ ██║
-██╔══██║ ██║╚██╗██║ ╚██╗ ██╔╝ ██║ ██║
-██║  ██║ ██║ ╚████║  ╚████╔╝  ██║ ███████╗
-╚═╝  ╚═╝ ╚═╝  ╚═══╝   ╚═══╝   ╚═╝ ╚══════╝
-```
+![The anvil init wizard, showing the ANVIL banner and the choice between creating a new iOS project or installing AI coding tools](docs/images/anvil-init.png)
 
 [![Release](https://img.shields.io/github/v/release/magnoscg/anvil?style=flat-square)](https://github.com/magnoscg/anvil/releases)
 [![Platform](https://img.shields.io/badge/platform-iOS%2018+-blue?style=flat-square)](https://developer.apple.com/ios/)
