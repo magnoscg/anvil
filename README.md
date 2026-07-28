@@ -76,6 +76,8 @@ anvil feature Auth
 
 The wizard can drop optional "AI packs" into the generated project — conventions, skills and agent definitions for Claude Code and OpenCode:
 
+![The AI Coding Packs step of the wizard, listing the seven selectable packs with their contents](docs/images/anvil-packs.png)
+
 | Pack | Contents |
 |------|----------|
 | `ios-architecture` | Clean Architecture rules, anti-patterns, 13 reference docs |
