@@ -1,5 +1,14 @@
 # AnvilCLI
 
+```
+ █████╗  ███╗   ██╗ ██╗   ██╗ ██╗ ██╗
+██╔══██╗ ████╗  ██║ ██║   ██║ ██║ ██║
+███████║ ██╔██╗ ██║ ██║   ██║ ██║ ██║
+██╔══██║ ██║╚██╗██║ ╚██╗ ██╔╝ ██║ ██║
+██║  ██║ ██║ ╚████║  ╚████╔╝  ██║ ███████╗
+╚═╝  ╚═╝ ╚═╝  ╚═══╝   ╚═══╝   ╚═╝ ╚══════╝
+```
+
 [![Release](https://img.shields.io/github/v/release/magnoscg/anvil?style=flat-square)](https://github.com/magnoscg/anvil/releases)
 [![Platform](https://img.shields.io/badge/platform-iOS%2018+-blue?style=flat-square)](https://developer.apple.com/ios/)
 [![Swift](https://img.shields.io/badge/Swift-6-orange?style=flat-square)](https://swift.org)
