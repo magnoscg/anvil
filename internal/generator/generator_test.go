@@ -3,6 +3,7 @@ package generator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +39,70 @@ func baseCfg(outputDir string) config.ProjectConfig {
 		OutputDir:    outputDir,
 		Mode:         config.ModeProject,
 	}
+}
+
+func snapshotPath(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(path)
+		if err != nil {
+			return "", err
+		}
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return "", err
+		}
+		resolvedSnapshot, err := snapshotPath(resolved)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("symlink:%s\n%s", target, resolvedSnapshot), nil
+	}
+
+	if !info.IsDir() {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("file:%o:%x", info.Mode().Perm(), data), nil
+	}
+
+	var snapshot strings.Builder
+	err = filepath.WalkDir(path, func(current string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative, err := filepath.Rel(path, current)
+		if err != nil {
+			return err
+		}
+		entryInfo, err := os.Lstat(current)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(&snapshot, "%s:%s:%o", relative, entryInfo.Mode().Type(), entryInfo.Mode().Perm())
+		if entryInfo.Mode().IsRegular() {
+			data, err := os.ReadFile(current)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(&snapshot, ":%x", data)
+		}
+		if entryInfo.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(current)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(&snapshot, ":%s", target)
+		}
+		snapshot.WriteByte('\n')
+		return nil
+	})
+	return snapshot.String(), err
 }
 
 // -- Tests --
@@ -120,6 +185,133 @@ func TestGenerateRollbackOnTemplateRenderFailure(t *testing.T) {
 	projectDir := filepath.Join(dir, "TestApp")
 	if _, statErr := os.Stat(projectDir); !os.IsNotExist(statErr) {
 		t.Errorf("project directory %s should have been rolled back (removed)", projectDir)
+	}
+}
+
+func TestGenerateRejectsExistingDestinationWithoutChangingIt(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, path string)
+	}{
+		{
+			name: "empty directory",
+			setup: func(t *testing.T, path string) {
+				t.Helper()
+				if err := os.Mkdir(path, 0755); err != nil {
+					t.Fatalf("setup directory: %v", err)
+				}
+			},
+		},
+		{
+			name: "directory with content",
+			setup: func(t *testing.T, path string) {
+				t.Helper()
+				if err := os.Mkdir(path, 0755); err != nil {
+					t.Fatalf("setup directory: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(path, "keep.txt"), []byte("keep me"), 0644); err != nil {
+					t.Fatalf("setup file: %v", err)
+				}
+			},
+		},
+		{
+			name: "file",
+			setup: func(t *testing.T, path string) {
+				t.Helper()
+				if err := os.WriteFile(path, []byte("keep me"), 0644); err != nil {
+					t.Fatalf("setup file: %v", err)
+				}
+			},
+		},
+		{
+			name: "symlink",
+			setup: func(t *testing.T, path string) {
+				t.Helper()
+				target := filepath.Join(filepath.Dir(path), "target")
+				if err := os.Mkdir(target, 0755); err != nil {
+					t.Fatalf("setup target: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(target, "keep.txt"), []byte("keep me"), 0644); err != nil {
+					t.Fatalf("setup target file: %v", err)
+				}
+				if err := os.Symlink(target, path); err != nil {
+					t.Fatalf("setup symlink: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			projectDir := filepath.Join(dir, "TestApp")
+			test.setup(t, projectDir)
+
+			before, beforeErr := snapshotPath(projectDir)
+			if beforeErr != nil {
+				t.Fatalf("snapshot before: %v", beforeErr)
+			}
+
+			writer := NewDiskWriter()
+			gen := NewProjectGenerator(
+				NewRenderer(minimalBaseFS(), writer),
+				writer,
+				&mockXcodeProjGenerator{},
+				&mockGitRunner{},
+				&mockMarkerReadWriter{},
+				minimalBaseFS(),
+				nil,
+				&mockPackRenderer{},
+			)
+
+			_, err := gen.Generate(context.Background(), baseCfg(dir))
+			if err == nil {
+				t.Fatal("expected existing destination error")
+			}
+
+			after, afterErr := snapshotPath(projectDir)
+			if afterErr != nil {
+				t.Fatalf("snapshot after: %v", afterErr)
+			}
+			if before != after {
+				t.Fatalf("destination changed:\nbefore: %s\nafter:  %s", before, after)
+			}
+		})
+	}
+}
+
+func TestGenerateRejectsInvalidProjectNamesBeforeWriting(t *testing.T) {
+	for _, name := range []string{"", "../Escape", "App/Child", `App\\Child`, "/tmp/App", "."} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writer := NewDiskWriter()
+			gen := NewProjectGenerator(
+				NewRenderer(minimalBaseFS(), writer),
+				writer,
+				&mockXcodeProjGenerator{},
+				&mockGitRunner{},
+				&mockMarkerReadWriter{},
+				minimalBaseFS(),
+				nil,
+				&mockPackRenderer{},
+			)
+			cfg := baseCfg(dir)
+			cfg.Name = name
+
+			_, err := gen.Generate(context.Background(), cfg)
+			var invalidName config.InvalidProjectNameError
+			if !errors.As(err, &invalidName) {
+				t.Fatalf("error = %v, want InvalidProjectNameError", err)
+			}
+
+			entries, readErr := os.ReadDir(dir)
+			if readErr != nil {
+				t.Fatalf("read output directory: %v", readErr)
+			}
+			if len(entries) != 0 {
+				t.Fatalf("invalid name created output: %v", entries)
+			}
+		})
 	}
 }
 

@@ -8,6 +8,16 @@ type MissingDependencyError struct {
 	InstallHint string
 }
 
+// InvalidProjectNameError indicates that a project name cannot be used as a
+// single filesystem directory component.
+type InvalidProjectNameError struct {
+	Name string
+}
+
+func (e InvalidProjectNameError) Error() string {
+	return fmt.Sprintf("invalid project name %q; use a letter followed by letters, numbers, hyphens, or underscores", e.Name)
+}
+
 func (e MissingDependencyError) Error() string {
 	msg := fmt.Sprintf("required dependency %q is not installed", e.Name)
 	if e.InstallHint != "" {

@@ -15,6 +15,9 @@ type FileWriter interface {
 	// EnsureDir creates a directory (and parents) if it does not exist.
 	EnsureDir(path string) error
 
+	// CreateDir creates exactly one new directory and fails if the path exists.
+	CreateDir(path string) error
+
 	// CopyFile copies a file from src to dst, preserving permissions.
 	CopyFile(src, dst string) error
 }
@@ -45,6 +48,15 @@ func (w *DiskWriter) WriteFile(path string, content []byte) error {
 func (w *DiskWriter) EnsureDir(path string) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return fmt.Errorf("creating directory %s: %w", path, err)
+	}
+	return nil
+}
+
+// CreateDir creates a new directory with 0755 permissions. Parent directories
+// must already exist and an existing path is never reused.
+func (w *DiskWriter) CreateDir(path string) error {
+	if err := os.Mkdir(path, 0755); err != nil {
+		return fmt.Errorf("creating new directory %s: %w", path, err)
 	}
 	return nil
 }

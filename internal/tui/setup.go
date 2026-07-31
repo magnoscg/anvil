@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,8 +11,6 @@ import (
 	"github.com/magnoscg/anvil/internal/config"
 	"github.com/magnoscg/anvil/internal/deps"
 )
-
-var validDirName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 
 const (
 	fieldProjectName = iota
@@ -442,7 +439,7 @@ func (m setupModel) handleScopeKey(msg tea.KeyPressMsg) (setupModel, tea.Cmd) {
 
 func (m setupModel) tryConfirm() (setupModel, tea.Cmd) {
 	name := m.fields[fieldProjectName].value
-	if name == "" || !validDirName.MatchString(name) {
+	if config.ValidateProjectName(name) != nil {
 		m.focused = fieldProjectName
 		m.cursor = len(m.fields[fieldProjectName].value)
 		return m, nil
@@ -584,7 +581,7 @@ func (m setupModel) view() string {
 
 		if i == fieldProjectName {
 			name := m.fields[fieldProjectName].value
-			if name != "" && !validDirName.MatchString(name) {
+			if name != "" && config.ValidateProjectName(name) != nil {
 				b.WriteString("                          " + m.theme.ErrorText.Render("Must start with a letter (a-z, 0-9, -, _ only)") + "\n")
 			}
 		}

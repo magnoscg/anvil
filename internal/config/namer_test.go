@@ -2,6 +2,32 @@ package config
 
 import "testing"
 
+func TestValidateProjectName(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{name: "MyApp"},
+		{name: "my-app_2"},
+		{name: "", wantErr: true},
+		{name: "2App", wantErr: true},
+		{name: "../App", wantErr: true},
+		{name: "App/Child", wantErr: true},
+		{name: `App\\Child`, wantErr: true},
+		{name: ".", wantErr: true},
+		{name: "App Name", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateProjectName(test.name)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("ValidateProjectName(%q) error = %v, wantErr %v", test.name, err, test.wantErr)
+			}
+		})
+	}
+}
+
 func TestToPascalCase(t *testing.T) {
 	tests := []struct {
 		input string

@@ -1,9 +1,20 @@
 package config
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 )
+
+var validProjectName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
+
+// ValidateProjectName verifies that name is one safe directory component.
+func ValidateProjectName(name string) error {
+	if !validProjectName.MatchString(name) {
+		return InvalidProjectNameError{Name: name}
+	}
+	return nil
+}
 
 // ToPascalCase converts a string to PascalCase.
 // Handles hyphen-separated, underscore-separated, camelCase, and PascalCase input.

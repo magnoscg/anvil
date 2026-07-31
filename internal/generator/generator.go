@@ -77,26 +77,41 @@ func NewProjectGenerator(
 //
 // On ANY error at steps 1-6 or 8, Rollback is called to clean up.
 // Git failure (step 7) is non-fatal: a warning is logged but generation succeeds.
-func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.ProjectConfig) (config.GenerationResult, error) {
+func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.ProjectConfig) (result config.GenerationResult, resultErr error) {
 	cfg.Normalize()
 
 	start := time.Now()
-	result := config.GenerationResult{}
+	if err := config.ValidateProjectName(cfg.Name); err != nil {
+		return result, err
+	}
 
 	projectDir := filepath.Join(cfg.OutputDir, cfg.Name)
 	result.ProjectDir = projectDir
 
-	// Step 1: Create output directory
-	if err := g.writer.EnsureDir(projectDir); err != nil {
+	// Step 1: Create and exclusively own the output directory.
+	if err := g.writer.EnsureDir(filepath.Dir(projectDir)); err != nil {
+		return result, fmt.Errorf("creating output directory: %w", err)
+	}
+	if err := g.writer.CreateDir(projectDir); err != nil {
 		return result, fmt.Errorf("creating project directory: %w", err)
 	}
+	defer func() {
+		if resultErr == nil {
+			return
+		}
+		if rollbackErr := Rollback(projectDir); rollbackErr != nil {
+			resultErr = config.RollbackError{
+				OriginalError: resultErr,
+				RollbackCause: rollbackErr,
+			}
+		}
+	}()
 
 	tmplCtx := NewProjectContext(cfg)
 
 	// Step 2: Render base templates
 	baseFiles, err := g.renderTemplateDir("base", tmplCtx, projectDir, cfg.Name)
 	if err != nil {
-		g.rollback(projectDir)
 		return result, fmt.Errorf("rendering base templates: %w", err)
 	}
 	result.FilesCreated = append(result.FilesCreated, baseFiles...)
@@ -104,7 +119,6 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 	// Step 2b: Render per-scheme xcconfig files
 	schemeFiles, err := g.renderSchemeXcconfigs(cfg, projectDir)
 	if err != nil {
-		g.rollback(projectDir)
 		return result, fmt.Errorf("rendering scheme xcconfigs: %w", err)
 	}
 	result.FilesCreated = append(result.FilesCreated, schemeFiles...)
@@ -113,7 +127,6 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 	if cfg.IncludeSwiftData {
 		sdFiles, err := g.renderTemplateDir("swiftdata", tmplCtx, projectDir, cfg.Name)
 		if err != nil {
-			g.rollback(projectDir)
 			return result, fmt.Errorf("rendering SwiftData templates: %w", err)
 		}
 		result.FilesCreated = append(result.FilesCreated, sdFiles...)
@@ -124,7 +137,6 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 		resolved := config.ResolveDependencies(cfg.AIPacks)
 		packFiles, err := g.packRenderer.RenderPacks(resolved, cfg.SkillsScope, tmplCtx, projectDir)
 		if err != nil {
-			g.rollback(projectDir)
 			return result, fmt.Errorf("rendering AI packs: %w", err)
 		}
 		result.FilesCreated = append(result.FilesCreated, packFiles...)
@@ -140,7 +152,6 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 		}
 		forgeResult, err := g.forge.Forge(featureCfg)
 		if err != nil {
-			g.rollback(projectDir)
 			return result, fmt.Errorf("forging Example feature: %w", err)
 		}
 		result.FilesCreated = append(result.FilesCreated, forgeResult.FilesCreated...)
@@ -149,7 +160,6 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 	// Step 6: Generate Xcode project (.xcodeproj bundle)
 	xcodeOutput, err := g.xcodeproj.Generate(ctx, projectDir, cfg)
 	if err != nil {
-		g.rollback(projectDir)
 		return result, fmt.Errorf("generating Xcode project: %w", err)
 	}
 	result.XcodeProjectOutput = xcodeOutput
@@ -177,7 +187,6 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 		CreatedAt:    time.Now(),
 	}
 	if err := g.marker.Write(projectDir, anvilMarker); err != nil {
-		g.rollback(projectDir)
 		return result, fmt.Errorf("writing .anvil.yml: %w", err)
 	}
 	result.FilesCreated = append(result.FilesCreated, ".anvil.yml")
@@ -344,11 +353,4 @@ func buildSchemeContext(scheme string, cfg config.ProjectConfig, isProduction bo
 	}
 
 	return ctx
-}
-
-// rollback removes the project directory on generation failure.
-func (g *DefaultProjectGenerator) rollback(dir string) {
-	if err := Rollback(dir); err != nil {
-		log.Printf("ERROR: rollback failed for %s: %v", dir, err)
-	}
 }
