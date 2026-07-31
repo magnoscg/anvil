@@ -2,251 +2,120 @@ package generator
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
-	"strings"
+	"errors"
 	"testing"
 	"testing/fstest"
+
+	"github.com/magnoscg/anvil/internal/config"
 )
 
-func TestMergeArraysAppendDedup(t *testing.T) {
-	memFS := fstest.MapFS{
-		"fragment.json": &fstest.MapFile{
-			Data: []byte(`{"permissions":{"allow":["b"]}}`),
-		},
-	}
+func TestSettingsMergeArraysAppendDedup(t *testing.T) {
+	merger := NewSettingsMerger(NewDiskWriter(), fstest.MapFS{
+		"fragment.json": &fstest.MapFile{Data: []byte(`{"permissions":{"allow":["Bash(git:*)","Read"]}}`)},
+	})
 
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	existing := `{"permissions":{"allow":["a"]}}`
-	if err := os.WriteFile(settingsPath, []byte(existing), 0644); err != nil {
-		t.Fatalf("writing existing settings: %v", err)
-	}
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	if err := merger.Merge(settingsPath, "fragment.json"); err != nil {
-		t.Fatalf("Merge failed: %v", err)
-	}
-
-	got := readJSON(t, settingsPath)
-	permissions := got["permissions"].(map[string]any)
-	allow := permissions["allow"].([]any)
-
-	if len(allow) != 2 {
-		t.Fatalf("allow has %d items, want 2", len(allow))
-	}
-	if allow[0] != "a" || allow[1] != "b" {
-		t.Errorf("allow = %v, want [a, b]", allow)
+	result := mergeSettingsForTest(t, merger, `{"permissions":{"allow":["Read","Write"]}}`, "fragment.json")
+	allow := result["permissions"].(map[string]any)["allow"].([]any)
+	want := []any{"Read", "Write", "Bash(git:*)"}
+	if !equalJSONValues(allow, want) {
+		t.Fatalf("allow = %v, want %v", allow, want)
 	}
 }
 
-func TestMergeObjects(t *testing.T) {
-	memFS := fstest.MapFS{
-		"fragment.json": &fstest.MapFile{
-			Data: []byte(`{"b":2}`),
-		},
+func TestSettingsMergeObjectsRecursively(t *testing.T) {
+	merger := NewSettingsMerger(NewDiskWriter(), fstest.MapFS{
+		"one.json": &fstest.MapFile{Data: []byte(`{"env":{"B":"2"},"nested":{"level":{"second":2}}}`)},
+		"two.json": &fstest.MapFile{Data: []byte(`{"env":{"C":"3"},"nested":{"level":{"third":3}}}`)},
+	})
+
+	result := mergeSettingsForTest(t, merger, `{"env":{"A":"1"},"nested":{"level":{"first":1}}}`, "one.json", "two.json")
+	environment := result["env"].(map[string]any)
+	if environment["A"] != "1" || environment["B"] != "2" || environment["C"] != "3" {
+		t.Fatalf("merged environment = %v", environment)
 	}
-
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	if err := os.WriteFile(settingsPath, []byte(`{"a":1}`), 0644); err != nil {
-		t.Fatalf("writing existing settings: %v", err)
-	}
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	if err := merger.Merge(settingsPath, "fragment.json"); err != nil {
-		t.Fatalf("Merge failed: %v", err)
-	}
-
-	got := readJSON(t, settingsPath)
-
-	if got["a"] != float64(1) {
-		t.Errorf("a = %v, want 1", got["a"])
-	}
-	if got["b"] != float64(2) {
-		t.Errorf("b = %v, want 2", got["b"])
+	level := result["nested"].(map[string]any)["level"].(map[string]any)
+	if len(level) != 3 {
+		t.Fatalf("merged nested object = %v", level)
 	}
 }
 
-func TestMergeSkipExistingScalars(t *testing.T) {
-	memFS := fstest.MapFS{
-		"fragment.json": &fstest.MapFile{
-			Data: []byte(`{"key":"new"}`),
-		},
-	}
+func TestSettingsMergeKeepsExistingScalars(t *testing.T) {
+	merger := NewSettingsMerger(NewDiskWriter(), fstest.MapFS{
+		"fragment.json": &fstest.MapFile{Data: []byte(`{"theme":"light","enabled":false,"count":2}`)},
+	})
 
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	if err := os.WriteFile(settingsPath, []byte(`{"key":"old"}`), 0644); err != nil {
-		t.Fatalf("writing existing settings: %v", err)
-	}
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	if err := merger.Merge(settingsPath, "fragment.json"); err != nil {
-		t.Fatalf("Merge failed: %v", err)
-	}
-
-	got := readJSON(t, settingsPath)
-	if got["key"] != "old" {
-		t.Errorf("key = %v, want 'old' (first wins)", got["key"])
+	result := mergeSettingsForTest(t, merger, `{"theme":"dark","enabled":true,"count":1}`, "fragment.json")
+	if result["theme"] != "dark" || result["enabled"] != true || result["count"] != float64(1) {
+		t.Fatalf("existing scalar values were replaced: %v", result)
 	}
 }
 
-func TestMergeWithNonExistentFile(t *testing.T) {
-	memFS := fstest.MapFS{
-		"fragment.json": &fstest.MapFile{
-			Data: []byte(`{"key":"value","nested":{"a":1}}`),
-		},
-	}
+func TestSettingsMergeUsesDeterministicDeepEquality(t *testing.T) {
+	merger := NewSettingsMerger(NewDiskWriter(), fstest.MapFS{
+		"fragment.json": &fstest.MapFile{Data: []byte(`{"items":[{"a":1,"b":2},{"a":2}]}`)},
+	})
 
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	if err := merger.Merge(settingsPath, "fragment.json"); err != nil {
-		t.Fatalf("Merge failed: %v", err)
-	}
-
-	got := readJSON(t, settingsPath)
-	if got["key"] != "value" {
-		t.Errorf("key = %v, want 'value'", got["key"])
-	}
-
-	nested := got["nested"].(map[string]any)
-	if nested["a"] != float64(1) {
-		t.Errorf("nested.a = %v, want 1", nested["a"])
+	result := mergeSettingsForTest(t, merger, `{"items":[{"b":2,"a":1}]}`, "fragment.json")
+	items := result["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("items = %v, want one deduplicated object and one new object", items)
 	}
 }
 
-func TestMergeDeepRecursive(t *testing.T) {
-	memFS := fstest.MapFS{
-		"fragment.json": &fstest.MapFile{
-			Data: []byte(`{"level1":{"level2":{"newKey":"newVal","array":["c"]}}}`),
-		},
+func TestSettingsMergeRejectsInvalidJSONAndNonObjects(t *testing.T) {
+	tests := []struct {
+		name      string
+		existing  string
+		fragment  string
+		errorPath string
+	}{
+		{name: "invalid existing", existing: `{broken`, fragment: `{}`, errorPath: "settings.json"},
+		{name: "existing array", existing: `[]`, fragment: `{}`, errorPath: "settings.json"},
+		{name: "invalid fragment", existing: `{}`, fragment: `{broken`, errorPath: "fragment.json"},
+		{name: "fragment array", existing: `{}`, fragment: `[]`, errorPath: "fragment.json"},
 	}
 
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	existing := `{"level1":{"level2":{"existingKey":"existingVal","array":["a","b"]}}}`
-	if err := os.WriteFile(settingsPath, []byte(existing), 0644); err != nil {
-		t.Fatalf("writing existing settings: %v", err)
-	}
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	if err := merger.Merge(settingsPath, "fragment.json"); err != nil {
-		t.Fatalf("Merge failed: %v", err)
-	}
-
-	got := readJSON(t, settingsPath)
-	level1 := got["level1"].(map[string]any)
-	level2 := level1["level2"].(map[string]any)
-
-	if level2["existingKey"] != "existingVal" {
-		t.Errorf("existingKey = %v, want 'existingVal'", level2["existingKey"])
-	}
-	if level2["newKey"] != "newVal" {
-		t.Errorf("newKey = %v, want 'newVal'", level2["newKey"])
-	}
-
-	array := level2["array"].([]any)
-	if len(array) != 3 {
-		t.Fatalf("array has %d items, want 3", len(array))
-	}
-	if array[0] != "a" || array[1] != "b" || array[2] != "c" {
-		t.Errorf("array = %v, want [a, b, c]", array)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			merger := NewSettingsMerger(NewDiskWriter(), fstest.MapFS{
+				"fragment.json": &fstest.MapFile{Data: []byte(test.fragment)},
+			})
+			_, err := merger.Merge("settings.json", []byte(test.existing), []string{"fragment.json"})
+			var mergeErr config.SettingsMergeError
+			if !errors.As(err, &mergeErr) {
+				t.Fatalf("error = %v, want SettingsMergeError", err)
+			}
+			if mergeErr.Path != test.errorPath {
+				t.Fatalf("error path = %q, want %q", mergeErr.Path, test.errorPath)
+			}
+		})
 	}
 }
 
-func TestMergeArrayDedup(t *testing.T) {
-	memFS := fstest.MapFS{
-		"fragment.json": &fstest.MapFile{
-			Data: []byte(`{"items":["a","b","c"]}`),
-		},
-	}
-
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	if err := os.WriteFile(settingsPath, []byte(`{"items":["a","b"]}`), 0644); err != nil {
-		t.Fatalf("writing existing settings: %v", err)
-	}
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	if err := merger.Merge(settingsPath, "fragment.json"); err != nil {
-		t.Fatalf("Merge failed: %v", err)
-	}
-
-	got := readJSON(t, settingsPath)
-	items := got["items"].([]any)
-
-	if len(items) != 3 {
-		t.Fatalf("items has %d entries, want 3 (a, b from existing + c from overlay)", len(items))
+func TestSettingsMergeRejectsMissingFragment(t *testing.T) {
+	merger := NewSettingsMerger(NewDiskWriter(), fstest.MapFS{})
+	_, err := merger.Merge("settings.json", nil, []string{"missing.json"})
+	var mergeErr config.SettingsMergeError
+	if !errors.As(err, &mergeErr) {
+		t.Fatalf("error = %v, want SettingsMergeError", err)
 	}
 }
 
-func TestMergeInvalidFragmentJSON(t *testing.T) {
-	memFS := fstest.MapFS{
-		"bad-fragment.json": &fstest.MapFile{
-			Data: []byte(`{this is not valid json}`),
-		},
-	}
-
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	err := merger.Merge(settingsPath, "bad-fragment.json")
-
-	if err == nil {
-		t.Fatal("expected error for invalid JSON fragment, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "parsing fragment") {
-		t.Errorf("error should mention 'parsing fragment', got: %v", err)
-	}
-}
-
-func TestMergeInvalidExistingJSON(t *testing.T) {
-	memFS := fstest.MapFS{
-		"fragment.json": &fstest.MapFile{
-			Data: []byte(`{"key":"value"}`),
-		},
-	}
-
-	dir := t.TempDir()
-	settingsPath := filepath.Join(dir, "settings.json")
-
-	// Write invalid JSON as the existing file
-	if err := os.WriteFile(settingsPath, []byte(`{broken`), 0644); err != nil {
-		t.Fatalf("writing invalid existing file: %v", err)
-	}
-
-	merger := NewSettingsMerger(NewDiskWriter(), memFS)
-	err := merger.Merge(settingsPath, "fragment.json")
-
-	if err == nil {
-		t.Fatal("expected error for invalid existing JSON, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "parsing existing settings") {
-		t.Errorf("error should mention 'parsing existing settings', got: %v", err)
-	}
-}
-
-// readJSON is a test helper that reads and parses a JSON file.
-func readJSON(t *testing.T, path string) map[string]any {
+func mergeSettingsForTest(t *testing.T, merger SettingsMerger, existing string, fragments ...string) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	data, err := merger.Merge("settings.json", []byte(existing), fragments)
 	if err != nil {
-		t.Fatalf("reading %s: %v", path, err)
+		t.Fatalf("Merge failed: %v", err)
 	}
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("parsing %s: %v\ncontent: %s", path, err, string(data))
+		t.Fatalf("decoding result: %v", err)
 	}
 	return result
+}
+
+func equalJSONValues(left, right any) bool {
+	leftData, _ := json.Marshal(left)
+	rightData, _ := json.Marshal(right)
+	return string(leftData) == string(rightData)
 }

@@ -2,6 +2,7 @@ package generator
 
 import (
 	"strings"
+	"time"
 
 	"github.com/magnoscg/anvil/internal/config"
 )
@@ -45,6 +46,15 @@ type ProjectTemplateContext struct {
 
 	// IsToolsMode is true when generating tools-only (no project forge).
 	IsToolsMode bool
+
+	// Date is the generation date used by generated indexes.
+	Date string
+
+	// HasIosArchitecture reports whether the architecture pack is selected.
+	HasIosArchitecture bool
+
+	// HasAxiomIos reports whether the Axiom iOS pack is selected.
+	HasAxiomIos bool
 }
 
 // FeatureTemplateContext holds ALL variables available to feature templates.
@@ -79,18 +89,21 @@ type FeatureTemplateContext struct {
 // NewProjectContext creates a ProjectTemplateContext from a ProjectConfig.
 func NewProjectContext(cfg config.ProjectConfig) ProjectTemplateContext {
 	return ProjectTemplateContext{
-		ProjectName:      cfg.Name,
-		ProjectNameLower: strings.ToLower(cfg.Name),
-		BundleID:         cfg.BundleID,
-		Organization:     cfg.Organization,
-		IOSVersion:       cfg.IOSVersion,
-		SwiftVersion:     cfg.SwiftVersion,
-		Schemes:          cfg.Schemes,
-		IncludeSwiftData: cfg.IncludeSwiftData,
-		AIPacks:          cfg.AIPacks,
-		SkillsScope:      cfg.SkillsScope,
-		IncludeExample:   cfg.IncludeExample,
-		IsToolsMode:      cfg.IsToolsMode(),
+		ProjectName:        cfg.Name,
+		ProjectNameLower:   strings.ToLower(cfg.Name),
+		BundleID:           cfg.BundleID,
+		Organization:       cfg.Organization,
+		IOSVersion:         cfg.IOSVersion,
+		SwiftVersion:       cfg.SwiftVersion,
+		Schemes:            cfg.Schemes,
+		IncludeSwiftData:   cfg.IncludeSwiftData,
+		AIPacks:            cfg.AIPacks,
+		SkillsScope:        cfg.SkillsScope,
+		IncludeExample:     cfg.IncludeExample,
+		IsToolsMode:        cfg.IsToolsMode(),
+		Date:               time.Now().Format("2006-01-02"),
+		HasIosArchitecture: cfg.HasPack("ios-architecture"),
+		HasAxiomIos:        cfg.HasPack("axiom-ios"),
 	}
 }
 

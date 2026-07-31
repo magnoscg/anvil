@@ -4,150 +4,126 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"os"
+	"reflect"
 
 	"github.com/magnoscg/anvil/internal/config"
 )
 
-// SettingsMerger merges a JSON fragment from the embedded FS into an existing
-// settings.json on disk. Arrays are appended (deduplicated), objects are merged
-// recursively, and scalars are kept from the existing file (first wins).
+// SettingsMerger composes embedded settings fragments without writing to disk.
 type SettingsMerger interface {
-	// Merge reads the existing settings file at existingPath (or starts from {}
-	// if the file does not exist), reads the fragment from fragmentPath inside
-	// the embedded FS, deep-merges them, and writes the result back to existingPath.
-	Merge(existingPath string, fragmentPath string) error
+	// Merge applies fragments in order while preserving values from existingData.
+	Merge(existingPath string, existingData []byte, fragmentPaths []string) ([]byte, error)
 }
 
-// DefaultSettingsMerger is the production implementation of SettingsMerger.
+// DefaultSettingsMerger reads settings fragments from the embedded filesystem.
 type DefaultSettingsMerger struct {
-	writer FileWriter
-	fs     fs.FS
+	fs fs.FS
 }
 
-// NewSettingsMerger creates a DefaultSettingsMerger backed by the given embedded FS.
-func NewSettingsMerger(writer FileWriter, embeddedFS fs.FS) *DefaultSettingsMerger {
-	return &DefaultSettingsMerger{writer: writer, fs: embeddedFS}
+// NewSettingsMerger creates a pure settings merger. The writer argument is kept
+// for constructor compatibility while filesystem writes belong to the installer.
+func NewSettingsMerger(_ FileWriter, embeddedFS fs.FS) *DefaultSettingsMerger {
+	return &DefaultSettingsMerger{fs: embeddedFS}
 }
 
-// Merge reads the existing JSON file (or creates an empty object), reads the
-// fragment from the embedded FS, performs a deep merge, and writes the result.
-func (m *DefaultSettingsMerger) Merge(existingPath string, fragmentPath string) error {
-	// Read existing file (or start from empty object)
+// Merge validates and combines an existing object with every fragment.
+func (m *DefaultSettingsMerger) Merge(existingPath string, existingData []byte, fragmentPaths []string) ([]byte, error) {
 	base := make(map[string]any)
-	existingData, err := os.ReadFile(existingPath)
-	if err == nil {
-		if err := json.Unmarshal(existingData, &base); err != nil {
-			return config.SettingsMergeError{
+	if len(existingData) > 0 {
+		parsed, err := decodeSettingsObject(existingData)
+		if err != nil {
+			return nil, config.SettingsMergeError{
 				Path:  existingPath,
 				Cause: fmt.Errorf("parsing existing settings: %w", err),
 			}
 		}
-	} else if !os.IsNotExist(err) {
-		return config.SettingsMergeError{
-			Path:  existingPath,
-			Cause: fmt.Errorf("reading existing settings: %w", err),
-		}
+		base = parsed
 	}
 
-	// Read fragment from embedded FS
-	fragmentData, err := fs.ReadFile(m.fs, fragmentPath)
+	for _, fragmentPath := range fragmentPaths {
+		fragmentData, err := fs.ReadFile(m.fs, fragmentPath)
+		if err != nil {
+			return nil, config.SettingsMergeError{
+				Path:  fragmentPath,
+				Cause: fmt.Errorf("reading fragment: %w", err),
+			}
+		}
+
+		overlay, err := decodeSettingsObject(fragmentData)
+		if err != nil {
+			return nil, config.SettingsMergeError{
+				Path:  fragmentPath,
+				Cause: fmt.Errorf("parsing fragment: %w", err),
+			}
+		}
+		base = deepMerge(base, overlay)
+	}
+
+	out, err := json.MarshalIndent(base, "", "  ")
 	if err != nil {
-		return config.SettingsMergeError{
-			Path:  fragmentPath,
-			Cause: fmt.Errorf("reading fragment: %w", err),
-		}
-	}
-
-	overlay := make(map[string]any)
-	if err := json.Unmarshal(fragmentData, &overlay); err != nil {
-		return config.SettingsMergeError{
-			Path:  fragmentPath,
-			Cause: fmt.Errorf("parsing fragment: %w", err),
-		}
-	}
-
-	// Deep merge
-	merged := deepMerge(base, overlay)
-
-	// Write result
-	out, err := json.MarshalIndent(merged, "", "  ")
-	if err != nil {
-		return config.SettingsMergeError{
+		return nil, config.SettingsMergeError{
 			Path:  existingPath,
 			Cause: fmt.Errorf("marshaling merged settings: %w", err),
 		}
 	}
-	out = append(out, '\n')
-
-	if err := m.writer.WriteFile(existingPath, out); err != nil {
-		return config.SettingsMergeError{
-			Path:  existingPath,
-			Cause: fmt.Errorf("writing merged settings: %w", err),
-		}
-	}
-
-	return nil
+	return append(out, '\n'), nil
 }
 
-// deepMerge recursively merges overlay into base with the following strategy:
-//   - Arrays: append overlay values that are not already present (dedup).
-//   - Objects: recurse into nested maps.
-//   - Scalars: keep existing value (first wins / skip existing).
+func decodeSettingsObject(data []byte) (map[string]any, error) {
+	var decoded any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return nil, err
+	}
+	object, ok := decoded.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("expected a JSON object")
+	}
+	return object, nil
+}
+
+// deepMerge recursively merges overlay into base. Existing scalar values win,
+// objects recurse, and arrays append values that are not already present.
 func deepMerge(base, overlay map[string]any) map[string]any {
 	result := make(map[string]any, len(base))
-	for k, v := range base {
-		result[k] = v
+	for key, value := range base {
+		result[key] = value
 	}
 
-	for k, overlayVal := range overlay {
-		baseVal, exists := result[k]
+	for key, overlayValue := range overlay {
+		baseValue, exists := result[key]
 		if !exists {
-			result[k] = overlayVal
+			result[key] = overlayValue
 			continue
 		}
 
-		// Both exist — merge based on type
-		switch baseTyped := baseVal.(type) {
+		switch typedBase := baseValue.(type) {
 		case map[string]any:
-			if overlayTyped, ok := overlayVal.(map[string]any); ok {
-				result[k] = deepMerge(baseTyped, overlayTyped)
+			if typedOverlay, ok := overlayValue.(map[string]any); ok {
+				result[key] = deepMerge(typedBase, typedOverlay)
 			}
-			// If types don't match, keep base (first wins)
-
 		case []any:
-			if overlayTyped, ok := overlayVal.([]any); ok {
-				result[k] = appendDedup(baseTyped, overlayTyped)
+			if typedOverlay, ok := overlayValue.([]any); ok {
+				result[key] = appendDedup(typedBase, typedOverlay)
 			}
-			// If types don't match, keep base
-
-		default:
-			// Scalar: keep existing (first wins)
 		}
 	}
 
 	return result
 }
 
-// appendDedup appends overlay items to base, skipping items already present.
 func appendDedup(base, overlay []any) []any {
-	result := make([]any, len(base))
-	copy(result, base)
-
-	for _, item := range overlay {
-		if !containsValue(result, item) {
-			result = append(result, item)
+	result := append([]any(nil), base...)
+	for _, candidate := range overlay {
+		if !containsValue(result, candidate) {
+			result = append(result, candidate)
 		}
 	}
 	return result
 }
 
-// containsValue checks if a slice contains a value using fmt.Sprintf comparison
-// for deep equality of JSON-parsed values.
-func containsValue(slice []any, val any) bool {
-	valStr := fmt.Sprintf("%v", val)
-	for _, item := range slice {
-		if fmt.Sprintf("%v", item) == valStr {
+func containsValue(values []any, candidate any) bool {
+	for _, value := range values {
+		if reflect.DeepEqual(value, candidate) {
 			return true
 		}
 	}

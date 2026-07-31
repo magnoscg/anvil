@@ -135,7 +135,7 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 	// Step 4: Render AI Packs (conditional)
 	if cfg.HasAnyPacks() {
 		resolved := config.ResolveDependencies(cfg.AIPacks)
-		packFiles, err := g.packRenderer.RenderPacks(resolved, cfg.SkillsScope, tmplCtx, projectDir)
+		packFiles, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, projectDir)
 		if err != nil {
 			return result, fmt.Errorf("rendering AI packs: %w", err)
 		}
@@ -211,7 +211,7 @@ func (g *DefaultProjectGenerator) GenerateToolsOnly(_ context.Context, cfg confi
 	tmplCtx := NewProjectContext(cfg)
 	resolved := config.ResolveDependencies(cfg.AIPacks)
 
-	packFiles, err := g.packRenderer.RenderPacks(resolved, cfg.SkillsScope, tmplCtx, cfg.OutputDir)
+	packFiles, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, cfg.OutputDir)
 	if err != nil {
 		return result, fmt.Errorf("rendering AI packs: %w", err)
 	}
@@ -219,6 +219,17 @@ func (g *DefaultProjectGenerator) GenerateToolsOnly(_ context.Context, cfg confi
 
 	result.Duration = time.Since(start)
 	return result, nil
+}
+
+func (g *DefaultProjectGenerator) installPacks(packs []string, skillsScope string, ctx any, projectDir string) ([]string, error) {
+	plan, err := g.packRenderer.PlanPacks(packs, skillsScope, ctx, projectDir)
+	if err != nil {
+		return nil, err
+	}
+	if err := g.packRenderer.Preflight(&plan); err != nil {
+		return nil, err
+	}
+	return g.packRenderer.Apply(plan)
 }
 
 // renderTemplateDir renders all templates in a template directory, placing output
@@ -278,7 +289,7 @@ func (g *DefaultProjectGenerator) copyEmbeddedFile(srcPath string, destPath stri
 	if err != nil {
 		return fmt.Errorf("reading embedded file %s: %w", srcPath, err)
 	}
-	return g.writer.WriteFile(destPath, data)
+	return g.writer.CreateFile(destPath, data, 0644)
 }
 
 // initGit runs the git init + add + commit sequence.

@@ -1,26 +1,29 @@
 package generator
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/magnoscg/anvil/internal/config"
 )
 
 // mockSettingsMerger records calls to Merge for verification in tests.
 type mockSettingsMerger struct {
-	mergeErr     error
-	mergeCalled  bool
-	existingPath string
-	fragmentPath string
+	mergeErr      error
+	mergeCalled   bool
+	existingPath  string
+	fragmentPaths []string
 }
 
-func (m *mockSettingsMerger) Merge(existingPath string, fragmentPath string) error {
+func (m *mockSettingsMerger) Merge(existingPath string, existingData []byte, fragmentPaths []string) ([]byte, error) {
 	m.mergeCalled = true
 	m.existingPath = existingPath
-	m.fragmentPath = fragmentPath
-	return m.mergeErr
+	m.fragmentPaths = append([]string(nil), fragmentPaths...)
+	return []byte("{}\n"), m.mergeErr
 }
 
 func TestRenderPacksEmptySlice(t *testing.T) {
@@ -144,10 +147,10 @@ func TestRenderPacksSectionsAppendInOrder(t *testing.T) {
 
 func TestRenderPacksCopiesDocs(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                       &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/docs":                  &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/docs/ARCHITECTURE.md":  &fstest.MapFile{Data: []byte("# Architecture\n")},
-		"ai-packs/test-pack/docs/testing.md":       &fstest.MapFile{Data: []byte("# Testing\n")},
+		"ai-packs/test-pack":                      &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/docs":                 &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/docs/ARCHITECTURE.md": &fstest.MapFile{Data: []byte("# Architecture\n")},
+		"ai-packs/test-pack/docs/testing.md":      &fstest.MapFile{Data: []byte("# Testing\n")},
 	}
 
 	renderer := NewRenderer(memFS, NewDiskWriter())
@@ -205,10 +208,10 @@ func TestRenderPacksCopiesCommands(t *testing.T) {
 
 func TestRenderPacksCopiesAgents(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                              &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/agents":                       &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/agents/DEV-IMPLEMENTER.md":    &fstest.MapFile{Data: []byte("implementer agent\n")},
-		"ai-packs/test-pack/agents/DEV-VERIFIER.md":       &fstest.MapFile{Data: []byte("verifier agent\n")},
+		"ai-packs/test-pack":                           &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/agents":                    &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/agents/DEV-IMPLEMENTER.md": &fstest.MapFile{Data: []byte("implementer agent\n")},
+		"ai-packs/test-pack/agents/DEV-VERIFIER.md":    &fstest.MapFile{Data: []byte("verifier agent\n")},
 	}
 
 	renderer := NewRenderer(memFS, NewDiskWriter())
@@ -240,9 +243,9 @@ func TestRenderPacksCopiesAgents(t *testing.T) {
 
 func TestRenderPacksRendersDevTemplates(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                           &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/dev":                       &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/dev/arch-index.md.tmpl":    &fstest.MapFile{Data: []byte("# {{ .ProjectName }} Arch\n")},
+		"ai-packs/test-pack":                        &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/dev":                    &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/dev/arch-index.md.tmpl": &fstest.MapFile{Data: []byte("# {{ .ProjectName }} Arch\n")},
 	}
 
 	renderer := NewRenderer(memFS, NewDiskWriter())
@@ -267,8 +270,8 @@ func TestRenderPacksRendersDevTemplates(t *testing.T) {
 
 func TestRenderPacksCallsSettingsMerger(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                       &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/settings-merge.json":   &fstest.MapFile{Data: []byte(`{"permissions":{"allow":["mcp:test"]}}`)},
+		"ai-packs/test-pack":                     &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/settings-merge.json": &fstest.MapFile{Data: []byte(`{"permissions":{"allow":["mcp:test"]}}`)},
 	}
 
 	renderer := NewRenderer(memFS, NewDiskWriter())
@@ -284,20 +287,25 @@ func TestRenderPacksCallsSettingsMerger(t *testing.T) {
 	if !merger.mergeCalled {
 		t.Error("SettingsMerger.Merge was not called")
 	}
-	if merger.existingPath != filepath.Join(dir, ".claude", "settings.json") {
-		t.Errorf("merge existingPath = %q, want %q", merger.existingPath, filepath.Join(dir, ".claude", "settings.json"))
+	canonicalDir, err := canonicalRoot(dir, true)
+	if err != nil {
+		t.Fatalf("canonicalRoot failed: %v", err)
 	}
-	if merger.fragmentPath != "ai-packs/test-pack/settings-merge.json" {
-		t.Errorf("merge fragmentPath = %q, want %q", merger.fragmentPath, "ai-packs/test-pack/settings-merge.json")
+	expectedSettingsPath := filepath.Join(canonicalDir, ".claude", "settings.json")
+	if merger.existingPath != expectedSettingsPath {
+		t.Errorf("merge existingPath = %q, want %q", merger.existingPath, expectedSettingsPath)
+	}
+	if len(merger.fragmentPaths) != 1 || merger.fragmentPaths[0] != "ai-packs/test-pack/settings-merge.json" {
+		t.Errorf("merge fragmentPaths = %q, want %q", merger.fragmentPaths, []string{"ai-packs/test-pack/settings-merge.json"})
 	}
 }
 
 func TestRenderPacksCopiesSkillsProjectScope(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                                  &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills":                           &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills/my-skill":                  &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills/my-skill/SKILL.md":         &fstest.MapFile{Data: []byte("# My Skill\n")},
+		"ai-packs/test-pack":                          &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills":                   &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills/my-skill":          &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills/my-skill/SKILL.md": &fstest.MapFile{Data: []byte("# My Skill\n")},
 	}
 
 	renderer := NewRenderer(memFS, NewDiskWriter())
@@ -321,9 +329,9 @@ func TestRenderPacksCopiesSkillsProjectScope(t *testing.T) {
 
 func TestRenderPacksRendersWorkflowTemplates(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                            &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/workflows":                  &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/workflows/ci.yml.tmpl":      &fstest.MapFile{Data: []byte("name: CI {{ .ProjectName }}\n")},
+		"ai-packs/test-pack":                       &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/workflows":             &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/workflows/ci.yml.tmpl": &fstest.MapFile{Data: []byte("name: CI {{ .ProjectName }}\n")},
 	}
 
 	renderer := NewRenderer(memFS, NewDiskWriter())
@@ -348,10 +356,10 @@ func TestRenderPacksRendersWorkflowTemplates(t *testing.T) {
 
 func TestRenderPacksCopiesSkillsGlobalScope(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                                  &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills":                           &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills/global-skill":              &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills/global-skill/SKILL.md":     &fstest.MapFile{Data: []byte("# Global Skill\n")},
+		"ai-packs/test-pack":                              &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills":                       &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills/global-skill":          &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills/global-skill/SKILL.md": &fstest.MapFile{Data: []byte("# Global Skill\n")},
 	}
 
 	renderer := NewRenderer(memFS, NewDiskWriter())
@@ -385,11 +393,11 @@ func TestRenderPacksCopiesSkillsGlobalScope(t *testing.T) {
 	}
 }
 
-func TestRenderPacksSkillsAlreadyExistSkipped(t *testing.T) {
+func TestRenderPacksSkillsAlreadyExistReturnsConflict(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                              &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills":                       &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills/existing-skill":        &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack":                                &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills":                         &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack/skills/existing-skill":          &fstest.MapFile{Mode: 0755 | os.ModeDir},
 		"ai-packs/test-pack/skills/existing-skill/SKILL.md": &fstest.MapFile{Data: []byte("# New version\n")},
 	}
 
@@ -412,8 +420,9 @@ func TestRenderPacksSkillsAlreadyExistSkipped(t *testing.T) {
 
 	projectDir := t.TempDir()
 	_, err := pr.RenderPacks([]string{"test-pack"}, "global", ProjectTemplateContext{}, projectDir)
-	if err != nil {
-		t.Fatalf("RenderPacks failed: %v", err)
+	var conflictErr config.InstallConflictError
+	if !errors.As(err, &conflictErr) {
+		t.Fatalf("error = %v, want InstallConflictError", err)
 	}
 
 	// The existing skill should NOT be overwritten
@@ -428,7 +437,7 @@ func TestRenderPacksSkillsAlreadyExistSkipped(t *testing.T) {
 
 func TestRenderPacks_WithToolsModeContext(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack": &fstest.MapFile{Mode: 0755 | os.ModeDir},
 		"ai-packs/test-pack/CLAUDE.md.tmpl": &fstest.MapFile{
 			Data: []byte("{{ if not .IsToolsMode }}PROJECT{{ end }}ALWAYS"),
 		},
@@ -458,7 +467,7 @@ func TestRenderPacks_WithToolsModeContext(t *testing.T) {
 
 func TestRenderPacks_WithProjectModeContext(t *testing.T) {
 	memFS := fstest.MapFS{
-		"ai-packs/test-pack":                &fstest.MapFile{Mode: 0755 | os.ModeDir},
+		"ai-packs/test-pack": &fstest.MapFile{Mode: 0755 | os.ModeDir},
 		"ai-packs/test-pack/CLAUDE.md.tmpl": &fstest.MapFile{
 			Data: []byte("{{ if not .IsToolsMode }}PROJECT{{ end }}ALWAYS"),
 		},

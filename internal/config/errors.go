@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // MissingDependencyError indicates that a required system dependency is not installed.
 type MissingDependencyError struct {
@@ -101,6 +104,18 @@ func (e PackNotFoundError) Error() string {
 type PackDependencyError struct {
 	Pack    string
 	Missing string
+}
+
+// InstallConflictError reports every destination that prevents a pack install.
+type InstallConflictError struct {
+	Paths []string
+}
+
+func (e InstallConflictError) Error() string {
+	if len(e.Paths) == 0 {
+		return "pack installation has destination conflicts"
+	}
+	return "pack installation blocked by existing or unsafe destinations:\n  - " + strings.Join(e.Paths, "\n  - ")
 }
 
 func (e PackDependencyError) Error() string {

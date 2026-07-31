@@ -22,7 +22,10 @@ func (s *stubRenderer) Render(tmplPath string, ctx any, destPath string) error {
 	}
 	// Default: create the file on disk (simulates real rendering)
 	w := generator.NewDiskWriter()
-	return w.WriteFile(destPath, []byte("// generated"))
+	if err := w.EnsureDir(filepath.Dir(destPath)); err != nil {
+		return err
+	}
+	return w.CreateFile(destPath, []byte("// generated"), 0644)
 }
 
 func (s *stubRenderer) RenderDir(tmplDir string, ctx any, destDir string) ([]string, error) {
@@ -222,7 +225,7 @@ func TestForgePartialFailureTriggersRollback(t *testing.T) {
 				return fmt.Errorf("simulated render failure")
 			}
 			w := generator.NewDiskWriter()
-			return w.WriteFile(destPath, []byte("// generated"))
+			return w.CreateFile(destPath, []byte("// generated"), 0644)
 		},
 	}
 
