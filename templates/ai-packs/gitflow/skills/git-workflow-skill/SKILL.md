@@ -1,98 +1,66 @@
 ---
-name: git-workflow
-description: "Use when establishing branching strategies, implementing Conventional Commits, creating or reviewing PRs, resolving PR review comments, merging PRs (including CI verification, auto-merge queues, and post-merge cleanup), managing PR review threads, merging PRs with signed commits, handling merge conflicts, or integrating Git with CI/CD."
+name: git-workflow-skill
+description: Plan and execute safe Git workflows that respect repository instructions, branch policy, review boundaries, and release history.
+license: MIT
+metadata:
+  author: Oscar Canton
+  origin: first-party
 ---
 
-# Git Workflow Skill
+# Git Workflow
 
-Expert patterns for Git version control: branching, commits, collaboration, and CI/CD.
+Use this skill when a task includes branching, commits, integration, release preparation, or recovery from a Git mistake.
 
-## Expertise Areas
+## Operating contract
 
-- **Branching**: Git Flow, GitHub Flow, Trunk-based development
-- **Commits**: Conventional Commits, semantic versioning
-- **Collaboration**: PR workflows, code review, merge strategies, thread resolution
-- **CI/CD**: GitHub Actions, GitLab CI, branch protection
+1. Read the repository instructions before choosing a workflow.
+2. Inspect `status`, the current branch, remotes, and recent history before changing anything.
+3. Treat uncommitted work as belonging to the user. Never discard or absorb unrelated changes.
+4. Stage explicit paths and review the staged diff before every commit.
+5. Keep commits small, coherent, and independently testable.
+6. Do not push, merge, rebase shared history, tag, or publish unless the user authorized that exact action.
+7. Never add an automated co-author line.
 
-## Reference Files
+## Branch selection
 
-| Reference | When to Load |
-|-----------|--------------|
-| `references/branching-strategies.md` | Managing branches, choosing branching model |
-| `references/commit-conventions.md` | Writing commits, semantic versioning |
-| `references/pull-request-workflow.md` | Creating/reviewing PRs, thread resolution, merging |
-| `references/ci-cd-integration.md` | CI/CD automation, GitHub Actions |
-| `references/advanced-git.md` | Rebasing, cherry-picking, bisecting |
-| `references/github-releases.md` | Release management, immutable releases |
-| `references/code-quality-tools.md` | Shell linting, formatting, smart fixups, structural diffs |
+Repository-specific instructions win. When the repository follows Gitflow:
 
-### Explicit Content Triggers
+- branch `feature/<topic>` from `develop` for product work;
+- branch `release/<version>` from `develop`, then integrate it into `main` and `develop`;
+- branch `hotfix/<topic>` from `main`, then integrate it into `main` and `develop`;
+- keep `main` deployable and use semantic version tags only for releases.
 
-When creating pull requests, load `references/pull-request-workflow.md` for PR structure, size guidelines, and template patterns.
+If the repository does not declare a strategy, propose the smallest reversible branch plan and wait for approval before creating shared history.
 
-When reviewing PRs or responding to review comments, load `references/pull-request-workflow.md` for review comment levels (blocking/suggestion/nit) and the code review checklist.
+## Commit workflow
 
-When replying to PR review threads or resolving threads, load `references/pull-request-workflow.md` for the GraphQL API patterns for thread replies and resolution.
+For each logical change:
 
-When merging PRs, load `references/pull-request-workflow.md` for the merge requirements checklist (resolved threads, Copilot review, rebased branch, CI checks).
+1. Run the narrowest relevant tests.
+2. Inspect `git diff --check` and the unstaged diff.
+3. Stage only the intended paths.
+4. Inspect `git diff --cached`.
+5. Commit with an imperative Conventional Commit subject such as `fix(scope): protect existing files`.
+6. Re-run the relevant validation if hooks or formatting changed the tree.
 
-When merging in repos requiring signed commits with rebase-only strategy, load `references/pull-request-workflow.md` for the local fast-forward merge workflow.
+Split changes by responsibility: behavior, tests, documentation, generated artifacts, and dependency updates should only share a commit when they form one inseparable unit.
 
-When handling merge conflicts, load `references/pull-request-workflow.md` for conflict resolution strategies.
+## Integration checks
 
-When choosing a branching strategy, load `references/branching-strategies.md` for Git Flow, GitHub Flow, and Trunk-based patterns.
+Before a merge or rebase, confirm:
 
-When writing commit messages, load `references/commit-conventions.md` for Conventional Commits format and semantic versioning rules.
+- the target branch is correct and current;
+- the working tree contains no unrelated staged files;
+- required tests pass on the source branch;
+- conflicts are resolved by understanding both sides, not by selecting one side wholesale;
+- the resulting history matches the repository policy.
 
-When creating releases, load `references/github-releases.md` for immutable release warnings and recovery patterns.
+After integration, verify the final commit graph, branch pointers, and remote state. A local merge is not evidence that a remote branch changed.
 
-When running a full PR lifecycle (CI check → resolve comments → merge → cleanup), load `references/pull-request-workflow.md` for the complete PR merge checklist.
+## Recovery
 
-When CI is failing on a PR and you need to fix it before merging, load `references/pull-request-workflow.md` for the CI verification and annotation checking patterns.
+Prefer additive and recoverable operations. Use a new corrective commit for published history. Use `git reflog` to locate lost local commits. Never run destructive reset, clean, or force-push commands without explicit authorization and an exact target.
 
-## Conventional Commits (Quick Reference)
+## Completion report
 
-```
-<type>[scope]: <description>
-```
-
-**Types**: `feat` (MINOR), `fix` (PATCH), `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
-
-**Breaking change**: Add `!` after type or `BREAKING CHANGE:` in footer.
-
-## Branch Naming
-
-```bash
-feature/TICKET-123-description
-fix/TICKET-456-bug-name
-release/1.2.0
-hotfix/1.2.1-security-patch
-```
-
-## GitHub Flow (Default)
-
-```bash
-git checkout main && git pull
-git checkout -b feature/my-feature
-# ... work ...
-git push -u origin HEAD
-gh pr create && gh pr merge --squash
-```
-
-For code quality tools (shellcheck, shfmt, git-absorb, difft), see `references/code-quality-tools.md`.
-
-## GitHub Immutable Releases
-
-**CRITICAL**: Deleted releases block tag names PERMANENTLY. Get releases right first time.
-
-See `references/github-releases.md` for prevention and recovery patterns.
-
-## Verification
-
-```bash
-./scripts/verify-git-workflow.sh /path/to/repository
-```
-
----
-
-> **Contributing:** https://github.com/netresearch/git-workflow-skill
+Report the branch, commits created, validation run, remaining uncommitted files, and whether any remote state changed.

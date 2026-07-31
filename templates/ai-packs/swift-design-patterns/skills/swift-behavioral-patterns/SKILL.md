@@ -1,109 +1,83 @@
 ---
 name: swift-behavioral-patterns
-description: >
-  Overview of Behavioral design patterns in Swift. Use when choosing between
-  Chain of Responsibility, Command, Iterator, Mediator, Memento, Observer,
-  State, Strategy, Template Method, and Visitor patterns.
-  Provides selection guide and links to individual pattern skills.
+description: Choose a Swift behavioral pattern by identifying responsibility flow, state change, interchangeable policy, history, notifications, or operations over stable models.
 license: MIT
 metadata:
-  category: Design Patterns
-  source: refactoring.guru
+  author: Oscar Canton
+  origin: first-party
 ---
 
-# Behavioral Design Patterns in Swift
+# Behavioral Patterns in Swift
 
-> Behavioral patterns are concerned with algorithms and the assignment of responsibilities between objects.
+## Intent
 
-## Overview
+Make collaboration and changing behavior explicit without concentrating every branch in one feature object.
 
-Behavioral design patterns describe not just patterns of objects or classes but also the patterns of communication between them. These patterns characterize complex control flow that's difficult to follow at runtime. They shift your focus away from flow of control to let you concentrate on the way objects are interconnected.
+## When to use it
 
-In Swift, behavioral patterns leverage closures, protocol-oriented programming, Combine framework, and async/await for elegant implementations.
+Use a behavioral pattern when requests move through handlers, actions need identity, traversal must be encapsulated, peers need coordination, state requires history, events have observers, behavior changes by state or policy, a workflow has stable steps, or operations vary over stable element types.
 
-## Pattern Selection Guide
+## When to avoid it
 
-| Pattern | Use When | Swift Feature | iOS Example |
-|---------|----------|---------------|-------------|
-| **Chain of Responsibility** | Multiple handlers should try processing a request in order | Protocol chains, linked lists | `UIResponder` chain, middleware pipelines |
-| **Command** | Encapsulating requests as objects for queuing, undo, or logging | Closures, `Codable` commands | `UndoManager`, `Operation`/`OperationQueue` |
-| **Iterator** | Traversing a collection without exposing internals | `Sequence`/`IteratorProtocol` | `for-in` loops, custom collections |
-| **Mediator** | Reducing chaotic dependencies between objects | Central coordinator object | `NotificationCenter`, `UINavigationController` |
-| **Memento** | Capturing and restoring object state without violating encapsulation | `Codable`, `NSCoding` | `UserDefaults`, state restoration, undo |
-| **Observer** | Notifying multiple objects about state changes | `Combine`, `NotificationCenter`, KVO | `@Published`, `ObservableObject`, `@Observable` |
-| **State** | Object behavior changes based on internal state | Enum with associated values, protocols | `UIGestureRecognizer` states, connection states |
-| **Strategy** | Interchangeable algorithms at runtime | Closures, protocol conformance | `sort(by:)`, `JSONEncoder` date strategies |
-| **Template Method** | Defining algorithm skeleton with customizable steps | Protocol with default implementations | `UIViewController` lifecycle, `Hashable` |
-| **Visitor** | Adding operations to object structures without modifying them | Protocol + double dispatch | Syntax tree walkers, serialization |
+Avoid protocol networks around a small switch. Start from the responsibility that changes and add one boundary, not a catalogue of patterns.
 
-## Quick Comparison
+## Participants
 
-### When REQUESTS need to be processed by a CHAIN of handlers
-Use **Chain of Responsibility**. UIKit's responder chain is the canonical iOS example.
+- Context or client initiating behavior.
+- Collaborators that own distinct decisions.
+- Message, state, command, strategy, or visitor that makes collaboration explicit.
 
-### When you need to ENCAPSULATE actions as objects
-Use **Command** for undo/redo, queuing, scheduling, or logging operations.
+## Example
 
-### When you need to TRAVERSE a collection
-Use **Iterator**. Swift's `Sequence` and `IteratorProtocol` make this a first-class language feature.
+```swift
+struct Purchase: Equatable {
+    let cents: Int
+    let country: String
+}
 
-### When objects have TOO MANY direct connections
-Use **Mediator** to centralize communication. Coordinator pattern in iOS is a Mediator variant.
+protocol PurchasePolicy {
+    func rejection(for purchase: Purchase) -> String?
+}
 
-### When you need to SAVE and RESTORE state
-Use **Memento**. Swift's `Codable` protocol makes serialization trivial.
+struct MaximumAmountPolicy: PurchasePolicy {
+    let limit: Int
 
-### When objects need to REACT to changes in other objects
-Use **Observer**. In modern Swift, prefer Combine's `@Published` or Observation framework's `@Observable`.
+    func rejection(for purchase: Purchase) -> String? {
+        purchase.cents > limit ? "Amount exceeds limit" : nil
+    }
+}
 
-### When behavior CHANGES based on STATE
-Use **State** pattern. Swift enums with associated values provide a particularly elegant implementation.
+struct CountryPolicy: PurchasePolicy {
+    let supported: Set<String>
 
-### When you need INTERCHANGEABLE algorithms
-Use **Strategy**. In Swift, closures often replace the full class hierarchy — `sort(by:)` is Strategy in action.
+    func rejection(for purchase: Purchase) -> String? {
+        supported.contains(purchase.country) ? nil : "Country is unsupported"
+    }
+}
 
-### When an ALGORITHM has fixed steps but variable implementations
-Use **Template Method**. Swift protocols with default implementations are ideal for this.
+struct PurchaseEvaluator {
+    let policies: [any PurchasePolicy]
 
-### When you need to ADD operations to complex object structures
-Use **Visitor** for operations across heterogeneous type hierarchies without modifying them.
+    func evaluate(_ purchase: Purchase) -> [String] {
+        policies.compactMap { $0.rejection(for: purchase) }
+    }
+}
 
-## Decision Tree
-
-```
-Need to manage behavior/communication?
-├── Request handled by chain of objects? → Chain of Responsibility
-├── Encapsulate action as object? → Command
-├── Traverse collection elements? → Iterator
-├── Reduce coupling between many objects? → Mediator
-├── Save/restore object state? → Memento
-├── React to state changes? → Observer
-├── Behavior varies by internal state? → State
-├── Swap algorithms at runtime? → Strategy
-├── Fixed algorithm, variable steps? → Template Method
-└── Add operations without modifying classes? → Visitor
+let evaluator = PurchaseEvaluator(policies: [
+    MaximumAmountPolicy(limit: 10_000),
+    CountryPolicy(supported: ["ES", "PT"])
+])
+precondition(evaluator.evaluate(Purchase(cents: 12_000, country: "ES")) == ["Amount exceeds limit"])
 ```
 
-## Individual Pattern Skills
+## Trade-offs
 
-- `/swift-chain-of-responsibility` — Passes requests along a chain of handlers
-- `/swift-command` — Encapsulates requests as objects with execute/undo support
-- `/swift-iterator` — Traverses collections without exposing internal structure
-- `/swift-mediator` — Reduces chaotic dependencies via a central coordinator
-- `/swift-memento` — Captures and restores object state without breaking encapsulation
-- `/swift-observer` — Notifies dependents automatically when state changes
-- `/swift-state` — Alters behavior when internal state changes
-- `/swift-strategy` — Defines interchangeable algorithm families
-- `/swift-template-method` — Defines algorithm skeleton with customizable steps
-- `/swift-visitor` — Adds operations to structures without modifying their classes
+Responsibilities become replaceable and testable. Indirection makes sequence and ownership harder to see unless names and composition stay close to the product flow.
 
-## Swift-Specific Considerations
+## Testing strategy
 
-- **Closures**: Replace many class-based behavioral patterns (Strategy, Command, Observer)
-- **Combine Framework**: Provides reactive Observer implementation with `Publisher`/`Subscriber`
-- **Observation Framework** (`@Observable`): Modern Swift alternative to KVO and Combine for state observation
-- **`Sequence`/`IteratorProtocol`**: First-class language support for Iterator pattern
-- **Enums with Associated Values**: Natural fit for State and Command patterns
-- **`async/await`**: Enables modern implementations of Chain of Responsibility and Command
-- **Protocol Default Implementations**: Enable Template Method without abstract classes
-- **`Codable`**: Simplifies Memento pattern for state serialization
+Test collaborators through their contracts, then add focused integration tests for ordering, cancellation, state transitions, duplicate events, and failure propagation.
+
+## Related patterns
+
+Chain routes requests. Command gives actions identity. Iterator encapsulates traversal. Mediator coordinates peers. Memento stores history. Observer broadcasts events. State and Strategy vary behavior. Template Method fixes sequence. Visitor varies operations.
