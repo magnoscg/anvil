@@ -69,14 +69,15 @@ func NewProjectGenerator(
 //  1. Create output directory
 //  2. Render base templates
 //  3. Render SwiftData templates (if enabled)
-//  4. Render AI Packs via PackRenderer (if any packs selected)
-//  5. Forge Example feature (if enabled)
-//  6. Generate Xcode project (.xcodeproj bundle)
-//  7. Initialize git repository (non-fatal on failure)
-//  8. Write .anvil.yml marker
+//  4. Forge Example feature (if enabled)
+//  5. Generate Xcode project (.xcodeproj bundle)
+//  6. Write .anvil.yml marker
+//  7. Render AI Packs via PackRenderer (if any packs selected)
+//  8. Initialize git repository (non-fatal on failure)
 //
-// On ANY error at steps 1-6 or 8, Rollback is called to clean up.
-// Git failure (step 7) is non-fatal: a warning is logged but generation succeeds.
+// On ANY error at steps 1-7, Rollback is called to clean up. Packs are the last
+// fatal step so a later failure cannot leave project-external resources behind.
+// Git failure (step 8) is non-fatal: a warning is logged but generation succeeds.
 func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.ProjectConfig) (result config.GenerationResult, resultErr error) {
 	cfg.Normalize()
 
@@ -132,17 +133,7 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 		result.FilesCreated = append(result.FilesCreated, sdFiles...)
 	}
 
-	// Step 4: Render AI Packs (conditional)
-	if cfg.HasAnyPacks() {
-		resolved := config.ResolveDependencies(cfg.AIPacks)
-		packFiles, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, projectDir)
-		if err != nil {
-			return result, fmt.Errorf("rendering AI packs: %w", err)
-		}
-		result.FilesCreated = append(result.FilesCreated, packFiles...)
-	}
-
-	// Step 5: Forge Example feature (conditional)
+	// Step 4: Forge Example feature (conditional)
 	if cfg.IncludeExample && g.forge != nil {
 		featureCfg := config.FeatureConfig{
 			FeatureName:          "Example",
@@ -157,24 +148,14 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 		result.FilesCreated = append(result.FilesCreated, forgeResult.FilesCreated...)
 	}
 
-	// Step 6: Generate Xcode project (.xcodeproj bundle)
+	// Step 5: Generate Xcode project (.xcodeproj bundle)
 	xcodeOutput, err := g.xcodeproj.Generate(ctx, projectDir, cfg)
 	if err != nil {
 		return result, fmt.Errorf("generating Xcode project: %w", err)
 	}
 	result.XcodeProjectOutput = xcodeOutput
 
-	// Step 7: Initialize git (non-fatal on failure)
-	gitOutput, gitErr := g.initGit(projectDir)
-	if gitErr != nil {
-		log.Printf("WARNING: git initialization failed: %v", gitErr)
-		log.Printf("You can manually initialize git with: cd %s && git init && git add . && git commit -m \"Initial commit\"", projectDir)
-		result.GitOutput = fmt.Sprintf("git init failed: %v", gitErr)
-	} else {
-		result.GitOutput = gitOutput
-	}
-
-	// Step 8: Write .anvil.yml marker
+	// Step 6: Write .anvil.yml marker
 	anvilMarker := config.AnvilMarker{
 		Version:      "0.1.0",
 		ProjectName:  cfg.Name,
@@ -190,6 +171,29 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 		return result, fmt.Errorf("writing .anvil.yml: %w", err)
 	}
 	result.FilesCreated = append(result.FilesCreated, ".anvil.yml")
+
+	// Step 7: Render AI Packs (conditional). This remains the final fatal step:
+	// global skills and tutorials must not be published before project generation
+	// and marker creation have both succeeded.
+	if cfg.HasAnyPacks() {
+		resolved := config.ResolveDependencies(cfg.AIPacks)
+		packFiles, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, projectDir)
+		if err != nil {
+			return result, fmt.Errorf("rendering AI packs: %w", err)
+		}
+		result.FilesCreated = append(result.FilesCreated, packFiles...)
+	}
+
+	// Step 8: Initialize git (non-fatal on failure). Running it last keeps the
+	// generated marker and every installed pack in the initial commit.
+	gitOutput, gitErr := g.initGit(projectDir)
+	if gitErr != nil {
+		log.Printf("WARNING: git initialization failed: %v", gitErr)
+		log.Printf("You can manually initialize git with: cd %s && git init && git add . && git commit -m \"Initial commit\"", projectDir)
+		result.GitOutput = fmt.Sprintf("git init failed: %v", gitErr)
+	} else {
+		result.GitOutput = gitOutput
+	}
 
 	result.Duration = time.Since(start)
 	return result, nil

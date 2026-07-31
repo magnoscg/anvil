@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,17 @@ func minimalBaseFS() fstest.MapFS {
 			Data: []byte("// {{ .SchemeName }}.xcconfig\nBUNDLE_ID = {{ .BundleID }}{{ .BundleIDSuffix }}\n"),
 		},
 	}
+}
+
+func minimalBaseWithGlobalPackFS() fstest.MapFS {
+	filesystem := minimalBaseFS()
+	filesystem["ai-packs/test-pack"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/test-pack/skills"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/test-pack/skills/global-skill"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/test-pack/skills/global-skill/SKILL.md"] = &fstest.MapFile{Data: []byte("# Global Skill\n")}
+	filesystem["ai-packs/test-pack/tutorials"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/test-pack/tutorials/catalog.md"] = &fstest.MapFile{Data: []byte("# Tutorial\n")}
+	return filesystem
 }
 
 func baseCfg(outputDir string) config.ProjectConfig {
@@ -556,6 +568,75 @@ func TestGenerateRollbackOnMarkerWriteFailure(t *testing.T) {
 	projectDir := filepath.Join(dir, "TestApp")
 	if _, statErr := os.Stat(projectDir); !os.IsNotExist(statErr) {
 		t.Error("project directory should have been rolled back after marker write failure")
+	}
+}
+
+func TestGenerateDoesNotPublishGlobalPacksBeforeFatalStepsComplete(t *testing.T) {
+	tests := []struct {
+		name      string
+		xcodeErr  error
+		markerErr error
+	}{
+		{
+			name:     "xcode failure",
+			xcodeErr: errors.New("injected xcode failure"),
+		},
+		{
+			name:      "marker failure",
+			markerErr: errors.New("injected marker failure"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			outputDir := t.TempDir()
+			homeDir := t.TempDir()
+			t.Setenv("HOME", homeDir)
+			claudeDir := filepath.Join(homeDir, ".claude")
+			if err := os.Mkdir(claudeDir, 0755); err != nil {
+				t.Fatalf("setup Claude directory: %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(claudeDir, "keep.txt"), []byte("keep"), 0600); err != nil {
+				t.Fatalf("setup existing global content: %v", err)
+			}
+			before, err := snapshotPath(claudeDir)
+			if err != nil {
+				t.Fatalf("snapshot before generation: %v", err)
+			}
+
+			memFS := minimalBaseWithGlobalPackFS()
+			writer := NewDiskWriter()
+			renderer := NewRenderer(memFS, writer)
+			packRenderer := NewPackRenderer(memFS, renderer, writer, NewSettingsMerger(writer, memFS))
+			gen := NewProjectGenerator(
+				renderer,
+				writer,
+				&mockXcodeProjGenerator{output: "ok", err: test.xcodeErr},
+				&mockGitRunner{},
+				&mockMarkerReadWriter{writeErr: test.markerErr},
+				memFS,
+				nil,
+				packRenderer,
+			)
+			cfg := baseCfg(outputDir)
+			cfg.AIPacks = []string{"test-pack"}
+			cfg.SkillsScope = "global"
+
+			if _, err := gen.Generate(context.Background(), cfg); err == nil {
+				t.Fatal("Generate succeeded despite the injected fatal failure")
+			}
+
+			after, err := snapshotPath(claudeDir)
+			if err != nil {
+				t.Fatalf("snapshot after generation: %v", err)
+			}
+			if before != after {
+				t.Fatalf("failed generation changed global Claude content:\nbefore: %s\nafter: %s", before, after)
+			}
+			if _, err := os.Stat(filepath.Join(outputDir, cfg.Name)); !os.IsNotExist(err) {
+				t.Fatal("failed generation left its owned project directory")
+			}
+		})
 	}
 }
 
