@@ -88,16 +88,9 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 
 	projectDir := filepath.Join(cfg.OutputDir, cfg.Name)
 	result.ProjectDir = projectDir
-
-	// Step 1: Create and exclusively own the output directory.
-	if err := g.writer.EnsureDir(filepath.Dir(projectDir)); err != nil {
-		return result, fmt.Errorf("creating output directory: %w", err)
-	}
-	if err := g.writer.CreateDir(projectDir); err != nil {
-		return result, fmt.Errorf("creating project directory: %w", err)
-	}
+	createdProjectDir := false
 	defer func() {
-		if resultErr == nil {
+		if resultErr == nil || !createdProjectDir {
 			return
 		}
 		if rollbackErr := Rollback(projectDir); rollbackErr != nil {
@@ -107,6 +100,15 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 			}
 		}
 	}()
+
+	// Step 1: Create and exclusively own the output directory.
+	if err := g.writer.EnsureDir(filepath.Dir(projectDir)); err != nil {
+		return result, fmt.Errorf("creating output directory: %w", err)
+	}
+	if err := g.writer.CreateDir(projectDir); err != nil {
+		return result, fmt.Errorf("creating project directory: %w", err)
+	}
+	createdProjectDir = true
 
 	tmplCtx := NewProjectContext(cfg)
 

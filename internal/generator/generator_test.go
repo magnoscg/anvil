@@ -571,6 +571,45 @@ func TestGenerateRollbackOnMarkerWriteFailure(t *testing.T) {
 	}
 }
 
+func TestGenerateRollbackOnPackFailureWithoutChangingExistingOutput(t *testing.T) {
+	dir := t.TempDir()
+	keepPath := filepath.Join(dir, "keep.txt")
+	if err := os.WriteFile(keepPath, []byte("keep me"), 0600); err != nil {
+		t.Fatalf("setup existing output: %v", err)
+	}
+
+	memFS := minimalBaseFS()
+	writer := NewDiskWriter()
+	gen := NewProjectGenerator(
+		NewRenderer(memFS, writer),
+		writer,
+		&mockXcodeProjGenerator{output: "ok"},
+		&mockGitRunner{},
+		&mockMarkerReadWriter{},
+		memFS,
+		nil,
+		&mockPackRenderer{applyErr: errors.New("injected pack failure")},
+	)
+	cfg := baseCfg(dir)
+	cfg.AIPacks = []string{"ios-architecture"}
+
+	_, err := gen.Generate(context.Background(), cfg)
+	if err == nil || !strings.Contains(err.Error(), "injected pack failure") {
+		t.Fatalf("error = %v, want injected pack failure", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, cfg.Name)); !os.IsNotExist(statErr) {
+		t.Fatal("pack failure left the owned project directory")
+	}
+	assertFileContent(t, keepPath, "keep me")
+	info, statErr := os.Stat(keepPath)
+	if statErr != nil {
+		t.Fatalf("stat existing output: %v", statErr)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("existing output mode = %o, want 600", info.Mode().Perm())
+	}
+}
+
 func TestGenerateDoesNotPublishGlobalPacksBeforeFatalStepsComplete(t *testing.T) {
 	tests := []struct {
 		name      string
