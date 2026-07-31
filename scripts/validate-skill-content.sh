@@ -37,6 +37,9 @@ fi
 [[ -f "$REPO_ROOT/THIRD_PARTY_NOTICES.md" ]] || fail "missing root THIRD_PARTY_NOTICES.md"
 [[ -f "$PACK_ROOT/ios-skills/THIRD_PARTY_NOTICES.md" ]] || fail "missing installable iOS notices"
 
+pack_count="$(find "$PACK_ROOT" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+[[ "$pack_count" == "7" ]] || fail "expected 7 packs, found $pack_count"
+
 skill_count="$(find "$PACK_ROOT" -name SKILL.md -type f | wc -l | tr -d ' ')"
 [[ "$skill_count" == "34" ]] || fail "expected 34 skills, found $skill_count"
 
@@ -83,8 +86,23 @@ trap 'rm -rf "$temporary_dir"' EXIT
 mkdir -p "$temporary_dir/module-cache"
 
 example_count=0
+required_pattern_sections=(
+  "Intent"
+  "When to use it"
+  "When to avoid it"
+  "Participants"
+  "Example"
+  "Trade-offs"
+  "Testing strategy"
+  "Related patterns"
+)
 for skill in "$PATTERN_ROOT"/*/SKILL.md; do
   slug="$(basename "$(dirname "$skill")")"
+  for section in "${required_pattern_sections[@]}"; do
+    section_count="$(grep -Fxc "## $section" "$skill" || true)"
+    [[ "$section_count" == "1" ]] || fail "$slug must contain exactly one '$section' section"
+  done
+
   fence_count="$(grep -c '^```swift$' "$skill" | tr -d ' ')"
   [[ "$fence_count" == "1" ]] || fail "$slug must contain exactly one Swift example"
 
