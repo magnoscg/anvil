@@ -18,6 +18,9 @@ jobs:
 
       - run: make test
 
+      - name: Validate skill provenance and Swift examples
+        run: ./scripts/validate-skill-content.sh
+
   swift-tests:
     name: Swift Tests (Example)
     runs-on: macos-latest
