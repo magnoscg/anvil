@@ -1,286 +1,82 @@
 ---
 name: swift-proxy
-description: >
-  Swift Proxy design pattern -- Structural. Use when controlling access to sensitive resources,
-  adding lazy initialization, or implementing caching/logging layers transparently.
-  Includes conceptual example, real-world example, and iOS framework usage guide.
+description: Use Proxy in Swift to control access to a capability for caching, authorization, laziness, or remote transport while preserving its interface.
 license: MIT
 metadata:
-  category: Structural
-  source: refactoring.guru
+  author: Oscar Canton
+  origin: first-party
 ---
 
-# Proxy -- Swift
+# Proxy
 
-> **Category**: Structural
-> **Intent**: Provide a surrogate or placeholder for another object to control access to it.
+## Intent
 
-## When to Use
+Stand in for another object and decide when or whether the real operation proceeds.
 
-The Proxy pattern is appropriate when you need a more versatile or sophisticated reference to an object than a simple pointer. Common scenarios include: lazy initialization (virtual proxy) when the real object is resource-intensive; access control (protection proxy) when different clients should have different access rights; logging requests (logging proxy); and caching results (caching proxy).
+## When to use it
 
-Use Proxy in iOS when you need to guard access to sensitive data (biometrics before showing bank accounts), when you want to add transparent caching to network requests, or when you need to defer expensive object creation until first use. It is also useful for wrapping remote services behind a local interface that handles network details transparently.
+Use it for lazy loading, access checks, request coalescing, local caching, or a remote boundary that should look like a domain capability.
 
-In Swift, the Proxy pattern benefits greatly from protocol-oriented design. Both the real subject and proxy conform to the same protocol, making them interchangeable from the client's perspective. This is especially powerful with dependency injection -- you can swap a real service for a proxy in tests or in specific security contexts without changing client code.
+## When to avoid it
 
-## Structure
+Avoid it when the wrapper changes the capability's meaning or error model without making that policy visible. Hidden network or cache behavior can surprise callers.
 
-| Participant | Role |
-|-------------|------|
-| Subject (Protocol) | Declares the common interface for both RealSubject and Proxy so that a Proxy can be used anywhere a RealSubject is expected. |
-| Real Subject | Contains the core business logic. The object that the proxy represents. |
-| Proxy | Has a reference to the real subject. Controls access to it, may handle creation, caching, logging, or access control. Conforms to the same protocol as the real subject. |
-| Client | Works with both real subjects and proxies via the Subject protocol. |
+## Participants
 
-## Conceptual Example
+- Subject protocol shared by proxy and real subject.
+- Real subject performing the operation.
+- Proxy controlling access and optionally retaining state.
+- Client using the subject boundary.
 
-```swift
-import XCTest
-
-protocol Subject {
-    func request()
-}
-
-class RealSubject: Subject {
-    func request() {
-        print("RealSubject: Handling request.")
-    }
-}
-
-class Proxy: Subject {
-    private var realSubject: RealSubject
-
-    init(_ realSubject: RealSubject) {
-        self.realSubject = realSubject
-    }
-
-    func request() {
-        if (checkAccess()) {
-            realSubject.request()
-            logAccess()
-        }
-    }
-
-    private func checkAccess() -> Bool {
-        print("Proxy: Checking access prior to firing a real request.")
-        return true
-    }
-
-    private func logAccess() {
-        print("Proxy: Logging the time of request.")
-    }
-}
-
-class Client {
-    static func clientCode(subject: Subject) {
-        subject.request()
-    }
-}
-
-class ProxyConceptual: XCTestCase {
-    func test() {
-        print("Client: Executing the client code with a real subject:")
-        let realSubject = RealSubject()
-        Client.clientCode(subject: realSubject)
-
-        print("\nClient: Executing the same client code with a proxy:")
-        let proxy = Proxy(realSubject)
-        Client.clientCode(subject: proxy)
-    }
-}
-```
-
-**Output:**
-```
-Client: Executing the client code with a real subject:
-RealSubject: Handling request.
-
-Client: Executing the same client code with a proxy:
-Proxy: Checking access prior to firing a real request.
-RealSubject: Handling request.
-Proxy: Logging the time of request.
-```
-
-## Real-World Example
+## Example
 
 ```swift
-import XCTest
+protocol AvatarLoading: AnyObject {
+    func avatar(for userID: String) -> String
+}
 
-class ProxyRealWorld: XCTestCase {
-    func testProxyRealWorld() {
-        print("Client: Loading a profile WITHOUT proxy")
-        loadBasicProfile(with: Keychain())
-        loadProfileWithBankAccount(with: Keychain())
+final class RemoteAvatarLoader: AvatarLoading {
+    private(set) var requestCount = 0
 
-        print("\nClient: Let's load a profile WITH proxy")
-        loadBasicProfile(with: ProfileProxy())
-        loadProfileWithBankAccount(with: ProfileProxy())
+    func avatar(for userID: String) -> String {
+        requestCount += 1
+        return "image-data:\(userID)"
+    }
+}
+
+final class CachingAvatarProxy: AvatarLoading {
+    private let remote: RemoteAvatarLoader
+    private var cache: [String: String] = [:]
+
+    init(remote: RemoteAvatarLoader) {
+        self.remote = remote
     }
 
-    func loadBasicProfile(with service: ProfileService) {
-        service.loadProfile(with: [.basic], success: { profile in
-            print("Client: Basic profile is loaded")
-        }) { error in
-            print("Client: Cannot load a basic profile")
-            print("Client: Error: " + error.localizedSummary)
+    func avatar(for userID: String) -> String {
+        if let cached = cache[userID] {
+            return cached
         }
-    }
-
-    func loadProfileWithBankAccount(with service: ProfileService) {
-        service.loadProfile(with: [.basic, .bankAccount], success: { profile in
-            print("Client: Basic profile with a bank account is loaded")
-        }) { error in
-            print("Client: Cannot load a profile with a bank account")
-            print("Client: Error: " + error.localizedSummary)
-        }
+        let loaded = remote.avatar(for: userID)
+        cache[userID] = loaded
+        return loaded
     }
 }
 
-enum AccessField {
-    case basic
-    case bankAccount
-}
-
-protocol ProfileService {
-    typealias Success = (Profile) -> ()
-    typealias Failure = (LocalizedError) -> ()
-
-    func loadProfile(with fields: [AccessField], success: Success, failure: Failure)
-}
-
-class ProfileProxy: ProfileService {
-    private let keychain = Keychain()
-
-    func loadProfile(with fields: [AccessField], success: Success, failure: Failure) {
-        if let error = checkAccess(for: fields) {
-            failure(error)
-        } else {
-            keychain.loadProfile(with: fields, success: success, failure: failure)
-        }
-    }
-
-    private func checkAccess(for fields: [AccessField]) -> LocalizedError? {
-        if fields.contains(.bankAccount) {
-            switch BiometricsService.checkAccess() {
-            case .authorized: return nil
-            case .denied: return ProfileError.accessDenied
-            }
-        }
-        return nil
-    }
-}
-
-class Keychain: ProfileService {
-    func loadProfile(with fields: [AccessField], success: Success, failure: Failure) {
-        var profile = Profile()
-
-        for item in fields {
-            switch item {
-            case .basic:
-                let info = loadBasicProfile()
-                profile.firstName = info[Profile.Keys.firstName.raw]
-                profile.lastName = info[Profile.Keys.lastName.raw]
-                profile.email = info[Profile.Keys.email.raw]
-            case .bankAccount:
-                profile.bankAccount = loadBankAccount()
-            }
-        }
-
-        success(profile)
-    }
-
-    private func loadBasicProfile() -> [String : String] {
-        return [Profile.Keys.firstName.raw : "Vasya",
-                Profile.Keys.lastName.raw : "Pupkin",
-                Profile.Keys.email.raw : "vasya.pupkin@gmail.com"]
-    }
-
-    private func loadBankAccount() -> BankAccount {
-        return BankAccount(id: 12345, amount: 999)
-    }
-}
-
-class BiometricsService {
-    enum Access {
-        case authorized
-        case denied
-    }
-
-    static func checkAccess() -> Access {
-        return .denied
-    }
-}
-
-struct Profile {
-    enum Keys: String {
-        case firstName
-        case lastName
-        case email
-    }
-
-    var firstName: String?
-    var lastName: String?
-    var email: String?
-    var bankAccount: BankAccount?
-}
-
-struct BankAccount {
-    var id: Int
-    var amount: Double
-}
-
-enum ProfileError: LocalizedError {
-    case accessDenied
-
-    var errorDescription: String? {
-        switch self {
-        case .accessDenied:
-            return "Access is denied. Please enter a valid password"
-        }
-    }
-}
-
-extension RawRepresentable {
-    var raw: Self.RawValue {
-        return rawValue
-    }
-}
-
-extension LocalizedError {
-    var localizedSummary: String {
-        return errorDescription ?? ""
-    }
-}
+let remote = RemoteAvatarLoader()
+let proxy = CachingAvatarProxy(remote: remote)
+_ = proxy.avatar(for: "user-1")
+_ = proxy.avatar(for: "user-1")
+precondition(remote.requestCount == 1)
 ```
 
-**Output:**
-```
-Client: Loading a profile WITHOUT proxy
-Client: Basic profile is loaded
-Client: Basic profile with a bank account is loaded
+## Trade-offs
 
-Client: Let's load a profile WITH proxy
-Client: Basic profile is loaded
-Client: Cannot load a profile with a bank account
-Client: Error: Access is denied. Please enter a valid password
-```
+Access policy is centralized and clients retain one interface. Latency, freshness, authorization, and identity can become implicit unless documented and observable.
 
-## iOS Framework Usage
+## Testing strategy
 
-- **UIKit**: `UIApperance` acts as a proxy that intercepts appearance-related property settings and applies them to all instances of a class. `NSProxy` (Objective-C heritage) is a dedicated base class for implementing proxy objects.
-- **SwiftUI**: Property wrappers like `@AppStorage`, `@SceneStorage`, and `@FetchRequest` act as proxies to underlying storage (UserDefaults, scene state, Core Data) -- they provide transparent access while handling persistence behind the scenes.
-- **Foundation/Combine**: `Lazy<T>` patterns and `NSURLProtocol` serve as proxies. `URLProtocol` lets you intercept and proxy all URL loading system requests for caching, mocking, or logging. Combine's `share()` operator creates a proxy publisher that multicasts to multiple subscribers.
+Verify forwarding, denial, cache hit and miss, invalidation, real-subject failures, and duplicate requests. Use clocks or schedulers when policy is time based.
 
-## Swift-Specific Notes
+## Related patterns
 
-- Define the shared interface as a Swift protocol rather than a base class -- this enables both value types (structs) and reference types (classes) to serve as either the real subject or the proxy.
-- Use Swift's `@propertyWrapper` to create transparent proxy objects that intercept get/set operations, ideal for logging, validation, or lazy initialization patterns.
-- Leverage Swift enums with associated values for access control results (like `BiometricsService.Access` in the real-world example) instead of Boolean returns, making the proxy's decision logic more expressive and extensible.
-- Combine the Proxy pattern with Swift's `async/await` for virtual proxies that asynchronously load expensive resources on first access while immediately returning a lightweight placeholder.
-- Use `weak` references from proxy to real subject when appropriate to avoid retain cycles, especially in iOS view controller hierarchies where proxies may outlive their subjects.
-
-## Related Patterns
-
-- **Adapter**: Provides a different interface to the wrapped object, while Proxy provides the same interface.
-- **Decorator**: Adds responsibilities to objects, while Proxy controls access. A protection proxy may look similar to a decorator but has a fundamentally different intent.
-- **Facade**: Both buffer a complex entity and initialize it on its own, but Facade's subject is usually not aware of the facade, while with Proxy the subject interface is matched exactly.
+Decorator always adds behavior around the call. Adapter changes the interface. Facade coordinates several subjects behind a task-level API.

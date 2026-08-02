@@ -92,6 +92,19 @@ Picking packs on an existing project writes them straight into it:
 | `gitflow` | Git branching conventions and workflow skill |
 | `github-actions` | CI/CD workflows for Go + Swift |
 
+Pack installation is collision-safe: Anvil renders and validates the complete
+plan before writing, reports every conflict together, and never overwrites
+skills, commands, workflows, docs, or `CLAUDE.md`. Existing
+`.claude/settings.json` values take precedence; compatible additions are merged
+and published atomically while preserving file permissions.
+
+The 34 bundled skills are tracked in
+[`templates/ai-packs/PROVENANCE.yml`](templates/ai-packs/PROVENANCE.yml). Original
+Anvil content is MIT-licensed and attributed to Oscar Canton. The three
+unmodified third-party MIT skills are pinned to exact commits and included in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md); selecting their pack also
+installs the required notices into the generated project.
+
 ### Third-party prerequisites
 
 Some packs configure the project to use tools that are **not bundled here** and must be installed separately:
@@ -119,6 +132,9 @@ make build
 ```bash
 # Unit tests
 make test
+
+# Skill inventory, provenance, and 25 standalone Swift 6 examples
+./scripts/validate-skill-content.sh
 
 # Integration tests (requires Xcode)
 make test-integration

@@ -1,0 +1,478 @@
+schema_version: 1
+skills:
+  - slug: git-workflow-skill
+    pack: gitflow
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Rewritten from a clean outline; no upstream text, scripts, checkpoints, or ShareAlike material retained."
+    distributed_paths:
+      - templates/ai-packs/gitflow/skills/git-workflow-skill/**
+      - .claude/skills/git-workflow-skill/**
+      - ~/.claude/skills/git-workflow-skill/**
+  - slug: ios-glass-ui-designer
+    pack: ios-skills
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Rewritten as an evidence-led Liquid Glass design and review workflow."
+    distributed_paths:
+      - templates/ai-packs/ios-skills/skills/ios-glass-ui-designer/**
+      - .claude/skills/ios-glass-ui-designer/**
+      - ~/.claude/skills/ios-glass-ui-designer/**
+  - slug: ios-tech-docs
+    pack: ios-skills
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Rewritten as a repository-evidence documentation workflow."
+    distributed_paths:
+      - templates/ai-packs/ios-skills/skills/ios-tech-docs/**
+      - .claude/skills/ios-tech-docs/**
+      - ~/.claude/skills/ios-tech-docs/**
+  - slug: macos-design-guidelines
+    pack: ios-skills
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "No exact upstream state matched; rewritten as original macOS product guidance."
+    distributed_paths:
+      - templates/ai-packs/ios-skills/skills/macos-design-guidelines/**
+      - .claude/skills/macos-design-guidelines/**
+      - ~/.claude/skills/macos-design-guidelines/**
+  - slug: mobile-ios-design
+    pack: ios-skills
+    author: "Seth Hobson"
+    origin: third-party
+    license: MIT
+    source_url: "https://github.com/wshobson/agents"
+    source_commit: "c4b82b0ad771190355eb8e204b1329732a18449a"
+    upstream_path: "plugins/ui-design/skills/mobile-ios-design"
+    content_sha256: "d99af4cb3a8922a0800b3b2cfc752bbb2c9453e93b914b5a2577679aeebf12a1"
+    modifications: "Content is unchanged; only its location inside the Anvil ios-skills pack differs."
+    distributed_paths:
+      - templates/ai-packs/ios-skills/skills/mobile-ios-design/**
+      - .claude/skills/mobile-ios-design/**
+      - ~/.claude/skills/mobile-ios-design/**
+  - slug: swift-charts
+    pack: ios-skills
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Rewritten as an original analytical design, accessibility, and validation workflow."
+    distributed_paths:
+      - templates/ai-packs/ios-skills/skills/swift-charts/**
+      - .claude/skills/swift-charts/**
+      - ~/.claude/skills/swift-charts/**
+  - slug: swift-concurrency
+    pack: ios-skills
+    author: "Antoine van der Lee"
+    origin: third-party
+    license: MIT
+    source_url: "https://github.com/AvdLee/Swift-Concurrency-Agent-Skill"
+    source_commit: "33a29607cadd8f79dc0d5e51e5e918a8981e794e"
+    upstream_path: "swift-concurrency"
+    content_sha256: "203418f17642362dd2996ec77e49749197fec491a2800f6ef147c3f8506f212c"
+    modifications: "Content is unchanged; only its location inside the Anvil ios-skills pack differs."
+    distributed_paths:
+      - templates/ai-packs/ios-skills/skills/swift-concurrency/**
+      - .claude/skills/swift-concurrency/**
+      - ~/.claude/skills/swift-concurrency/**
+  - slug: swiftui-expert-skill
+    pack: ios-skills
+    author: "Antoine van der Lee"
+    origin: third-party
+    license: MIT
+    source_url: "https://github.com/AvdLee/SwiftUI-Agent-Skill"
+    source_commit: "5c2289ffbc3aa5b02f25f73d84e178b08e8ea45c"
+    upstream_path: "swiftui-expert-skill"
+    content_sha256: "305778f66db8b44b9a0fef755aa5d96a1d58cd68ca63913941ca437629ee5604"
+    modifications: "Content is unchanged; only its location inside the Anvil ios-skills pack differs."
+    distributed_paths:
+      - templates/ai-packs/ios-skills/skills/swiftui-expert-skill/**
+      - .claude/skills/swiftui-expert-skill/**
+      - ~/.claude/skills/swiftui-expert-skill/**
+  - slug: ios-tutorials
+    pack: prd-planner
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Rewritten to use only code and documentation available in the current project; the former global catalogue scripts were removed."
+    distributed_paths:
+      - templates/ai-packs/prd-planner/skills/ios-tutorials/**
+      - .claude/skills/ios-tutorials/**
+      - ~/.claude/skills/ios-tutorials/**
+  - slug: swift-abstract-factory
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-abstract-factory/**
+      - .claude/skills/swift-abstract-factory/**
+      - ~/.claude/skills/swift-abstract-factory/**
+  - slug: swift-adapter
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-adapter/**
+      - .claude/skills/swift-adapter/**
+      - ~/.claude/skills/swift-adapter/**
+  - slug: swift-behavioral-patterns
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-behavioral-patterns/**
+      - .claude/skills/swift-behavioral-patterns/**
+      - ~/.claude/skills/swift-behavioral-patterns/**
+  - slug: swift-bridge
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-bridge/**
+      - .claude/skills/swift-bridge/**
+      - ~/.claude/skills/swift-bridge/**
+  - slug: swift-builder
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-builder/**
+      - .claude/skills/swift-builder/**
+      - ~/.claude/skills/swift-builder/**
+  - slug: swift-chain-of-responsibility
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-chain-of-responsibility/**
+      - .claude/skills/swift-chain-of-responsibility/**
+      - ~/.claude/skills/swift-chain-of-responsibility/**
+  - slug: swift-command
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-command/**
+      - .claude/skills/swift-command/**
+      - ~/.claude/skills/swift-command/**
+  - slug: swift-composite
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-composite/**
+      - .claude/skills/swift-composite/**
+      - ~/.claude/skills/swift-composite/**
+  - slug: swift-creational-patterns
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-creational-patterns/**
+      - .claude/skills/swift-creational-patterns/**
+      - ~/.claude/skills/swift-creational-patterns/**
+  - slug: swift-decorator
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-decorator/**
+      - .claude/skills/swift-decorator/**
+      - ~/.claude/skills/swift-decorator/**
+  - slug: swift-facade
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-facade/**
+      - .claude/skills/swift-facade/**
+      - ~/.claude/skills/swift-facade/**
+  - slug: swift-factory-method
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-factory-method/**
+      - .claude/skills/swift-factory-method/**
+      - ~/.claude/skills/swift-factory-method/**
+  - slug: swift-flyweight
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-flyweight/**
+      - .claude/skills/swift-flyweight/**
+      - ~/.claude/skills/swift-flyweight/**
+  - slug: swift-iterator
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-iterator/**
+      - .claude/skills/swift-iterator/**
+      - ~/.claude/skills/swift-iterator/**
+  - slug: swift-mediator
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-mediator/**
+      - .claude/skills/swift-mediator/**
+      - ~/.claude/skills/swift-mediator/**
+  - slug: swift-memento
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-memento/**
+      - .claude/skills/swift-memento/**
+      - ~/.claude/skills/swift-memento/**
+  - slug: swift-observer
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-observer/**
+      - .claude/skills/swift-observer/**
+      - ~/.claude/skills/swift-observer/**
+  - slug: swift-prototype
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-prototype/**
+      - .claude/skills/swift-prototype/**
+      - ~/.claude/skills/swift-prototype/**
+  - slug: swift-proxy
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-proxy/**
+      - .claude/skills/swift-proxy/**
+      - ~/.claude/skills/swift-proxy/**
+  - slug: swift-singleton
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-singleton/**
+      - .claude/skills/swift-singleton/**
+      - ~/.claude/skills/swift-singleton/**
+  - slug: swift-state
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-state/**
+      - .claude/skills/swift-state/**
+      - ~/.claude/skills/swift-state/**
+  - slug: swift-strategy
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-strategy/**
+      - .claude/skills/swift-strategy/**
+      - ~/.claude/skills/swift-strategy/**
+  - slug: swift-structural-patterns
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-structural-patterns/**
+      - .claude/skills/swift-structural-patterns/**
+      - ~/.claude/skills/swift-structural-patterns/**
+  - slug: swift-template-method
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-template-method/**
+      - .claude/skills/swift-template-method/**
+      - ~/.claude/skills/swift-template-method/**
+  - slug: swift-visitor
+    pack: swift-design-patterns
+    author: "Oscar Canton"
+    origin: first-party
+    license: MIT
+    source_url: null
+    source_commit: null
+    upstream_path: null
+    content_sha256: null
+    modifications: "Original Anvil edition with new structure, guidance, and one self-contained Swift 6 product example."
+    distributed_paths:
+      - templates/ai-packs/swift-design-patterns/skills/swift-visitor/**
+      - .claude/skills/swift-visitor/**
+      - ~/.claude/skills/swift-visitor/**

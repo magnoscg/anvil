@@ -62,7 +62,14 @@ func (r *DefaultRenderer) Render(tmplPath string, ctx any, destPath string) erro
 		}
 	}
 
-	if err := r.writer.WriteFile(destPath, buf.Bytes()); err != nil {
+	if err := r.writer.EnsureDir(filepath.Dir(destPath)); err != nil {
+		return config.TemplateRenderError{
+			TemplateName: tmplPath,
+			Cause:        fmt.Errorf("creating output directory: %w", err),
+		}
+	}
+
+	if err := r.writer.CreateFile(destPath, buf.Bytes(), 0644); err != nil {
 		return config.TemplateRenderError{
 			TemplateName: tmplPath,
 			Cause:        fmt.Errorf("writing output: %w", err),

@@ -1,11 +1,24 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // MissingDependencyError indicates that a required system dependency is not installed.
 type MissingDependencyError struct {
 	Name        string
 	InstallHint string
+}
+
+// InvalidProjectNameError indicates that a project name cannot be used as a
+// single filesystem directory component.
+type InvalidProjectNameError struct {
+	Name string
+}
+
+func (e InvalidProjectNameError) Error() string {
+	return fmt.Sprintf("invalid project name %q; use a letter followed by letters, numbers, hyphens, or underscores", e.Name)
 }
 
 func (e MissingDependencyError) Error() string {
@@ -91,6 +104,18 @@ func (e PackNotFoundError) Error() string {
 type PackDependencyError struct {
 	Pack    string
 	Missing string
+}
+
+// InstallConflictError reports every destination that prevents a pack install.
+type InstallConflictError struct {
+	Paths []string
+}
+
+func (e InstallConflictError) Error() string {
+	if len(e.Paths) == 0 {
+		return "pack installation has destination conflicts"
+	}
+	return "pack installation blocked by existing or unsafe destinations:\n  - " + strings.Join(e.Paths, "\n  - ")
 }
 
 func (e PackDependencyError) Error() string {

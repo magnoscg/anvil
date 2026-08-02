@@ -79,16 +79,33 @@ func (m *mockFeatureForge) Forge(cfg config.FeatureConfig) (config.ForgeResult, 
 }
 
 type mockPackRenderer struct {
-	files  []string
-	err    error
-	called bool
-	packs  []string
-	scope  string
+	files        []string
+	err          error
+	preflightErr error
+	applyErr     error
+	called       bool
+	packs        []string
+	scope        string
 }
 
-func (m *mockPackRenderer) RenderPacks(packs []string, skillsScope string, ctx any, projectDir string) ([]string, error) {
+func (m *mockPackRenderer) PlanPacks(packs []string, skillsScope string, ctx any, projectDir string) (PackInstallPlan, error) {
 	m.called = true
 	m.packs = packs
 	m.scope = skillsScope
-	return m.files, m.err
+	plan := PackInstallPlan{projectRoot: projectDir}
+	for _, file := range m.files {
+		plan.files = append(plan.files, plannedFile{displayPath: file})
+	}
+	return plan, m.err
+}
+
+func (m *mockPackRenderer) Preflight(plan *PackInstallPlan) error {
+	if m.preflightErr == nil {
+		plan.preflighted = true
+	}
+	return m.preflightErr
+}
+
+func (m *mockPackRenderer) Apply(plan PackInstallPlan) ([]string, error) {
+	return append([]string(nil), m.files...), m.applyErr
 }

@@ -1,88 +1,78 @@
 ---
 name: swift-structural-patterns
-description: >
-  Overview of Structural design patterns in Swift. Use when choosing between
-  Adapter, Bridge, Composite, Decorator, Facade, Flyweight, and Proxy patterns.
-  Provides selection guide and links to individual pattern skills.
+description: Choose a Swift structural pattern by identifying incompatible boundaries, independent dimensions, tree composition, wrapping, or controlled access.
 license: MIT
 metadata:
-  category: Design Patterns
-  source: refactoring.guru
+  author: Oscar Canton
+  origin: first-party
 ---
 
-# Structural Design Patterns in Swift
+# Structural Patterns in Swift
 
-> Structural patterns explain how to assemble objects and classes into larger structures, while keeping these structures flexible and efficient.
+## Intent
 
-## Overview
+Arrange existing types into a clearer boundary without changing the product behavior they ultimately provide.
 
-Structural design patterns are concerned with how classes and objects are composed to form larger structures. Structural class patterns use inheritance to compose interfaces or implementations, while structural object patterns describe ways to compose objects to realize new functionality.
+## When to use it
 
-In Swift, structural patterns benefit from protocol extensions, generics, property wrappers, and Swift's powerful type system.
+Use a structural pattern when integrating a legacy API, separating two variation axes, representing a tree, layering behavior, simplifying a subsystem, sharing immutable state, or controlling access.
 
-## Pattern Selection Guide
+## When to avoid it
 
-| Pattern | Use When | Swift Feature | iOS Example |
-|---------|----------|---------------|-------------|
-| **Adapter** | Making incompatible interfaces work together | Protocol conformance, extensions | Wrapping C APIs, bridging ObjC/Swift |
-| **Bridge** | Separating abstraction from implementation to vary independently | Protocols as abstractions | Cross-platform rendering, driver abstractions |
-| **Composite** | Treating individual objects and compositions uniformly (tree structures) | Recursive protocols | `UIView` subview hierarchy, file systems |
-| **Decorator** | Adding behavior dynamically without modifying existing code | Protocol extensions, wrapping | `InputStream` decorators, middleware chains |
-| **Facade** | Providing a simplified interface to a complex subsystem | Wrapper classes/structs | `URLSession` (facades networking), `AVPlayer` |
-| **Flyweight** | Sharing common state between many objects to save memory | Shared caches, `NSCache` | `UIFont`, `UIColor` system colors, string interning |
-| **Proxy** | Providing a placeholder/surrogate to control access to another object | Lazy properties, protocol conformance | Lazy image loading, access control wrappers |
+Avoid wrappers that only forward every member. Prefer a small protocol, extension, or direct composition when no structural pressure exists.
 
-## Quick Comparison
+## Participants
 
-### When interfaces DON'T match
-Use **Adapter** to make an existing class work with an interface it wasn't designed for.
+- Client-facing capability.
+- Existing component or subsystem that performs the work.
+- Structural type that adapts, composes, decorates, coordinates, shares, or guards access.
 
-### When you need to VARY abstraction and implementation independently
-Use **Bridge** to split a large class or set of closely related classes into two separate hierarchies.
+## Example
 
-### When you have TREE structures
-Use **Composite** to treat leaves and containers uniformly. UIKit's view hierarchy is the classic example.
+```swift
+protocol OfferSource {
+    func offers() -> [String]
+}
 
-### When you need to ADD responsibilities dynamically
-Use **Decorator** to wrap objects with additional behavior. Prefer this over subclassing for flexible combinations.
+struct NetworkOfferSource: OfferSource {
+    func offers() -> [String] {
+        ["Weekend", "Members"]
+    }
+}
 
-### When you need to SIMPLIFY a complex API
-Use **Facade** to provide a clean interface to a messy subsystem.
+struct FilteringOfferSource: OfferSource {
+    let wrapped: any OfferSource
+    let blocked: Set<String>
 
-### When MEMORY is critical with many similar objects
-Use **Flyweight** to share common state. Swift value types and copy-on-write help here.
+    func offers() -> [String] {
+        wrapped.offers().filter { !blocked.contains($0) }
+    }
+}
 
-### When you need to CONTROL access to an object
-Use **Proxy** for lazy loading, access control, logging, or caching.
+struct OffersScreenModel {
+    private let source: any OfferSource
 
-## Decision Tree
+    init(source: any OfferSource) {
+        self.source = source
+    }
 
+    var rows: [String] {
+        source.offers().map { "Offer: \($0)" }
+    }
+}
+
+let source = FilteringOfferSource(wrapped: NetworkOfferSource(), blocked: ["Members"])
+precondition(OffersScreenModel(source: source).rows == ["Offer: Weekend"])
 ```
-Need to compose or structure objects?
-├── Interface mismatch? → Adapter
-├── Need abstraction + implementation to vary? → Bridge
-├── Tree/hierarchy structure? → Composite
-├── Add behavior without changing class? → Decorator
-├── Complex subsystem needs simple API? → Facade
-├── Many similar objects eating memory? → Flyweight
-└── Need to control access/lazy load? → Proxy
-```
 
-## Individual Pattern Skills
+## Trade-offs
 
-- `/swift-adapter` — Makes incompatible interfaces compatible through wrapping
-- `/swift-bridge` — Separates abstraction from implementation so both can vary
-- `/swift-composite` — Composes objects into tree structures for part-whole hierarchies
-- `/swift-decorator` — Attaches additional responsibilities to objects dynamically
-- `/swift-facade` — Provides a simplified interface to a complex subsystem
-- `/swift-flyweight` — Shares common state among many objects to reduce memory usage
-- `/swift-proxy` — Provides a surrogate or placeholder to control access to another object
+Composition isolates change and makes boundaries testable. Too many near-empty layers obscure control flow and ownership.
 
-## Swift-Specific Considerations
+## Testing strategy
 
-- **Protocol Extensions**: Enable Decorator-like behavior without wrapper classes
-- **Property Wrappers**: `@propertyWrapper` is essentially a built-in Proxy/Decorator mechanism
-- **Extensions**: Swift extensions can act as lightweight Adapters by adding protocol conformance to existing types
-- **Value Types**: `struct` with copy-on-write provides natural Flyweight optimization
-- **Generics**: Enable type-safe structural patterns without runtime casting
-- **@dynamicMemberLookup**: Can implement Proxy pattern with dot-syntax forwarding
+Contract-test the client-facing capability, verify forwarding and transformations, and include identity, ordering, error, and lifecycle cases at the boundary.
+
+## Related patterns
+
+Adapter changes an interface. Bridge separates dimensions. Composite models trees. Decorator layers behavior. Facade simplifies a subsystem. Flyweight shares intrinsic state. Proxy controls access.

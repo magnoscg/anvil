@@ -1,171 +1,80 @@
 ---
 name: swift-adapter
-description: >
-  Swift Adapter design pattern — Structural. Use when making incompatible interfaces work
-  together, wrapping third-party SDKs, bridging Objective-C and Swift, or adding protocol
-  conformance to existing types. Includes conceptual example, real-world example, and iOS framework usage guide.
+description: Use Adapter in Swift to translate a legacy or third-party interface into the small domain capability an iOS feature needs.
 license: MIT
 metadata:
-  category: Structural
-  source: refactoring.guru
+  author: Oscar Canton
+  origin: first-party
 ---
 
-# Adapter — Swift
+# Adapter
 
-> **Category**: Structural
-> **Intent**: Adapter is a structural design pattern that allows objects with incompatible interfaces to collaborate. It acts as a wrapper between two objects, catching calls for one and transforming them to a format recognized by the other.
+## Intent
 
-## When to Use
+Translate one interface, data shape, or convention into another without leaking the source model into feature code.
 
-Use the Adapter pattern when you want to use an existing class but its interface is not compatible with the rest of your code. The pattern lets you create a middle-layer class that serves as a translator between your code and a legacy class, a 3rd-party class, or any other class with a weird interface.
+## When to use it
 
-This pattern is essential in iOS when integrating third-party SDKs that have different APIs than your app's protocols, when bridging Objective-C libraries into Swift code, or when you need to make unrelated classes work together without modifying their source code.
+Use it around SDKs, generated clients, legacy storage, and platform callbacks whose vocabulary or error model differs from the domain.
 
-In Swift, extensions provide a particularly elegant way to implement the Adapter pattern — you can add protocol conformance to any existing type, effectively adapting it to a new interface without subclassing or wrapping.
+## When to avoid it
 
-## Structure
+Avoid it when the source already satisfies the domain boundary or when changing the source is cheaper and under your control.
 
-| Participant | Role |
-|-------------|------|
-| Target (Protocol) | Defines the domain-specific interface used by the client code. |
-| Adaptee | Contains useful behavior but has an incompatible interface. |
-| Adapter | Makes the Adaptee's interface compatible with the Target interface, either through wrapping or extension-based conformance. |
+## Participants
 
-## Conceptual Example
+- Target protocol expected by the feature.
+- Adaptee with an incompatible interface.
+- Adapter that maps calls, data, and failures.
 
-```swift
-import XCTest
-
-class Target {
-    func request() -> String {
-        return "Target: The default target's behavior."
-    }
-}
-
-class Adaptee {
-    public func specificRequest() -> String {
-        return ".eetpadA eht fo roivaheb laicepS"
-    }
-}
-
-class Adapter: Target {
-    private var adaptee: Adaptee
-
-    init(_ adaptee: Adaptee) {
-        self.adaptee = adaptee
-    }
-
-    override func request() -> String {
-        return "Adapter: (TRANSLATED) " + adaptee.specificRequest().reversed()
-    }
-}
-
-class Client {
-    static func someClientCode(target: Target) {
-        print(target.request())
-    }
-}
-
-class AdapterConceptual: XCTestCase {
-    func testAdapterConceptual() {
-        print("Client: I can work just fine with the Target objects:")
-        Client.someClientCode(target: Target())
-
-        let adaptee = Adaptee()
-        print("Client: The Adaptee class has a weird interface. See, I don't understand it:")
-        print("Adaptee: " + adaptee.specificRequest())
-
-        print("Client: But I can work with it via the Adapter:")
-        Client.someClientCode(target: Adapter(adaptee))
-    }
-}
-```
-
-**Output:**
-```
-Client: I can work just fine with the Target objects:
-Target: The default target's behavior.
-Client: The Adaptee class has a weird interface. See, I don't understand it:
-Adaptee: .eetpadA eht fo roivaheb laicepS
-Client: But I can work with it via the Adapter:
-Adapter: (TRANSLATED) Special behavior of the Adaptee.
-```
-
-## Real-World Example
+## Example
 
 ```swift
-import XCTest
-import UIKit
-
-class AdapterRealWorld: XCTestCase {
-    func testAdapterRealWorld() {
-        print("Starting an authorization via Facebook")
-        startAuthorization(with: FacebookAuthSDK())
-
-        print("Starting an authorization via Twitter.")
-        startAuthorization(with: TwitterAuthSDK())
-    }
-
-    func startAuthorization(with service: AuthService) {
-        let topViewController = UIViewController()
-        service.presentAuthFlow(from: topViewController)
-    }
+struct ProductPrice: Equatable {
+    let productID: String
+    let cents: Int
 }
 
-protocol AuthService {
-    func presentAuthFlow(from viewController: UIViewController)
+protocol PriceLoading {
+    func price(for productID: String) -> ProductPrice?
 }
 
-class FacebookAuthSDK {
-    func presentAuthFlow(from viewController: UIViewController) {
-        print("Facebook WebView has been shown.")
+final class LegacyPriceStore {
+    private let rows: [[String: String]] = [
+        ["sku": "pro.monthly", "minor_units": "799"]
+    ]
+
+    func lookup(sku: String) -> [String: String]? {
+        rows.first { $0["sku"] == sku }
     }
 }
 
-class TwitterAuthSDK {
-    func startAuthorization(with viewController: UIViewController) {
-        print("Twitter WebView has been shown. Users will be happy :)")
+struct LegacyPriceAdapter: PriceLoading {
+    let store: LegacyPriceStore
+
+    func price(for productID: String) -> ProductPrice? {
+        guard
+            let row = store.lookup(sku: productID),
+            let rawCents = row["minor_units"],
+            let cents = Int(rawCents)
+        else { return nil }
+
+        return ProductPrice(productID: productID, cents: cents)
     }
 }
 
-extension TwitterAuthSDK: AuthService {
-    /// Adapter: bridges Twitter's startAuthorization to AuthService's presentAuthFlow
-    func presentAuthFlow(from viewController: UIViewController) {
-        print("The Adapter is called! Redirecting to the original method...")
-        self.startAuthorization(with: viewController)
-    }
-}
-
-extension FacebookAuthSDK: AuthService {
-    /// Facebook already matches — extension just declares conformance
-}
+let loader = LegacyPriceAdapter(store: LegacyPriceStore())
+precondition(loader.price(for: "pro.monthly") == ProductPrice(productID: "pro.monthly", cents: 799))
 ```
 
-**Output:**
-```
-Starting an authorization via Facebook
-Facebook WebView has been shown.
-Starting an authorization via Twitter.
-The Adapter is called! Redirecting to the original method...
-Twitter WebView has been shown. Users will be happy :)
-```
+## Trade-offs
 
-## iOS Framework Usage
+The domain stays stable and source quirks are centralized. Mapping code must be maintained and can conceal lossy conversions unless they are explicit.
 
-- **UIKit**: `UITableViewDataSource` / `UICollectionViewDataSource` adapt your model to UIKit's data requirements. `UIViewRepresentable` adapts UIKit views for SwiftUI.
-- **SwiftUI**: `UIViewControllerRepresentable` and `UIViewRepresentable` are adapters bridging UIKit into SwiftUI. `Transferable` protocol adapts types for drag-and-drop.
-- **Foundation**: `NSItemProvider` adapts arbitrary objects for cross-process transfer. `Codable` conformance adapts types for JSON/PropertyList serialization.
+## Testing strategy
 
-## Swift-Specific Notes
+Test every mapping branch, malformed source value, missing field, unit conversion, and error translation. Use captured source fixtures at the adapter boundary.
 
-- **Extension-based adapters**: Swift extensions can add protocol conformance to any type — even types you don't own. This is the most idiomatic way to implement Adapter in Swift.
-- **Protocol composition**: Use `typealias` to combine protocols: `typealias NetworkAdapter = URLSessionProtocol & RetryPolicy` for adapters that bridge multiple interfaces.
-- **Objective-C bridging**: `@objc` protocol conformance and `NS_SWIFT_NAME` annotations are built-in adapter mechanisms between Swift and Objective-C.
-- **Wrapper structs**: For complex adaptations, a lightweight struct wrapping the adaptee provides value semantics and clear ownership.
-- **`where` clauses**: Conditional conformance (`extension Array: MyProtocol where Element: Codable`) enables powerful type-safe adapters.
+## Related patterns
 
-## Related Patterns
-
-- **Facade**: Both wrap existing interfaces, but Facade simplifies a complex subsystem while Adapter makes an existing interface compatible with a different one.
-- **Decorator**: Both wrap objects, but Decorator adds behavior while Adapter changes the interface. Decorator keeps the same interface; Adapter provides a different one.
-- **Bridge**: Bridge separates abstraction from implementation upfront. Adapter is applied to an existing system to make incompatible things work together.
+Facade offers a simpler subsystem API without necessarily translating models. Proxy preserves the interface while controlling access. Anti-corruption layers often contain several adapters.
