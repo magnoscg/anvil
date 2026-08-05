@@ -1,35 +1,59 @@
 name: CI
 
 on:
+  push:
+    branches: [develop, main]
   pull_request:
     branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   go-tests:
     name: Go Tests
     runs-on: macos-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: true
 
-      - run: make test
+      - name: Verify downloaded modules
+        run: go mod verify
+
+      - name: Run Go vet
+        run: go vet ./...
+
+      - name: Run Go tests
+        run: make test
 
       - name: Validate skill provenance and Swift examples
         run: ./scripts/validate-skill-content.sh
 
+      - name: Validate public social preview
+        run: make validate-public-assets
+
   swift-tests:
     name: Swift Tests (Example)
     runs-on: macos-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install tools
-        run: |
-          brew install swiftlint swiftformat xcbeautify
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build Example project
         run: |
@@ -37,7 +61,7 @@ jobs:
             -project Example/Arquitectura.xcodeproj \
             -scheme Arquitectura-Dev \
             -destination "platform=iOS Simulator,OS=latest,name=iPhone 16 Pro" \
-            2>&1 | xcbeautify
+            -quiet
 
       - name: Run Swift tests
         run: |
@@ -45,4 +69,23 @@ jobs:
             -project Example/Arquitectura.xcodeproj \
             -scheme Arquitectura-Dev \
             -destination "platform=iOS Simulator,OS=latest,name=iPhone 16 Pro" \
-            2>&1 | xcbeautify
+            -quiet
+
+  vulnerability-scan:
+    name: Go Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Scan reachable Go code
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
