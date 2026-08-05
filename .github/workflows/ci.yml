@@ -55,12 +55,34 @@ jobs:
         with:
           persist-credentials: false
 
+      # A hardcoded device name silently rots when the runner image moves to a
+      # new iPhone generation, so resolve whatever the image actually ships.
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          udid="$(xcrun simctl list devices available --json | jq -r '
+            .devices
+            | to_entries
+            | map(select(.key | contains("SimRuntime.iOS")))
+            | sort_by(.key)
+            | reverse
+            | .[0].value
+            | map(select(.name | startswith("iPhone")))
+            | .[0].udid
+          ')"
+          if [ -z "$udid" ] || [ "$udid" = "null" ]; then
+            echo "No available iPhone simulator on this runner" >&2
+            exit 1
+          fi
+          xcrun simctl list devices available | grep -F "$udid"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
       - name: Build Example project
         run: |
           xcodebuild build \
             -project Example/Arquitectura.xcodeproj \
             -scheme Arquitectura-Dev \
-            -destination "platform=iOS Simulator,OS=latest,name=iPhone 16 Pro" \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
             -quiet
 
       - name: Run Swift tests
@@ -68,7 +90,7 @@ jobs:
           xcodebuild test \
             -project Example/Arquitectura.xcodeproj \
             -scheme Arquitectura-Dev \
-            -destination "platform=iOS Simulator,OS=latest,name=iPhone 16 Pro" \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
             -quiet
 
   vulnerability-scan:
