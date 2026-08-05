@@ -1,4 +1,4 @@
-.PHONY: build test test-integration install clean lint fmt all
+.PHONY: build test test-integration validate-public-assets install clean lint fmt all
 
 VERSION ?= dev
 BINARY_NAME := anvil
@@ -16,6 +16,10 @@ test:
 ## test-integration: Run integration tests (requires macOS + Xcode)
 test-integration:
 	go test -tags integration -v -count=1 ./...
+
+## validate-public-assets: Verify social preview size, provenance, and integrity
+validate-public-assets:
+	./scripts/validate-public-assets.sh
 
 ## install: Install binary to GOPATH/bin
 install:
@@ -35,4 +39,4 @@ fmt:
 	gofmt -w .
 
 ## all: Format, lint, test, and build
-all: fmt lint test build
+all: fmt lint test validate-public-assets build

@@ -762,24 +762,30 @@ All implement the `error` interface with descriptive `.Error()` messages and opt
 
 ### CI Pipeline (`.github/workflows/ci.yml`)
 
-**Trigger:** Pull requests to `develop` and `main`
+**Trigger:** Pull requests to, and direct pushes on, `develop` and `main`
 
 **Jobs:**
 
 1. **Go Tests** (macos-latest)
-   - Checkout → Setup Go → `make test`
+   - Verify modules → `go vet` → `make test` → validate provenance and Swift examples
 
 2. **Swift Tests** (macos-latest)
-   - Install tools (swiftlint, swiftformat, xcbeautify)
    - Build Example project: `xcodebuild build -scheme Arquitectura-Dev`
    - Test Example project: `xcodebuild test -scheme Arquitectura-Dev`
 
+3. **Go Vulnerability Scan** (ubuntu-latest)
+   - Run the pinned `govulncheck` version against reachable Go code
+
+All third-party actions are pinned to full commit SHAs and the workflow token is
+read-only.
+
 ### Release Pipeline (`.github/workflows/release.yml`)
 
-**Trigger:** Tags matching `v*`
+**Trigger:** Tags matching semantic version shape `X.Y.Z` without a `v` prefix
 
 **Job:**
-- Checkout with full history → Setup Go → Run goreleaser
+- Validate the exact tag format → checkout with full history → setup Go → run
+  pinned GoReleaser with a job-scoped `contents: write` token
 
 ### Goreleaser Configuration (`.goreleaser.yml`)
 
@@ -808,19 +814,19 @@ release:
   github:
     owner: magnoscg
     name: anvil
-  draft: true
+  draft: false
   prerelease: auto
 ```
 
 ### Release Process
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag 0.6.0
+git push origin 0.6.0
 # GitHub Actions triggers goreleaser automatically
-# Creates draft release with:
-#   - anvil_0.3.0_darwin_arm64.tar.gz
-#   - anvil_0.3.0_darwin_amd64.tar.gz
+# Creates a release with:
+#   - anvil_0.6.0_darwin_arm64.tar.gz
+#   - anvil_0.6.0_darwin_amd64.tar.gz
 #   - checksums.txt
 ```
 
