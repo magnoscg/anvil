@@ -1,11 +1,14 @@
 # AnvilCLI
 
-![The anvil init wizard, showing the ANVIL banner and the choice between creating a new iOS project or installing AI coding tools](docs/images/anvil-init.png)
+![Anvil engineering preview showing safe iOS scaffolding and a successful transactional AI pack installation](docs/images/social-preview.png)
 
 [![Release](https://img.shields.io/github/v/release/magnoscg/anvil?style=flat-square)](https://github.com/magnoscg/anvil/releases)
+[![CI](https://github.com/magnoscg/anvil/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/magnoscg/anvil/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-iOS%2018+-blue?style=flat-square)](https://developer.apple.com/ios/)
 [![Swift](https://img.shields.io/badge/Swift-6-orange?style=flat-square)](https://swift.org)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+
+[Security policy](SECURITY.md) · [Asset provenance](ASSET_PROVENANCE.md)
 
 CLI tool that scaffolds new iOS projects following **Clean Architecture + MVVM + Router**. Written in Go with a BubbleTea TUI wizard. Generates production-ready Xcode projects with all layers wired up and ready to build.
 
@@ -80,7 +83,7 @@ The wizard can drop optional "AI packs" into the generated project — conventio
 
 Picking packs on an existing project writes them straight into it:
 
-![The wizard reporting that the AI coding tools were installed successfully, 39 files written](docs/images/anvil-done.png)
+![The wizard reporting that the AI coding tools were installed successfully, 118 files written](docs/images/anvil-done.png)
 
 | Pack | Contents |
 |------|----------|
@@ -97,6 +100,8 @@ plan before writing, reports every conflict together, and never overwrites
 skills, commands, workflows, docs, or `CLAUDE.md`. Existing
 `.claude/settings.json` values take precedence; compatible additions are merged
 and published atomically while preserving file permissions.
+
+Security reports are handled privately; see [SECURITY.md](SECURITY.md).
 
 The 34 bundled skills are tracked in
 [`templates/ai-packs/PROVENANCE.yml`](templates/ai-packs/PROVENANCE.yml). Original
@@ -136,6 +141,9 @@ make test
 # Skill inventory, provenance, and 25 standalone Swift 6 examples
 ./scripts/validate-skill-content.sh
 
+# Social preview dimensions, size, provenance, and reviewed SHA-256
+make validate-public-assets
+
 # Integration tests (requires Xcode)
 make test-integration
 ```
@@ -150,7 +158,7 @@ make lint
 ### Full pipeline
 
 ```bash
-make all    # fmt + lint + test + build
+make all    # fmt + lint + test + public asset validation + build
 ```
 
 ### Golden file tests

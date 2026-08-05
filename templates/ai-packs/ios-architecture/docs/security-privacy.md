@@ -221,7 +221,7 @@ final class AuthViewModel {
 
 ```swift
 // WRONG: Visible in binary
-let apiKey = "sk-1234567890abcdef"
+let apiKey = "<REDACTED_SECRET>"
 ```
 
 ### DO: Use Configuration Files or Environment
