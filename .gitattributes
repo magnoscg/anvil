@@ -1,0 +1,6 @@
+# Anvil is a Go CLI. The Swift in this repository is what the tool emits, not
+# what it is made of: Example/ is the reference application it generates, and
+# testdata/ holds the golden files that prove it generates them unchanged.
+# Counting either as the repository's language mislabels the tool on GitHub.
+Example/** linguist-documentation
+testdata/** linguist-generated
