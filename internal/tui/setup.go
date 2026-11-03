@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -444,6 +445,11 @@ func (m setupModel) tryConfirm() (setupModel, tea.Cmd) {
 		m.cursor = len(m.fields[fieldProjectName].value)
 		return m, nil
 	}
+	if config.ValidateSchemeNames(parseSchemes(m.fields[fieldSchemes].value)) != nil {
+		m.focused = fieldSchemes
+		m.cursor = len(m.fields[fieldSchemes].value)
+		return m, nil
+	}
 	if !m.depsChecked || !m.depsReport.Ready() {
 		return m, nil
 	}
@@ -583,6 +589,12 @@ func (m setupModel) view() string {
 			name := m.fields[fieldProjectName].value
 			if name != "" && config.ValidateProjectName(name) != nil {
 				b.WriteString("                          " + m.theme.ErrorText.Render("Must start with a letter (a-z, 0-9, -, _ only)") + "\n")
+			}
+		}
+
+		if i == fieldSchemes {
+			if err := config.ValidateSchemeNames(parseSchemes(m.fields[fieldSchemes].value)); err != nil {
+				b.WriteString("                          " + m.theme.ErrorText.Render(schemeErrorHint(err)) + "\n")
 			}
 		}
 	}
@@ -734,6 +746,14 @@ func (m setupModel) renderScopePrompt() string {
 	}
 
 	return b.String()
+}
+
+func schemeErrorHint(err error) string {
+	var invalid config.InvalidSchemeNameError
+	if errors.As(err, &invalid) && invalid.Duplicate {
+		return "Scheme names must differ ignoring case"
+	}
+	return "Each scheme must start with a letter (a-z, 0-9, _ only)"
 }
 
 func parseSchemes(s string) []string {

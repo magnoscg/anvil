@@ -327,6 +327,47 @@ func TestGenerateRejectsInvalidProjectNamesBeforeWriting(t *testing.T) {
 	}
 }
 
+func TestGenerateRejectsInvalidSchemeNamesBeforeWriting(t *testing.T) {
+	for _, schemes := range [][]string{
+		{"Dev", "../../../../../escaped", "Production"},
+		{"Dev/Child"},
+		{"/tmp/Dev"},
+		{"Dev", "dev"},
+	} {
+		t.Run(strings.Join(schemes, ","), func(t *testing.T) {
+			dir := t.TempDir()
+			outputDir := filepath.Join(dir, "output")
+			writer := NewDiskWriter()
+			gen := NewProjectGenerator(
+				NewRenderer(minimalBaseFS(), writer),
+				writer,
+				&mockXcodeProjGenerator{},
+				&mockGitRunner{},
+				&mockMarkerReadWriter{},
+				minimalBaseFS(),
+				nil,
+				&mockPackRenderer{},
+			)
+			cfg := baseCfg(outputDir)
+			cfg.Schemes = schemes
+
+			_, err := gen.Generate(context.Background(), cfg)
+			var invalidScheme config.InvalidSchemeNameError
+			if !errors.As(err, &invalidScheme) {
+				t.Fatalf("error = %v, want InvalidSchemeNameError", err)
+			}
+
+			entries, readErr := os.ReadDir(dir)
+			if readErr != nil {
+				t.Fatalf("read temp directory: %v", readErr)
+			}
+			if len(entries) != 0 {
+				t.Fatalf("invalid scheme created output: %v", entries)
+			}
+		})
+	}
+}
+
 func TestGenerateRollbackOnXcodeProjFailure(t *testing.T) {
 	dir := t.TempDir()
 	memFS := minimalBaseFS()

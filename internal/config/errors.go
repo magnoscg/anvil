@@ -21,6 +21,20 @@ func (e InvalidProjectNameError) Error() string {
 	return fmt.Sprintf("invalid project name %q; use a letter followed by letters, numbers, hyphens, or underscores", e.Name)
 }
 
+// InvalidSchemeNameError indicates that a scheme name cannot be used as a file
+// name and Swift enum case, or that it repeats another scheme.
+type InvalidSchemeNameError struct {
+	Name      string
+	Duplicate bool
+}
+
+func (e InvalidSchemeNameError) Error() string {
+	if e.Duplicate {
+		return fmt.Sprintf("duplicate scheme name %q; scheme names must differ ignoring case", e.Name)
+	}
+	return fmt.Sprintf("invalid scheme name %q; use a letter followed by letters, numbers, or underscores", e.Name)
+}
+
 func (e MissingDependencyError) Error() string {
 	msg := fmt.Sprintf("required dependency %q is not installed", e.Name)
 	if e.InstallHint != "" {

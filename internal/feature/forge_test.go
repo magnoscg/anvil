@@ -71,6 +71,44 @@ func TestForgeHappyPath(t *testing.T) {
 	}
 }
 
+func TestForgeRejectsUnsafeProjectNameBeforeWriting(t *testing.T) {
+	for _, projectName := range []string{"../outside", "App/Child", "/tmp/App", ""} {
+		t.Run(projectName, func(t *testing.T) {
+			dir := t.TempDir()
+			projectRoot := filepath.Join(dir, "project")
+			if err := os.Mkdir(projectRoot, 0o755); err != nil {
+				t.Fatalf("create project root: %v", err)
+			}
+			forge := NewFeatureForge(&stubRenderer{})
+
+			_, err := forge.Forge(config.FeatureConfig{
+				FeatureName: "Pokemon",
+				ProjectRoot: projectRoot,
+				ProjectName: projectName,
+			})
+
+			var invalidName config.InvalidProjectNameError
+			if !errors.As(err, &invalidName) {
+				t.Fatalf("error = %v, want InvalidProjectNameError", err)
+			}
+			entries, readErr := os.ReadDir(dir)
+			if readErr != nil {
+				t.Fatalf("read temp directory: %v", readErr)
+			}
+			if len(entries) != 1 || entries[0].Name() != "project" {
+				t.Fatalf("unsafe project name wrote outside the project: %v", entries)
+			}
+			projectEntries, readErr := os.ReadDir(projectRoot)
+			if readErr != nil {
+				t.Fatalf("read project root: %v", readErr)
+			}
+			if len(projectEntries) != 0 {
+				t.Fatalf("unsafe project name wrote into the project: %v", projectEntries)
+			}
+		})
+	}
+}
+
 func TestForgeHappyPathFileCount(t *testing.T) {
 	dir := t.TempDir()
 
