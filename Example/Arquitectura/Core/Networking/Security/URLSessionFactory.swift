@@ -4,7 +4,7 @@ import Foundation
 
 /// Creates the app's `URLSession` from the environment configuration.
 /// The session waits for connectivity instead of failing at once while offline, bounded by the
-/// resource timeout, and installs `SSLPinningDelegate` when pinning is enabled.
+/// resource timeout, and installs `SSLPinningDelegate` for the API host when pinning is enabled.
 enum URLSessionFactory {
     // MARK: - Public Methods
 
@@ -25,7 +25,8 @@ enum URLSessionFactory {
 
         assert(!configuration.sslPublicKeyHashes.isEmpty,
                "SSL_PINNING_ENABLED=YES but SSL_PUBLIC_KEY_HASHES is empty in \(configuration.environment): every connection will be rejected.")
-        let delegate = SSLPinningDelegate(publicKeyHashes: configuration.sslPublicKeyHashes)
+        let delegate = SSLPinningDelegate(publicKeyHashes: configuration.sslPublicKeyHashes,
+                                          pinnedHosts: Set([configuration.baseURL.host()].compactMap(\.self)))
         return URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 }

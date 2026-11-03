@@ -10,7 +10,9 @@ import Security
 /// Pins use the `sha256/<base64>` format produced by
 /// `openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64`.
 /// Pinning the current leaf key plus a backup key lets the certificate rotate without an app update.
-/// Challenges other than server trust get the system's default handling.
+/// Only the hosts given at init are pinned, normally the API's own host: other hosts, such as external
+/// APIs reached through the same session, and challenges other than server trust get the system's
+/// default handling.
 ///
 /// Thread Safety: Conforms to `Sendable` via `@unchecked` because:
 /// - All stored properties are immutable (`let` constants)
@@ -23,6 +25,7 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
     // MARK: - Properties
 
     private let pinnedPublicKeyHashes: Set<String>
+    private let pinnedHosts: Set<String>
     private let isEnabled: Bool
 
     // MARK: - Init
@@ -30,9 +33,11 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
     /// Creates an SSL Pinning delegate.
     /// - Parameters:
     ///   - publicKeyHashes: Base64-encoded SHA-256 hashes of SubjectPublicKeyInfo, formatted as "sha256/..."
+    ///   - pinnedHosts: Hosts whose connections must match a pin, compared case-insensitively.
     ///   - isEnabled: Whether pinning validation is enabled. When false, default handling is used.
-    init(publicKeyHashes: [String], isEnabled: Bool = true) {
+    init(publicKeyHashes: [String], pinnedHosts: Set<String>, isEnabled: Bool = true) {
         self.pinnedPublicKeyHashes = Set(publicKeyHashes)
+        self.pinnedHosts = Set(pinnedHosts.map { $0.lowercased() })
         self.isEnabled = isEnabled
         super.init()
     }
@@ -44,15 +49,19 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
         -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         guard isEnabled,
               challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let serverTrust = challenge.protectionSpace.serverTrust else {
+              pinnedHosts.contains(challenge.protectionSpace.host.lowercased()) else {
             return (.performDefaultHandling, nil)
+        }
+
+        guard let serverTrust = challenge.protectionSpace.serverTrust else {
+            return (.cancelAuthenticationChallenge, nil)
         }
 
         let policies = [SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString)]
         SecTrustSetPolicies(serverTrust, policies as CFArray)
 
         guard SecTrustEvaluateWithError(serverTrust, nil),
-              Self.publicKeyPins(in: serverTrust).contains(where: pinnedPublicKeyHashes.contains) else {
+              acceptsChain(withPins: Self.publicKeyPins(in: serverTrust)) else {
             return (.cancelAuthenticationChallenge, nil)
         }
 
@@ -63,6 +72,13 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
 // MARK: - Public Key Pins
 
 extension SSLPinningDelegate {
+    /// Checks whether a validated chain carries at least one pinned public key.
+    /// - Parameter pins: The pins of the chain's certificates.
+    /// - Returns: True if any pin matches; always false when no pin is configured.
+    nonisolated func acceptsChain(withPins pins: [String]) -> Bool {
+        pins.contains(where: pinnedPublicKeyHashes.contains)
+    }
+
     /// Returns the pin of every certificate in the trust's chain, leaf first.
     /// - Parameter trust: The server trust object from the authentication challenge.
     /// - Returns: The `sha256/` pins of the chain's supported public keys.

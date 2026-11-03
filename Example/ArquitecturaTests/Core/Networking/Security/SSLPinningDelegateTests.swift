@@ -23,7 +23,7 @@ struct SSLPinningDelegateTests {
     func ellipticCurveP256PinMatchesOpenSSL() throws {
         let key = try Self.publicKey(of: Self.p256Certificate)
 
-        #expect(SSLPinningDelegate.publicKeyPin(for: key) == "sha256/3vIDjxskFtq6dc/Typn71SiUYMhzEKL5UjYAu1WBcgs=")
+        #expect(SSLPinningDelegate.publicKeyPin(for: key) == Self.p256Pin)
     }
 
     @Test("The pin of an EC P-384 key matches the SubjectPublicKeyInfo hash from openssl")
@@ -40,12 +40,93 @@ struct SSLPinningDelegateTests {
         #expect(SSLPinningDelegate.publicKeyPin(for: key) == nil)
     }
 
+    @Test("The pins of a trust start with its leaf certificate")
+    func trustPinsStartWithLeaf() throws {
+        let certificate = try Self.certificate(of: Self.p256Certificate)
+        var trust: SecTrust?
+        let status = SecTrustCreateWithCertificates(certificate, SecPolicyCreateBasicX509(), &trust)
+        let serverTrust = try #require(trust)
+
+        #expect(status == errSecSuccess)
+        #expect(SSLPinningDelegate.publicKeyPins(in: serverTrust).first == Self.p256Pin)
+    }
+
+    // MARK: - Chain Decision Tests
+
+    @Test("A chain is accepted when any of its keys is pinned")
+    func chainWithPinnedIntermediateIsAccepted() {
+        let delegate = SSLPinningDelegate(publicKeyHashes: ["sha256/intermediate"], pinnedHosts: [Self.apiHost])
+
+        #expect(delegate.acceptsChain(withPins: ["sha256/leaf", "sha256/intermediate"]))
+        #expect(!delegate.acceptsChain(withPins: ["sha256/leaf"]))
+    }
+
+    @Test("Without pins every chain is rejected")
+    func emptyPinSetRejectsEveryChain() {
+        let delegate = SSLPinningDelegate(publicKeyHashes: [], pinnedHosts: [Self.apiHost])
+
+        #expect(!delegate.acceptsChain(withPins: [Self.p256Pin]))
+    }
+
+    // MARK: - Challenge Handling Tests
+
+    @Test("A host without pins gets the default handling")
+    func unpinnedHostGetsDefaultHandling() async {
+        let delegate = SSLPinningDelegate(publicKeyHashes: [Self.p256Pin], pinnedHosts: [Self.apiHost])
+        let challenge = Self.makeChallenge(host: "pokeapi.co", method: NSURLAuthenticationMethodServerTrust)
+
+        let (disposition, credential) = await delegate.urlSession(URLSession.shared, didReceive: challenge)
+
+        #expect(disposition == .performDefaultHandling)
+        #expect(credential == nil)
+    }
+
+    @Test("A pinned host without a server trust is rejected, whatever the host's case")
+    func pinnedHostWithoutTrustIsRejected() async {
+        let delegate = SSLPinningDelegate(publicKeyHashes: [Self.p256Pin], pinnedHosts: [Self.apiHost])
+        let challenge = Self.makeChallenge(host: "API.Example.com", method: NSURLAuthenticationMethodServerTrust)
+
+        let (disposition, _) = await delegate.urlSession(URLSession.shared, didReceive: challenge)
+
+        #expect(disposition == .cancelAuthenticationChallenge)
+    }
+
+    @Test("Challenges other than server trust get the default handling")
+    func otherChallengesGetDefaultHandling() async {
+        let delegate = SSLPinningDelegate(publicKeyHashes: [Self.p256Pin], pinnedHosts: [Self.apiHost])
+        let challenge = Self.makeChallenge(host: Self.apiHost, method: NSURLAuthenticationMethodHTTPBasic)
+
+        let (disposition, _) = await delegate.urlSession(URLSession.shared, didReceive: challenge)
+
+        #expect(disposition == .performDefaultHandling)
+    }
+
     // MARK: - Helpers
 
-    private static func publicKey(of base64Lines: [String]) throws -> SecKey {
+    private static let apiHost = "api.example.com"
+    private static let p256Pin = "sha256/3vIDjxskFtq6dc/Typn71SiUYMhzEKL5UjYAu1WBcgs="
+
+    private static func certificate(of base64Lines: [String]) throws -> SecCertificate {
         let data = try #require(Data(base64Encoded: base64Lines.joined()))
-        let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
-        return try #require(SecCertificateCopyKey(certificate))
+        return try #require(SecCertificateCreateWithData(nil, data as CFData))
+    }
+
+    private static func publicKey(of base64Lines: [String]) throws -> SecKey {
+        try #require(SecCertificateCopyKey(certificate(of: base64Lines)))
+    }
+
+    private static func makeChallenge(host: String, method: String) -> URLAuthenticationChallenge {
+        let protectionSpace = URLProtectionSpace(host: host,
+                                                 port: 443,
+                                                 protocol: NSURLProtectionSpaceHTTPS,
+                                                 realm: nil,
+                                                 authenticationMethod: method)
+        return URLAuthenticationChallenge(protectionSpace: protectionSpace,
+                                          proposedCredential: nil,
+                                          previousFailureCount: 0,
+                                          failureResponse: nil,
+                                          error: nil,
+                                          sender: IgnoringChallengeSender())
     }
 
     // MARK: - Certificates
@@ -97,4 +178,17 @@ struct SSLPinningDelegateTests {
                                              "BQADgYEAIbcqDgMH7w/s/PpSjUUp45u/jgmQOi7Pcck7r5puTffCN7U5K8gx7LBaU2DK",
                                              "J9+EjpjdaveFd2hnIpTnaQgTOoLpOVsgydiWzmuyflNt9SK8p9bCWmalEoBjpQhRmP4E",
                                              "7RRbq5jmNKczOtRn76ebV3xjXFO44rsDBHCzcnIWz7w="]
+}
+
+// MARK: - IgnoringChallengeSender
+
+/// Challenge sender that ignores every call: the delegate under test returns its decision instead.
+private nonisolated final class IgnoringChallengeSender: NSObject, URLAuthenticationChallengeSender {
+    // MARK: - URLAuthenticationChallengeSender
+
+    func use(_ credential: URLCredential, for challenge: URLAuthenticationChallenge) {}
+
+    func continueWithoutCredential(for challenge: URLAuthenticationChallenge) {}
+
+    func cancel(_ challenge: URLAuthenticationChallenge) {}
 }

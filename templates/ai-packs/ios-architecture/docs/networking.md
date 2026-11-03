@@ -471,11 +471,11 @@ enum URLSessionFactory {
 
 - `waitsForConnectivity = true`: an offline request waits for a connection instead of failing at once. `resourceTimeout` (60 s by default) bounds the wait.
 - Low Data Mode is allowed. Mark only non-essential requests with `request.allowsConstrainedNetworkAccess = false`.
-- `SSL_PINNING_ENABLED = YES` installs `SSLPinningDelegate`. With no hashes the session pins to an empty set and rejects every connection (fail closed), with an assertion in debug builds.
+- `SSL_PINNING_ENABLED = YES` installs `SSLPinningDelegate` for the `baseURL` host. With no hashes the session pins to an empty set and rejects every connection (fail closed), with an assertion in debug builds.
 
 ### SSLPinningDelegate
 
-After the system validates the certificate chain, the connection is accepted only if the SHA-256 of the SubjectPublicKeyInfo of a certificate in the chain matches a pin. Challenges other than server trust get the system's default handling. Supported keys: RSA 2048/3072/4096 and EC P-256/P-384/P-521.
+Only the API host (`baseURL`) is pinned. After the system validates the certificate chain, the connection is accepted only if the SHA-256 of the SubjectPublicKeyInfo of a certificate in the chain matches a pin. Other hosts reached through the same session (any external `APIEndpoint`) and challenges other than server trust get the system's default handling. To pin an external host too, pass its host and pins to `SSLPinningDelegate` in `URLSessionFactory`. Supported keys: RSA 2048/3072/4096 and EC P-256/P-384/P-521.
 
 Compute a pin (the scheme xcconfig shows the full command):
 

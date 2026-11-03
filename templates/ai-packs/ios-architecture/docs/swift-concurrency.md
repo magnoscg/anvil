@@ -78,10 +78,12 @@ Use only when you have thread-safe code that the compiler cannot verify:
 // Core/Networking/Security/SSLPinningDelegate.swift (excerpt)
 final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     private let pinnedPublicKeyHashes: Set<String>
+    private let pinnedHosts: Set<String>
     private let isEnabled: Bool
 
-    init(publicKeyHashes: [String], isEnabled: Bool = true) {
+    init(publicKeyHashes: [String], pinnedHosts: Set<String>, isEnabled: Bool = true) {
         self.pinnedPublicKeyHashes = Set(publicKeyHashes)
+        self.pinnedHosts = Set(pinnedHosts.map { $0.lowercased() })
         self.isEnabled = isEnabled
         super.init()
     }
