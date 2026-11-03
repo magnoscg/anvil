@@ -4,6 +4,7 @@ import SwiftUI
 // MARK: - AppRouterImpl
 
 /// Implementation of AppRouter using NavigationPath.
+/// `path` is App-layer state: it is bound to the root `NavigationStack` and persisted by `AppNavigationCoordinator`.
 @MainActor
 @Observable
 final class AppRouterImpl: AppRouter {

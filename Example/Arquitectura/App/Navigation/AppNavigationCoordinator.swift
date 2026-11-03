@@ -16,13 +16,13 @@ final class AppNavigationCoordinator {
 
     // MARK: - Properties
 
-    private var appRouter: AppRouter
+    private let appRouter: AppRouterImpl
     private var saveTask: Task<Void, Never>?
     private var hasHandledDeepLink = false
 
     // MARK: - Init
 
-    init(appRouter: AppRouter) {
+    init(appRouter: AppRouterImpl) {
         self.appRouter = appRouter
     }
 
