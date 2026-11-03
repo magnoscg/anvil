@@ -135,18 +135,18 @@ mcp__sosumi__fetchAppleDocumentation(path: "/documentation/swiftui/state")
   - `Common/` — extensions, `Models/ErrorDecorator.swift`, `SwiftUI/{Builders,Components,Modifiers}/`
   - `DesignSystem/Tokens/` — colors, typography, spacing, icons
   - `Security/` — `KeychainHelper`
-- **Domain** layer is global: `Domain/<Feature>/` contains:
+- **Domain** layer is global and organized by **domain concept**, not by screen: `Domain/<Concept>/` (one concept can serve several screens, e.g. `Domain/Pokemon` serves `Features/PokemonList` and `Features/PokemonDetail`). It contains:
   - `Models/` — Domain models (e.g., `<Feature>Model.swift`)
   - `UseCases/` — Protocol + Implementation in separate files (`<Feature>UseCase.swift`, `<Feature>UseCaseImpl.swift`)
   - `Repositories/` — Repository **protocol** (`<Feature>Repository.swift`), owned by Domain
   - `Domain/Common/` — `DomainError` (no knowledge of `APIError` or any infrastructure type)
-- **Data** layer is global: `Data/<Feature>/` contains:
+- **Data** layer is global and mirrors Domain: `Data/<Concept>/` contains:
   - `Repositories/` — Repository **Impl** only (`<Feature>RepositoryImpl.swift`), conforming to the Domain protocol
   - `DataSources/` — Remote, Static or bundled-JSON data sources (protocol + Impl in separate files)
   - `DTO/` — Data Transfer Objects
   - `Mappers/` — DTO → Model transformations (protocol + Impl in separate files)
   - `Data/Common/` — `DomainError+Mapping` (`APIError` → `DomainError`, `DomainError.catching`)
-- **Features** contain presentation only:
+- **Features** are organized **per screen** and contain presentation only (`Features/<Screen>/`):
   - `DI/` — Factory
   - `UI/` — Views, State enum, Decorators, Components
   - `Presentation/ViewModels/` — ViewModels
