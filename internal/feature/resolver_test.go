@@ -36,7 +36,10 @@ func TestWiringInstructionsWithoutRouteResolver(t *testing.T) {
 	if !strings.Contains(joined, "PokemonFactory.makeView(appRouter:dependencies:)") {
 		t.Errorf("expected the factory registration step, got:\n%s", joined)
 	}
-	if !strings.Contains(joined, "Include RouteResolver?") {
-		t.Errorf("expected guidance on how to get a resolver, got:\n%s", joined)
+	if !strings.Contains(joined, "Features/Pokemon/Navigation/PokemonRouteResolver.swift") {
+		t.Errorf("expected guidance on how to add a resolver, got:\n%s", joined)
+	}
+	if strings.Contains(joined, "re-run") {
+		t.Errorf("must not suggest re-running anvil feature, which refuses an existing feature, got:\n%s", joined)
 	}
 }
