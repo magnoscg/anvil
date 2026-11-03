@@ -152,7 +152,7 @@ rules:
 ```
 
 4. **Generar `.dev/arch-index.md`**:
-   - Lee cada fichero en `~/.claude/dev-verify-docs/` (los 18 docs)
+   - Lee cada fichero en `.claude/docs/` (los docs que instala el pack ios-architecture)
    - Para cada doc: extrae titulo, identifica cuando debe leerse (que dominios/ficheros activan su lectura), y extrae las 3-5 reglas mas criticas (busca MUST, NEVER, siempre, nunca, CRITICO, prohibido)
    - Escribe el indice con este formato:
 
@@ -161,7 +161,7 @@ rules:
 Generated: <fecha actual YYYY-MM-DD>
 
 ## <NOMBRE_DOC>.md
-**Path**: ~/.claude/dev-verify-docs/<NOMBRE_DOC>.md
+**Path**: .claude/docs/<NOMBRE_DOC>.md
 **Leer cuando**: <condicion concreta: que ficheros o dominios activan la lectura>
 **Reglas criticas**:
 1. <regla 1>
@@ -169,7 +169,7 @@ Generated: <fecha actual YYYY-MM-DD>
 3. <regla 3>
 ...
 
-(repetir para cada uno de los 18 docs)
+(repetir para cada doc de `.claude/docs/`)
 ```
 
 5. **Generar `.dev/skill-registry.md`**:

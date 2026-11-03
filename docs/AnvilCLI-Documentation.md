@@ -429,15 +429,13 @@ For each selected pack, the PackRenderer executes up to 10 steps:
   - `swift-concurrency.md`, `performance.md`
   - `swiftdata.md`, `networking.md`
   - `security-privacy.md`, `diagnostics.md`
-  - `testing.md`, `create-tests.md`, `workflow-qa.md`
+  - `testing.md`, `create-tests.md`
 
 **prd-planner:**
 - `CLAUDE-section.md.tmpl` — Appends workflow section to CLAUDE.md
 - `commands/` — Dev workflow commands (`dev-prd`, `dev-plan`, `dev-build`, `dev-status`, etc.)
-- `agents/` — Specialized agents (DEV-SPEC-WRITER, DEV-TASK-PLANNER, DEV-IMPLEMENTER, etc.)
+- `agents/` — Specialized agents (DEV-ARCHITECT, DEV-TASK-PLANNER, DEV-IMPLEMENTER, DEV-VERIFIER, etc.)
 - `dev/` — `arch-index.md`, `skill-registry.md`, `ast-patterns.yml`
-- `plan/` — `INDEX.md` template
-- `settings-merge.json` — Merges agent/command config into settings
 - `skills/ios-tutorials/` — search skill over your own local tutorial library (corpus not bundled)
 
 **axiom-ios:**
