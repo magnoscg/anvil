@@ -40,7 +40,7 @@
   - `Config/` — `AppDependencies`, `AppEnvironment`, `EnvironmentConfiguration`, `Xcconfig/`
   - `Navigation/` — `AppRouter`, `AppRouterImpl`, `RootNavigationView`, `AppNavigationCoordinator`
 - **Core** (`Core/`) — shared infrastructure, no feature knowledge:
-  - `Networking/` — `APIClient` + `APIClientImpl`, endpoints, `APIError`, interceptors, retry
+  - `Networking/` — `APIClient` + `APIClientImpl`, endpoints, `APIError`, interceptors, retry, SSL pinning (`Security/URLSessionFactory`, `SSLPinningDelegate`)
   - `Common/` — extensions, `Models/ErrorDecorator.swift`, `SwiftUI/{Builders,Components,Modifiers}/`
   - `DesignSystem/Tokens/` — colors, typography, spacing, icons
   - `Security/` — `KeychainHelper`

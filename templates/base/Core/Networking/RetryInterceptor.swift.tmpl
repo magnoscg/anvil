@@ -6,6 +6,9 @@ import Foundation
 /// Only retries transient errors (5xx, 429, network timeouts) on requests that are safe to resend:
 /// an idempotent HTTP method, or any request carrying an `Idempotency-Key` header. A POST or PATCH
 /// whose response was lost may already have been applied, so it is sent once. Respects cancellation.
+/// An offline device is not retried: the session already waits for connectivity, and a retry a few
+/// seconds later would fail the same way. A `Retry-After` header on a 429 or 5xx, up to `maxDelay`, replaces
+/// the backoff, and no retry starts after the policy's `maxElapsedTime`.
 struct RetryInterceptor: RequestInterceptor {
     // MARK: - Properties
 
@@ -29,34 +32,61 @@ struct RetryInterceptor: RequestInterceptor {
             return try await next(request)
         }
 
-        var lastError: (any Error)?
+        let clock = ContinuousClock()
+        let start = clock.now
+        var attempt = 0
 
-        for attempt in 0...policy.maxRetries {
-            try Task.checkCancellation()
-
+        while true {
+            let delay: TimeInterval
             do {
                 let (data, response) = try await next(request)
-
-                if isRetryableStatusCode(response.statusCode), policy.shouldRetry(attempt: attempt) {
-                    lastError = APIError.httpError(statusCode: response.statusCode, data: data)
-                    try await sleep(for: attempt)
-                    continue
+                guard isRetryableStatusCode(response.statusCode),
+                      let retryDelay = delayBeforeRetry(
+                          attempt: attempt,
+                          elapsed: start.duration(to: clock.now),
+                          retryAfter: Self.retryAfter(from: response)
+                      ) else {
+                    return (data, response)
                 }
-
-                return (data, response)
+                delay = retryDelay
             } catch is CancellationError {
                 throw CancellationError()
-            } catch let urlError as URLError where isRetryableURLError(urlError) {
-                lastError = urlError
-                guard policy.shouldRetry(attempt: attempt) else { break }
-                try await sleep(for: attempt)
-                continue
             } catch {
-                throw error
+                guard isRetryable(error),
+                      let retryDelay = delayBeforeRetry(
+                          attempt: attempt,
+                          elapsed: start.duration(to: clock.now),
+                          retryAfter: nil
+                      ) else {
+                    throw error
+                }
+                delay = retryDelay
             }
+            try await Task.sleep(for: .seconds(delay))
+            attempt += 1
         }
+    }
 
-        throw lastError ?? APIError.unknown(SendableError(URLError(.unknown)))
+    // MARK: - Retry-After
+
+    /// Reads the `Retry-After` header of a response, as delay-seconds or as an HTTP date.
+    /// Returns nil when the header is absent or invalid.
+    static func retryAfter(from response: HTTPURLResponse, now: Date = Date()) -> TimeInterval? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespaces), !value.isEmpty else {
+            return nil
+        }
+        if let seconds = Int(value) {
+            return seconds >= 0 ? TimeInterval(seconds) : nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: value) else {
+            return nil
+        }
+        return max(0, date.timeIntervalSince(now))
     }
 
     // MARK: - Private
@@ -77,16 +107,34 @@ struct RetryInterceptor: RequestInterceptor {
         statusCode >= 500 || statusCode == 429
     }
 
-    private func isRetryableURLError(_ error: URLError) -> Bool {
-        let retryableCodes: [URLError.Code] = [
-            .timedOut, .networkConnectionLost, .notConnectedToInternet,
-            .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
-        ]
-        return retryableCodes.contains(error.code)
+    private func isRetryable(_ error: any Error) -> Bool {
+        switch error {
+        case let urlError as URLError:
+            Self.retryableURLErrorCodes.contains(urlError.code)
+        case let apiError as APIError:
+            apiError.isRetryable
+        default:
+            false
+        }
     }
 
-    private func sleep(for attempt: Int) async throws {
-        let delay = policy.delay(for: attempt)
-        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    private static let retryableURLErrorCodes: Set<URLError.Code> = [
+        .timedOut, .networkConnectionLost,
+        .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
+    ]
+
+    /// Returns how long to wait before the next attempt, or nil when no retry may start.
+    /// A `Retry-After` value up to `maxDelay` replaces the backoff delay; no retry starts after the policy's
+    /// time budget.
+    private func delayBeforeRetry(attempt: Int, elapsed: Duration, retryAfter: TimeInterval?) -> TimeInterval? {
+        guard policy.shouldRetry(attempt: attempt) else {
+            return nil
+        }
+        if let retryAfter, retryAfter > policy.maxDelay {
+            return nil
+        }
+        let delay = retryAfter ?? policy.delay(for: attempt)
+        let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return policy.fitsTimeBudget(elapsed: elapsedSeconds, delay: delay) ? delay : nil
     }
 }

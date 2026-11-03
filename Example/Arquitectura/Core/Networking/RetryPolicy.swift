@@ -22,6 +22,9 @@ nonisolated struct RetryPolicy: Equatable {
     /// Jitter factor (0.0 to 1.0) to randomize delays
     let jitterFactor: Double
 
+    /// Time budget in seconds, from the first attempt, within which a retry may start
+    let maxElapsedTime: TimeInterval
+
     // MARK: - Init
 
     /// Creates a retry policy with custom configuration.
@@ -30,14 +33,17 @@ nonisolated struct RetryPolicy: Equatable {
     ///   - baseDelay: Base delay in seconds (default: 1.0)
     ///   - maxDelay: Maximum delay cap in seconds (default: 30.0)
     ///   - jitterFactor: Jitter factor 0.0-1.0 (default: 0.3)
+    ///   - maxElapsedTime: Seconds from the first attempt within which a retry may start (default: 30.0)
     init(maxRetries: Int = 3,
          baseDelay: TimeInterval = 1.0,
          maxDelay: TimeInterval = 30.0,
-         jitterFactor: Double = 0.3) {
+         jitterFactor: Double = 0.3,
+         maxElapsedTime: TimeInterval = 30.0) {
         self.maxRetries = max(0, maxRetries)
         self.baseDelay = max(0, baseDelay)
         self.maxDelay = max(0, maxDelay)
         self.jitterFactor = min(max(0, jitterFactor), 1.0)
+        self.maxElapsedTime = max(0, maxElapsedTime)
     }
 
     // MARK: - Methods
@@ -59,32 +65,45 @@ nonisolated struct RetryPolicy: Equatable {
     func shouldRetry(attempt currentAttempt: Int) -> Bool {
         currentAttempt < maxRetries
     }
+
+    /// Checks if a retry that waits `delay` seconds would still start within the time budget.
+    /// - Parameters:
+    ///   - elapsed: Seconds since the first attempt started
+    ///   - delay: Seconds the retry would wait before starting
+    /// - Returns: True if the retry would start within `maxElapsedTime`
+    func fitsTimeBudget(elapsed: TimeInterval, delay: TimeInterval) -> Bool {
+        elapsed + delay <= maxElapsedTime
+    }
 }
 
 // MARK: - Preset Policies
 
 nonisolated extension RetryPolicy {
-    /// Default retry policy: 3 retries with exponential backoff (1s, 2s, 4s base)
+    /// Default retry policy: 3 retries with exponential backoff (1s, 2s, 4s base) within 30 seconds
     static let `default` = RetryPolicy(maxRetries: 3,
                                        baseDelay: 1.0,
                                        maxDelay: 30.0,
-                                       jitterFactor: 0.3)
+                                       jitterFactor: 0.3,
+                                       maxElapsedTime: 30.0)
 
     /// No retries - fail immediately on first error
     static let none = RetryPolicy(maxRetries: 0,
                                   baseDelay: 0,
                                   maxDelay: 0,
-                                  jitterFactor: 0)
+                                  jitterFactor: 0,
+                                  maxElapsedTime: 0)
 
-    /// Aggressive retry policy for critical operations: 5 retries with longer delays
+    /// Aggressive retry policy for critical operations: 5 retries with longer delays within 2 minutes
     static let aggressive = RetryPolicy(maxRetries: 5,
                                         baseDelay: 2.0,
                                         maxDelay: 60.0,
-                                        jitterFactor: 0.25)
+                                        jitterFactor: 0.25,
+                                        maxElapsedTime: 120.0)
 
-    /// Quick retry policy for fast operations: 2 retries with short delays
+    /// Quick retry policy for fast operations: 2 retries with short delays within 10 seconds
     static let quick = RetryPolicy(maxRetries: 2,
                                    baseDelay: 0.5,
                                    maxDelay: 5.0,
-                                   jitterFactor: 0.2)
+                                   jitterFactor: 0.2,
+                                   maxElapsedTime: 10.0)
 }

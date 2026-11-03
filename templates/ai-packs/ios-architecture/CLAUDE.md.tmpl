@@ -41,7 +41,7 @@
   - `Navigation/` — `AppRouter`, `AppRouterImpl`, `RootNavigationView`, `AppNavigationCoordinator`
 {{ if or .IncludeSwiftData .IsToolsMode }}  - `DI/PersistenceAssembly.swift` — SwiftData helpers (production / preview stacks), only when SwiftData is enabled
 {{ end }}- **Core** (`Core/`) — shared infrastructure, no feature knowledge:
-  - `Networking/` — `APIClient` + `APIClientImpl`, endpoints, `APIError`, interceptors, retry
+  - `Networking/` — `APIClient` + `APIClientImpl`, endpoints, `APIError`, interceptors, retry, SSL pinning (`Security/URLSessionFactory`, `SSLPinningDelegate`)
   - `Common/` — extensions, `Models/ErrorDecorator.swift`, `SwiftUI/{Builders,Components,Modifiers}/`
   - `DesignSystem/Tokens/` — colors, typography, spacing, icons
   - `Security/` — `KeychainHelper`

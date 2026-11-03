@@ -12,11 +12,16 @@ import Foundation
 /// - `URLSession` is designed to be thread-safe
 /// - `decoderFactory` creates a new decoder per request (no shared mutable state)
 ///
+/// ## Session Ownership
+/// The client invalidates only a session it created itself. An injected session belongs to
+/// the caller, who may share it, so the client never invalidates it.
+///
 /// - Warning: DO NOT add mutable (`var`) properties without re-analyzing thread safety!
 final class APIClientImpl: APIClient, @unchecked Sendable {
     // MARK: - Properties
 
     private let session: URLSession
+    private let ownsSession: Bool
     private let configuration: EnvironmentConfiguration
     private let decoderFactory: @Sendable () -> JSONDecoder
     private let interceptorChain: DefaultInterceptorChain
@@ -26,7 +31,8 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
     /// Creates an API client with the given configuration.
     /// - Parameters:
     ///   - configuration: Environment configuration (must be injected explicitly).
-    ///   - session: URLSession to use (defaults to a session configured for the environment).
+    ///   - session: URLSession to use. An injected session is never invalidated by the client.
+    ///     When nil, the client creates a session for the environment and invalidates it on deinit.
     ///   - decoderFactory: Factory closure to create a JSONDecoder per request (thread-safe).
     ///   - interceptorChain: Concrete interceptor chain (default: logging + retry).
     init(configuration: EnvironmentConfiguration,
@@ -34,7 +40,13 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
          decoderFactory: @escaping @Sendable () -> JSONDecoder = { JSONDecoder() },
          interceptorChain: DefaultInterceptorChain = DefaultInterceptorChain()) {
         self.configuration = configuration
-        self.session = session ?? URLSessionFactory.makeSession(configuration: configuration)
+        if let session {
+            self.session = session
+            ownsSession = false
+        } else {
+            self.session = URLSessionFactory.makeSession(configuration: configuration)
+            ownsSession = true
+        }
         self.decoderFactory = decoderFactory
         self.interceptorChain = interceptorChain
     }
@@ -42,7 +54,9 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
     // MARK: - Deinit
 
     deinit {
-        session.invalidateAndCancel()
+        if ownsSession {
+            session.finishTasksAndInvalidate()
+        }
     }
 
     // MARK: - APIClient

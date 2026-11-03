@@ -28,15 +28,18 @@ protocol NetworkMonitor {
 // MARK: - NetworkMonitorImpl
 
 /// NWPathMonitor-based connectivity monitor with Observable support for SwiftUI binding.
+/// Use it to show connectivity in the UI, not to decide whether to send a request: the session
+/// waits for connectivity, and a check before the request can be stale by the time it runs.
+/// It reports no connection until the first path update arrives.
 @MainActor
 @Observable
 final class NetworkMonitorImpl: NetworkMonitor {
     // MARK: - Properties
 
-    private(set) var isConnected: Bool = true
+    private(set) var isConnected: Bool = false
     private(set) var isExpensive: Bool = false
     private(set) var isConstrained: Bool = false
-    private(set) var connectionType: ConnectionType = .wifi
+    private(set) var connectionType: ConnectionType = .none
 
     private let monitor: NWPathMonitor
     private let queue: DispatchQueue
@@ -75,15 +78,5 @@ final class NetworkMonitorImpl: NetworkMonitor {
         if path.usesInterfaceType(.loopback) { return .loopback }
         if path.status == .satisfied { return .other }
         return .none
-    }
-}
-
-// MARK: - Convenience
-
-extension NetworkMonitor {
-    func canMakeRequest(respectLowDataMode: Bool = false) -> Bool {
-        guard isConnected else { return false }
-        if respectLowDataMode, isConstrained { return false }
-        return true
     }
 }
