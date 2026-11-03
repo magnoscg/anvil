@@ -27,12 +27,11 @@ struct PokemonDetailUseCaseTests {
         #expect(result.genus == expectedModel.genus)
     }
 
-    @Test("Execute maps repository error to DomainError")
-    func executeMapsRepositoryError() async {
+    @Test("Execute propagates the repository's DomainError")
+    func executePropagatesRepositoryError() async {
         // Given
-        let expectedError = NSError(domain: "test", code: 500)
         let mockRepository = MockPokemonDetailRepository()
-        await mockRepository.setFetchPokemonDetailResult(.failure(expectedError))
+        await mockRepository.setFetchPokemonDetailResult(.failure(DomainError.server))
         let useCase = PokemonDetailUseCaseImpl(repository: mockRepository)
 
         // When/Then
@@ -40,8 +39,7 @@ struct PokemonDetailUseCaseTests {
             _ = try await useCase.execute(pokemonId: 25)
             #expect(Bool(false), "Expected error to be thrown")
         } catch {
-            #expect(error is DomainError)
-            #expect(error as? DomainError == .unknown)
+            #expect(error as? DomainError == .server)
         }
     }
 

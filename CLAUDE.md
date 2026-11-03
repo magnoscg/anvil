@@ -138,12 +138,14 @@ mcp__sosumi__fetchAppleDocumentation(path: "/documentation/swiftui/state")
 - **Domain** layer is global: `Domain/<Feature>/` contains:
   - `Models/` — Domain models (e.g., `<Feature>Model.swift`)
   - `UseCases/` — Protocol + Implementation in separate files (`<Feature>UseCase.swift`, `<Feature>UseCaseImpl.swift`)
-  - `Domain/Common/` — `DomainError` and `DomainError+Mapping`
+  - `Repositories/` — Repository **protocol** (`<Feature>Repository.swift`), owned by Domain
+  - `Domain/Common/` — `DomainError` (no knowledge of `APIError` or any infrastructure type)
 - **Data** layer is global: `Data/<Feature>/` contains:
-  - `Repositories/` — Repository **protocol** and its Impl, in separate files (the protocol lives here, not in Domain — see Known Deviations)
+  - `Repositories/` — Repository **Impl** only (`<Feature>RepositoryImpl.swift`), conforming to the Domain protocol
   - `DataSources/` — Remote, Static or bundled-JSON data sources (protocol + Impl in separate files)
   - `DTO/` — Data Transfer Objects
   - `Mappers/` — DTO → Model transformations (protocol + Impl in separate files)
+  - `Data/Common/` — `DomainError+Mapping` (`APIError` → `DomainError`, `DomainError.catching`)
 - **Features** contain presentation only:
   - `DI/` — Factory
   - `UI/` — Views, State enum, Decorators, Components
@@ -154,11 +156,9 @@ mcp__sosumi__fetchAppleDocumentation(path: "/documentation/swiftui/state")
 
 ### Known Deviations from Strict Clean Architecture
 
-These are deliberate, project-wide choices. Follow them consistently; changing any of them is a project-wide refactor, never a per-feature decision.
+This is a deliberate, project-wide choice. Follow it consistently; changing it is a project-wide refactor, never a per-feature decision.
 
-- **Repository protocols live in `Data/<Feature>/Repositories/`**, so `<Feature>UseCaseImpl` (Domain) depends on a Data contract.
-- **`DomainError.map(_:)` knows `APIError`** (`Domain/Common/DomainError+Mapping.swift`), so Domain is not transport-independent.
-- **`ErrorDecorator` lives in `Core/Common/Models/`** even though it is a presentation type.
+- **`ErrorDecorator` lives in `Core/Common/Models/`** even though it is a presentation type, because every feature shares it.
 
 ### Dependency Injection
 
@@ -175,8 +175,8 @@ These are deliberate, project-wide choices. Follow them consistently; changing a
 | Domain Model | `<Feature>Model.swift` | `ArchitectureModel.swift` |
 | UseCase Protocol | `<Feature>UseCase.swift` | `ArchitectureUseCase.swift` |
 | UseCase Impl | `<Feature>UseCaseImpl.swift` | `ArchitectureUseCaseImpl.swift` |
-| Repository Protocol | `<Feature>Repository.swift` | `ArchitectureRepository.swift` |
-| Repository Impl | `<Feature>RepositoryImpl.swift` | `ArchitectureRepositoryImpl.swift` |
+| Repository Protocol (Domain) | `Domain/<Feature>/Repositories/<Feature>Repository.swift` | `ArchitectureRepository.swift` |
+| Repository Impl (Data) | `Data/<Feature>/Repositories/<Feature>RepositoryImpl.swift` | `ArchitectureRepositoryImpl.swift` |
 | DataSource Protocol | `<Feature><Kind>DataSource.swift` (`Remote`, `Static`, `JSON`) | `ArchitectureStaticDataSource.swift` |
 | DataSource Impl | `<Feature><Kind>DataSourceImpl.swift` | `ArchitectureStaticDataSourceImpl.swift` |
 | DTO | `<Feature>DTO.swift` | `ArchitectureDTO.swift` |
@@ -229,7 +229,7 @@ These are deliberate, project-wide choices. Follow them consistently; changing a
 - With approachable concurrency, a plain `nonisolated async` function runs on the caller's actor. Work that must leave the main actor (heavy decoding, disk I/O) has to be marked `@concurrent` explicitly.
 - Propagate cancellation:
   - `APIClientImpl` turns `URLError.cancelled` into `CancellationError`.
-  - UseCases and Repositories rethrow `CancellationError` before handling any other error.
+  - `DomainError.catching` rethrows `CancellationError` unchanged; repositories that catch errors themselves (e.g., optional sub-requests) rethrow it first.
   - ViewModels restore the previous state on cancellation instead of showing an error.
 
 ### Errors
@@ -237,8 +237,9 @@ These are deliberate, project-wide choices. Follow them consistently; changing a
 - Avoid `try?` / empty `catch {}` without justification. Don't turn a load failure into an empty result: it later surfaces as "not found" instead of an error.
 - Prefer typed errors over loose `String` when useful.
 - Map errors between layers: `APIError` → `DomainError` → `ErrorDecorator`:
-  - Data throws `APIError` (from `APIClient`).
-  - `<Feature>UseCaseImpl` catches and converts with `DomainError.map(_:)`.
+  - DataSources throw `APIError` (from `APIClient`) or their own errors.
+  - Every `<Feature>RepositoryImpl` that can fail wraps its work in `try await DomainError.catching { ... }`, so repositories throw only `DomainError` or `CancellationError`.
+  - `<Feature>UseCaseImpl` does not catch or map; it lets the `DomainError` through.
   - The ViewModel converts with `ErrorDecorator.from(_:)` and sets `state = .error(...)`.
 
 ### Memory (closures)
@@ -280,7 +281,8 @@ These are deliberate, project-wide choices. Follow them consistently; changing a
 - **Don't put `import SwiftData`** in Domain or Presentation.
 - **Don't mix DTOs with Models** — always map between layers.
 - **Don't access network/persistence** from ViewModels directly.
-- **Don't move a single Repository protocol to Domain** — today they all live in `Data/<Feature>/Repositories/` (see Known Deviations). Moving them is a project-wide refactor.
+- **Don't put Repository protocols in Data** — they belong to `Domain/<Feature>/Repositories/`; Data holds only the Impl.
+- **Don't reference `APIError` (or any infrastructure type) from Domain** — repositories translate errors with `DomainError.catching`.
 - **Don't use boolean app state** (`isLoggedIn`, `hasOnboarded`) — use enum state machine (e.g., `AppLaunchState`).
 - **Don't put business logic in `@main`** — it only composes `AppDependencies`, `AppRouterImpl` and the root view. If app-level state grows beyond `AppLaunchState`, extract it to an `@Observable` type in `App/`.
 - **Don't do I/O or decoding in initializers reached from a Factory** — load lazily inside an `async` / `throws` method.

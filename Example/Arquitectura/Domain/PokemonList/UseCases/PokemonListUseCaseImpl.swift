@@ -20,18 +20,11 @@ struct PokemonListUseCaseImpl: PokemonListUseCase {
     // MARK: - PokemonListUseCase
 
     func execute(page: Int, pageSize: Int) async throws -> PokemonListResult {
-        do {
-            let offset = page * pageSize
+        let offset = page * pageSize
+        let result = try await repository.getPokemonList(limit: pageSize, offset: offset)
 
-            let result = try await repository.getPokemonList(limit: pageSize, offset: offset)
-
-            return PokemonListResult(pokemon: result.pokemon,
-                                     hasMore: result.hasMore,
-                                     totalCount: result.totalCount)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw DomainError.map(error)
-        }
+        return PokemonListResult(pokemon: result.pokemon,
+                                 hasMore: result.hasMore,
+                                 totalCount: result.totalCount)
     }
 }

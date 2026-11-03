@@ -9,6 +9,6 @@ protocol PokemonDetailRepository: Sendable {
     /// Species failure is non-fatal (partial failure pattern).
     /// - Parameter id: The Pokemon's unique identifier.
     /// - Returns: A complete PokemonDetailModel with all available data.
-    /// - Throws: Error if the required detail endpoint fails. CancellationError is always propagated.
+    /// - Throws: `DomainError` if the required detail endpoint fails. `CancellationError` is always propagated.
     func fetchPokemonDetail(id: Int) async throws -> PokemonDetailModel
 }

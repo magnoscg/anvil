@@ -39,17 +39,17 @@ struct {{ .FeatureName }}UseCaseImplTests {
 
     // MARK: - Error
 
-    @Test("Given repository throws error, when execute, then propagates error")
+    @Test("Given repository throws a DomainError, when execute, then propagates it")
     func execute_repositoryThrows_propagatesError() async {
         // Given
-        let expectedError = NSError(domain: "test", code: 42)
-        mockRepository.fetchResult = .failure(expectedError)
+        mockRepository.fetchResult = .failure(DomainError.network)
 
         // When / Then
         do {
             _ = try await sut.execute()
             Issue.record("Expected error to be thrown")
         } catch {
+            #expect(error as? DomainError == .network)
             #expect(mockRepository.fetchCallCount == 1)
         }
     }

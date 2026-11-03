@@ -29,13 +29,15 @@ struct PokemonListRepositoryImpl: PokemonListRepository {
     // MARK: - PokemonListRepository
 
     func getPokemonList(limit: Int, offset: Int) async throws -> PokemonListRepositoryResult {
-        let listResponse = try await remoteDataSource.fetchPokemonList(limit: limit, offset: offset)
-        let pokemon = try await fetchDetailsInParallel(for: listResponse.results)
-        let hasMore = listResponse.next != nil
+        try await DomainError.catching {
+            let listResponse = try await remoteDataSource.fetchPokemonList(limit: limit, offset: offset)
+            let pokemon = try await fetchDetailsInParallel(for: listResponse.results)
+            let hasMore = listResponse.next != nil
 
-        return PokemonListRepositoryResult(pokemon: pokemon,
-                                           totalCount: listResponse.count,
-                                           hasMore: hasMore)
+            return PokemonListRepositoryResult(pokemon: pokemon,
+                                               totalCount: listResponse.count,
+                                               hasMore: hasMore)
+        }
     }
 
     // MARK: - Private Methods

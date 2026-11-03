@@ -10,7 +10,7 @@ protocol PokemonListUseCase: Sendable {
     ///   - page: Zero-based page index.
     ///   - pageSize: Number of Pokemon per page.
     /// - Returns: Result containing Pokemon and pagination info.
-    /// - Throws: Error if the fetch fails.
+    /// - Throws: `DomainError` if the fetch fails, or `CancellationError`.
     func execute(page: Int, pageSize: Int) async throws -> PokemonListResult
 }
 

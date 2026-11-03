@@ -49,7 +49,7 @@ func buildTestFS() fstest.MapFS {
 		"base/Core/Networking/RetryPolicy.swift.tmpl",
 		"base/Core/Security/KeychainHelper.swift.tmpl",
 		"base/Domain/Common/DomainError.swift.tmpl",
-		"base/Domain/Common/DomainErrorMapping.swift.tmpl",
+		"base/Data/Common/DomainErrorMapping.swift.tmpl",
 		"base/Info.plist.tmpl",
 		"base/placeholder.txt.tmpl",
 		"base/Resources/Assets.xcassets/Contents.json.tmpl",

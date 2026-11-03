@@ -60,10 +60,10 @@ struct PokemonListRepositoryTests {
         #expect(result.pokemon[0].id == 1)
     }
 
-    @Test("Fetch propagates list error")
+    @Test("Fetch with list failure throws the mapped DomainError")
     func fetchPropagatesListError() async {
         // Given
-        let expectedError = NSError(domain: "test", code: 500)
+        let expectedError = APIError.networkError(URLError(.notConnectedToInternet))
 
         let mockDataSource = MockPokemonListRemoteDataSource()
         await mockDataSource.setFetchListResult(.failure(expectedError))
@@ -76,9 +76,7 @@ struct PokemonListRepositoryTests {
             _ = try await repository.getPokemonList(limit: 20, offset: 0)
             #expect(Bool(false), "Expected error to be thrown")
         } catch {
-            let nsError = error as NSError
-            #expect(nsError.domain == "test")
-            #expect(nsError.code == 500)
+            #expect(error as? DomainError == .network)
         }
     }
 
