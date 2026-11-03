@@ -23,7 +23,7 @@ struct PokemonListRepositoryResult: Equatable {
     // MARK: - Properties
 
     /// The fetched Pokemon models.
-    let pokemon: [PokemonListModel]
+    let pokemon: [PokemonSummaryModel]
 
     /// Total count of available Pokemon in the API.
     let totalCount: Int

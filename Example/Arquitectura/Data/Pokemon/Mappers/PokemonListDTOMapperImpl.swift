@@ -7,14 +7,14 @@ import Foundation
 struct PokemonListDTOMapperImpl: PokemonListDTOMapper {
     // MARK: - PokemonListDTOMapper
 
-    nonisolated func mapToDomain(_ dto: PokemonListDTO) -> PokemonListModel {
-        PokemonListModel(id: dto.id,
+    nonisolated func mapToDomain(_ dto: PokemonListDTO) -> PokemonSummaryModel {
+        PokemonSummaryModel(id: dto.id,
                          name: formatName(dto.name),
                          imageURL: mapImageURL(from: dto),
                          types: mapTypes(from: dto.types))
     }
 
-    nonisolated func mapToDomain(_ dtos: [PokemonListDTO]) -> [PokemonListModel] {
+    nonisolated func mapToDomain(_ dtos: [PokemonListDTO]) -> [PokemonSummaryModel] {
         dtos.map { mapToDomain($0) }
     }
 

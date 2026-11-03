@@ -60,6 +60,29 @@ struct PokemonListRepositoryTests {
         #expect(result.pokemon[0].id == 1)
     }
 
+    @Test("Fetch throws the mapped DomainError when every detail request fails")
+    func fetchWithAllDetailFailuresThrows() async {
+        // Given
+        let listResponse = makeListResponse(count: 2, next: "next-url", results: [makeResultDTO(name: "bulbasaur", id: 1),
+                                                                                  makeResultDTO(name: "charmander", id: 4)])
+
+        let mockDataSource = MockPokemonListRemoteDataSource()
+        await mockDataSource.setFetchListResult(.success(listResponse))
+        await mockDataSource.setFetchDetailResult(.failure(APIError.networkError(URLError(.timedOut))), forId: 1)
+        await mockDataSource.setFetchDetailResult(.failure(APIError.networkError(URLError(.timedOut))), forId: 4)
+
+        let repository = PokemonListRepositoryImpl(remoteDataSource: mockDataSource,
+                                                   dtoMapper: PokemonListDTOMapperImpl())
+
+        // When/Then
+        do {
+            _ = try await repository.getPokemonList(limit: 20, offset: 0)
+            Issue.record("Expected an error instead of an empty page")
+        } catch {
+            #expect(error as? DomainError == .network)
+        }
+    }
+
     @Test("Fetch with list failure throws the mapped DomainError")
     func fetchPropagatesListError() async {
         // Given
