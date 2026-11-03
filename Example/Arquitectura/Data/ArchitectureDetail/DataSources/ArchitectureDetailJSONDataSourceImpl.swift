@@ -1,10 +1,11 @@
 import Foundation
-import os
 
 // MARK: - ArchitectureDetailJSONDataSourceImpl
 
-/// Implementation that loads architecture details from a bundled JSON file.
-/// JSON is loaded and decoded once during initialization and cached for all subsequent calls.
+/// Loads architecture details from the bundled JSON file.
+/// Creating it does no I/O, so Factories can build it cheaply on every destination evaluation.
+/// The file is read and decoded off the main actor when details are requested,
+/// and a missing or invalid file is thrown instead of being reported as an empty catalogue.
 struct ArchitectureDetailJSONDataSourceImpl: ArchitectureDetailJSONDataSource {
     // MARK: - Constants
 
@@ -13,47 +14,40 @@ struct ArchitectureDetailJSONDataSourceImpl: ArchitectureDetailJSONDataSource {
         static let fileExtension = "json"
     }
 
-    // MARK: - Static Properties
-
-    private nonisolated static let logger = Logger(subsystem: "com.magnos.Arquitectura",
-                                                   category: "ArchitectureDetailJSON")
-
     // MARK: - Properties
 
-    private let cachedFeatures: [ArchitectureDetailDTO]
+    private let fileURL: URL?
 
     // MARK: - Init
 
     init(bundle: Bundle = .main) {
-        do {
-            self.cachedFeatures = try Self.loadFeatures(from: bundle)
-        } catch {
-            Self.logger.error("Failed to load architecture details JSON: \(error.localizedDescription)")
-            self.cachedFeatures = []
-        }
+        fileURL = bundle.url(forResource: Constants.fileName, withExtension: Constants.fileExtension)
+    }
+
+    init(fileURL: URL?) {
+        self.fileURL = fileURL
     }
 
     // MARK: - ArchitectureDetailJSONDataSource
 
-    func loadFeatureDetails() throws -> [ArchitectureDetailDTO] {
-        cachedFeatures
+    func loadFeatureDetails() async throws -> [ArchitectureDetailDTO] {
+        guard let fileURL else {
+            throw DataSourceError.fileNotFound("\(Constants.fileName).\(Constants.fileExtension)")
+        }
+        return try await Self.decodeFeatures(at: fileURL)
     }
 
-    func loadFeatureDetail(id: String) throws -> ArchitectureDetailDTO? {
-        cachedFeatures.first { $0.id == id }
+    func loadFeatureDetail(id: String) async throws -> ArchitectureDetailDTO? {
+        try await loadFeatureDetails().first { $0.id == id }
     }
 }
 
 // MARK: - Private Methods
 
 private extension ArchitectureDetailJSONDataSourceImpl {
-    static func loadFeatures(from bundle: Bundle) throws -> [ArchitectureDetailDTO] {
-        guard let url = bundle.url(forResource: Constants.fileName, withExtension: Constants.fileExtension) else {
-            throw DataSourceError.fileNotFound("\(Constants.fileName).\(Constants.fileExtension)")
-        }
-
-        let data = try Data(contentsOf: url)
-        let response = try JSONDecoder().decode(ArchitectureDetailResponseDTO.self, from: data)
-        return response.features
+    @concurrent
+    nonisolated static func decodeFeatures(at fileURL: URL) async throws -> [ArchitectureDetailDTO] {
+        let data = try Data(contentsOf: fileURL)
+        return try JSONDecoder().decode(ArchitectureDetailResponseDTO.self, from: data).features
     }
 }
