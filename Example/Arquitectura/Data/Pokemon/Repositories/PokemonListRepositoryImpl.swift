@@ -43,32 +43,43 @@ struct PokemonListRepositoryImpl: PokemonListRepository {
     // MARK: - Private Methods
 
     /// Fetches Pokemon details in parallel using TaskGroup.
+    /// Individual failures are logged and skipped, but if every detail fails the first error is
+    /// thrown, so a failed load never turns into an empty page.
     /// - Parameter results: Array of Pokemon list results containing names and URLs.
     /// - Returns: Array of Pokemon domain models sorted by ID.
+    /// - Throws: The first detail error when no detail could be loaded, or `CancellationError`.
     private func fetchDetailsInParallel(for results: [PokemonListResultDTO]) async throws -> [PokemonSummaryModel] {
-        try await withThrowingTaskGroup(of: PokemonSummaryModel?.self) { group in
+        try await withThrowingTaskGroup(of: Result<PokemonSummaryModel, any Error>.self) { group in
             for result in results {
                 guard let pokemonID = result.extractedID else { continue }
 
                 group.addTask {
                     do {
                         let detail = try await self.remoteDataSource.fetchPokemonDetail(id: pokemonID)
-                        return self.dtoMapper.mapToDomain(detail)
+                        return .success(self.dtoMapper.mapToDomain(detail))
                     } catch is CancellationError {
                         throw CancellationError()
                     } catch {
                         Self.logger
                             .warning("Failed to fetch Pokemon detail id=\(pokemonID): \(error.localizedDescription)")
-                        return nil
+                        return .failure(error)
                     }
                 }
             }
 
             var models: [PokemonSummaryModel] = []
-            for try await model in group {
-                if let model {
+            var firstFailure: (any Error)?
+            for try await outcome in group {
+                switch outcome {
+                case let .success(model):
                     models.append(model)
+                case let .failure(error):
+                    firstFailure = firstFailure ?? error
                 }
+            }
+
+            if models.isEmpty, let firstFailure {
+                throw firstFailure
             }
 
             return models.sorted { $0.id < $1.id }
