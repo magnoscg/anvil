@@ -75,16 +75,17 @@ final class AppNavigationCoordinator {
         }
     }
 
-    func saveNavigationStateDebounced(persist: @escaping @MainActor (Data?) -> Void) {
+    /// Debounces navigation state saves. When encoding fails nothing is written,
+    /// so the last good state is kept.
+    func saveNavigationStateDebounced(persist: @escaping @MainActor (Data) -> Void) {
         saveTask?.cancel()
-        saveTask = Task {
+        saveTask = Task { [weak self] in
             do {
                 try await Task.sleep(for: .milliseconds(300))
             } catch {
                 return
             }
-            guard !Task.isCancelled else { return }
-            let data = self.encodeNavigationState()
+            guard !Task.isCancelled, let data = self?.encodeNavigationState() else { return }
             persist(data)
         }
     }

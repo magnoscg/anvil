@@ -297,7 +297,7 @@ struct AppNavigationCoordinatorTests {
             }
         }
 
-        #expect(persistedData != nil)
+        #expect(!persistedData.isEmpty)
     }
 
     // MARK: - Helpers

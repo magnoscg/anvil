@@ -77,8 +77,9 @@ final class AppNavigationCoordinator {
 
     /// Debounces navigation state saves to avoid excessive serialization
     /// during rapid navigation changes (e.g., animated transitions).
+    /// When encoding fails nothing is written, so the last good state is kept.
     /// - Parameter persist: Closure that receives encoded data and writes it to storage.
-    func saveNavigationStateDebounced(persist: @escaping @MainActor (Data?) -> Void) {
+    func saveNavigationStateDebounced(persist: @escaping @MainActor (Data) -> Void) {
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             do {
@@ -87,8 +88,7 @@ final class AppNavigationCoordinator {
                 // CancellationError — debounce superseded by a newer save
                 return
             }
-            guard !Task.isCancelled else { return }
-            let data = self?.encodeNavigationState()
+            guard !Task.isCancelled, let data = self?.encodeNavigationState() else { return }
             persist(data)
         }
     }
