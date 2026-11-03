@@ -92,6 +92,76 @@ struct RetryInterceptorTests {
         #expect(callCount == 3)
     }
 
+    // MARK: - Method and Header Matching
+
+    @Test("Idempotent methods are retried regardless of case", arguments: ["get", "HEAD", "Delete", "OPTIONS"])
+    func idempotentMethodsAreRetried(method: String) async throws {
+        let counter = CallCounter()
+        let request = try makeRequest(method: method)
+
+        _ = try await interceptor.intercept(request: request) { request in
+            await counter.increment()
+            return try Self.makeResponse(for: request, statusCode: 503)
+        }
+
+        let callCount = await counter.count
+        #expect(callCount == 3)
+    }
+
+    @Test("The Idempotency-Key header is matched case-insensitively")
+    func lowercaseIdempotencyKeyIsRetried() async throws {
+        let counter = CallCounter()
+        var request = try makeRequest(method: "POST")
+        request.setValue(UUID().uuidString, forHTTPHeaderField: "idempotency-key")
+
+        _ = try await interceptor.intercept(request: request) { request in
+            await counter.increment()
+            return try Self.makeResponse(for: request, statusCode: 503)
+        }
+
+        let callCount = await counter.count
+        #expect(callCount == 3)
+    }
+
+    @Test("An empty Idempotency-Key does not make a POST retryable")
+    func emptyIdempotencyKeyIsIgnored() async throws {
+        let counter = CallCounter()
+        var request = try makeRequest(method: "POST")
+        request.setValue("  ", forHTTPHeaderField: "Idempotency-Key")
+
+        _ = try await interceptor.intercept(request: request) { request in
+            await counter.increment()
+            return try Self.makeResponse(for: request, statusCode: 503)
+        }
+
+        let callCount = await counter.count
+        #expect(callCount == 1)
+    }
+
+    @Test("A request from an already cancelled task is not sent")
+    func cancelledTaskIsNotSent() async throws {
+        let counter = CallCounter()
+        let request = try makeRequest(method: "POST")
+        let interceptor = self.interceptor
+
+        let task = Task {
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            _ = try await interceptor.intercept(request: request) { request in
+                await counter.increment()
+                return try Self.makeResponse(for: request, statusCode: 200)
+            }
+        }
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+        let callCount = await counter.count
+        #expect(callCount == 0)
+    }
+
     // MARK: - Helpers
 
     private func makeRequest(method: String) throws -> URLRequest {

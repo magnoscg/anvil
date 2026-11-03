@@ -30,6 +30,8 @@ nonisolated struct RetryInterceptor: RequestInterceptor {
     func intercept(request: URLRequest,
                    next: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)) async throws -> (Data,
                                                                                                           HTTPURLResponse) {
+        try Task.checkCancellation()
+
         guard Self.isSafeToRetry(request) else {
             return try await next(request)
         }
@@ -100,7 +102,8 @@ private extension RetryInterceptor {
 
     /// Determines if resending the request cannot duplicate a side effect on the server.
     static func isSafeToRetry(_ request: URLRequest) -> Bool {
-        if request.value(forHTTPHeaderField: idempotencyKeyHeader) != nil {
+        if let idempotencyKey = request.value(forHTTPHeaderField: idempotencyKeyHeader),
+           !idempotencyKey.trimmingCharacters(in: .whitespaces).isEmpty {
             return true
         }
         let method = (request.httpMethod ?? "GET").uppercased()
