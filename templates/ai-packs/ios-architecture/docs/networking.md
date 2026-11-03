@@ -356,7 +356,10 @@ protocol RequestInterceptor: Sendable {
 
 #### RetryInterceptor
 
-Implements retry logic with exponential backoff. Only retries transient errors.
+Implements retry logic with exponential backoff. Only retries transient errors, and only on requests that are
+safe to resend: an idempotent method (GET, HEAD, PUT, DELETE, OPTIONS, TRACE) or any request carrying a
+non-empty `Idempotency-Key` header. POST and PATCH without that header are sent once, because a lost response
+or a 5xx after the server applied them would otherwise duplicate the side effect. Cancellation is checked first.
 
 ```swift
 struct RetryInterceptor: RequestInterceptor {
