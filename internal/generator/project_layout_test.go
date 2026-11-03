@@ -124,7 +124,7 @@ func TestProjectLayoutBaseOnly(t *testing.T) {
 		t.Fatalf("ProjectLayout failed: %v", err)
 	}
 
-	// base has 45 files in list, minus 1 skipped (Scheme.xcconfig.tmpl) = 44
+	// base has 47 files in list, minus 1 skipped (Scheme.xcconfig.tmpl) = 46
 	// .gitkeep (non-tmpl) is skipped, xcodeproj/ dir is skipped entirely
 	if len(jobs) != 46 {
 		t.Errorf("base-only: got %d jobs, want 46", len(jobs))
@@ -152,7 +152,7 @@ func TestProjectLayoutBaseWithSwiftData(t *testing.T) {
 		t.Fatalf("ProjectLayout failed: %v", err)
 	}
 
-	// 44 base + 3 swiftdata = 47
+	// 46 base + 3 swiftdata = 49
 	if len(jobs) != 49 {
 		t.Errorf("base+swiftdata: got %d jobs, want 49", len(jobs))
 	}
@@ -180,7 +180,7 @@ func TestProjectLayoutBaseWithClaude(t *testing.T) {
 		t.Fatalf("ProjectLayout failed: %v", err)
 	}
 
-	// 44 base + 14 claude = 58
+	// 46 base + 14 claude = 60
 	if len(jobs) != 60 {
 		t.Errorf("base+claude: got %d jobs, want 60", len(jobs))
 		for _, j := range jobs {
@@ -235,7 +235,7 @@ func TestProjectLayoutAllOptions(t *testing.T) {
 		t.Fatalf("ProjectLayout failed: %v", err)
 	}
 
-	// 44 base + 3 swiftdata + 14 claude = 61
+	// 46 base + 3 swiftdata + 14 claude = 63
 	if len(jobs) != 63 {
 		t.Errorf("all options: got %d jobs, want 63", len(jobs))
 	}
