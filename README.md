@@ -97,9 +97,12 @@ Picking packs on an existing project writes them straight into it:
 
 Pack installation is collision-safe: Anvil renders and validates the complete
 plan before writing, reports every conflict together, and never overwrites
-skills, commands, workflows, docs, or `CLAUDE.md`. Existing
-`.claude/settings.json` values take precedence; compatible additions are merged
-and published atomically while preserving file permissions.
+skills, commands, workflows, docs, or `CLAUDE.md`. A global skill that an
+earlier run already installed in `~/.claude/skills/` is reused instead of
+blocking the run; if its content differs, it is left untouched and listed at
+the end. Existing `.claude/settings.json` values take precedence; compatible
+additions are merged and published atomically while preserving file
+permissions.
 
 Security reports are handled privately; see [SECURITY.md](SECURITY.md).
 

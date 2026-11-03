@@ -280,7 +280,7 @@ Two radio options:
 
 **Scope Prompt** (overlay, shown if any selected pack has `HasSkills=true`):
 - Project scope → `.claude/skills/`
-- Global scope → `~/.claude/skills/`
+- Global scope → `~/.claude/skills/` (a skill that already exists there is reused; one that differs is kept as is and listed when generation finishes)
 
 **Controls:** up/down navigate, tab cycle, space toggle, left/right expand/collapse, enter confirm, esc back
 

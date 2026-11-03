@@ -179,11 +179,12 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 	// and marker creation have both succeeded.
 	if cfg.HasAnyPacks() {
 		resolved := config.ResolveDependencies(cfg.AIPacks)
-		packFiles, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, projectDir)
+		packFiles, keptSkills, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, projectDir)
 		if err != nil {
 			return result, fmt.Errorf("rendering AI packs: %w", err)
 		}
 		result.FilesCreated = append(result.FilesCreated, packFiles...)
+		result.KeptSkills = keptSkills
 	}
 
 	// Step 8: Initialize git (non-fatal on failure). Running it last keeps the
@@ -217,25 +218,38 @@ func (g *DefaultProjectGenerator) GenerateToolsOnly(_ context.Context, cfg confi
 	tmplCtx := NewProjectContext(cfg)
 	resolved := config.ResolveDependencies(cfg.AIPacks)
 
-	packFiles, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, cfg.OutputDir)
+	packFiles, keptSkills, err := g.installPacks(resolved, cfg.SkillsScope, tmplCtx, cfg.OutputDir)
 	if err != nil {
 		return result, fmt.Errorf("rendering AI packs: %w", err)
 	}
 	result.FilesCreated = append(result.FilesCreated, packFiles...)
+	result.KeptSkills = keptSkills
 
 	result.Duration = time.Since(start)
 	return result, nil
 }
 
-func (g *DefaultProjectGenerator) installPacks(packs []string, skillsScope string, ctx any, projectDir string) ([]string, error) {
+// installPacks applies the packs and returns the files it created and the
+// existing global skills it left untouched because their content differs.
+func (g *DefaultProjectGenerator) installPacks(packs []string, skillsScope string, ctx any, projectDir string) ([]string, []string, error) {
 	plan, err := g.packRenderer.PlanPacks(packs, skillsScope, ctx, projectDir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := g.packRenderer.Preflight(&plan); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return g.packRenderer.Apply(plan)
+	files, err := g.packRenderer.Apply(plan)
+	if err != nil {
+		return nil, nil, err
+	}
+	var differing []string
+	for _, skill := range plan.KeptSkills() {
+		if !skill.Identical {
+			differing = append(differing, skill.Path)
+		}
+	}
+	return files, differing, nil
 }
 
 // renderTemplateDir renders all templates in a template directory, placing output
