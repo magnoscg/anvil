@@ -43,7 +43,11 @@
 
 ### Axiom Skills Reference
 
+{{ if .HasIosArchitecture -}}
 > Consult the detailed documentation in `.claude/docs/` for each area.
+{{- else -}}
+> The Doc column names the ios-architecture pack's docs in `.claude/docs/`, which this project does not have unless that pack is added.
+{{- end }}
 
 #### Pre-commit Audits (Run before PR)
 
