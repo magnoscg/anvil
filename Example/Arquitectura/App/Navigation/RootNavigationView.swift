@@ -2,8 +2,9 @@ import SwiftUI
 
 // MARK: - RootNavigationView
 
-/// Root view that manages the NavigationStack and state persistence.
-/// Navigation logic is delegated to AppNavigationCoordinator — this View is a thin shell.
+/// Root view that manages the NavigationStack and state persistence for one window.
+/// The router and coordinator are owned by `AppRootView`; navigation logic lives in
+/// AppNavigationCoordinator — this View is a thin shell.
 struct RootNavigationView: View {
     // MARK: - Properties
 
@@ -12,8 +13,7 @@ struct RootNavigationView: View {
     var appRouter: AppRouterImpl
     let dependencies: AppDependencies
 
-    @State
-    private var coordinator: AppNavigationCoordinator
+    let coordinator: AppNavigationCoordinator
 
     /// Persists navigation state for restoration after app termination
     @SceneStorage("app.navigation.path")
@@ -21,10 +21,12 @@ struct RootNavigationView: View {
 
     // MARK: - Init
 
-    init(appRouter: AppRouterImpl, dependencies: AppDependencies) {
+    init(appRouter: AppRouterImpl,
+         coordinator: AppNavigationCoordinator,
+         dependencies: AppDependencies) {
         self.appRouter = appRouter
+        self.coordinator = coordinator
         self.dependencies = dependencies
-        self._coordinator = State(initialValue: AppNavigationCoordinator(appRouter: appRouter))
     }
 
     // MARK: - Body
@@ -34,9 +36,6 @@ struct RootNavigationView: View {
             ArchitectureFactory.makeView(appRouter: appRouter)
                 .withArchitectureRoutes(appRouter: appRouter)
                 .withPokemonListRoutes(appRouter: appRouter, dependencies: dependencies)
-        }
-        .onOpenURL { url in
-            coordinator.handleDeepLink(url)
         }
         .task(id: "restore") {
             coordinator.restoreNavigationState(from: navigationData)
