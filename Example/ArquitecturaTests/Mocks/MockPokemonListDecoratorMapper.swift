@@ -12,7 +12,7 @@ struct MockPokemonListDecoratorMapper: PokemonListDecoratorMapper {
 
     // MARK: - PokemonListDecoratorMapper
 
-    func map(_ model: PokemonListModel) -> PokemonListItemDecorator {
+    func map(_ model: PokemonSummaryModel) -> PokemonListItemDecorator {
         if let mapResult {
             return mapResult
         }
@@ -23,7 +23,7 @@ struct MockPokemonListDecoratorMapper: PokemonListDecoratorMapper {
                                         types: [])
     }
 
-    func mapToItems(_ models: [PokemonListModel]) -> [PokemonListItemDecorator] {
+    func mapToItems(_ models: [PokemonSummaryModel]) -> [PokemonListItemDecorator] {
         if let mapToItemsResult {
             return mapToItemsResult
         }

@@ -22,7 +22,7 @@ struct PokemonListResult: Equatable {
     // MARK: - Properties
 
     /// The fetched Pokemon models for this page.
-    let pokemon: [PokemonListModel]
+    let pokemon: [PokemonSummaryModel]
 
     /// Whether there are more pages available.
     let hasMore: Bool

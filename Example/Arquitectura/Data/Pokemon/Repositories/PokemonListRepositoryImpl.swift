@@ -45,8 +45,8 @@ struct PokemonListRepositoryImpl: PokemonListRepository {
     /// Fetches Pokemon details in parallel using TaskGroup.
     /// - Parameter results: Array of Pokemon list results containing names and URLs.
     /// - Returns: Array of Pokemon domain models sorted by ID.
-    private func fetchDetailsInParallel(for results: [PokemonListResultDTO]) async throws -> [PokemonListModel] {
-        try await withThrowingTaskGroup(of: PokemonListModel?.self) { group in
+    private func fetchDetailsInParallel(for results: [PokemonListResultDTO]) async throws -> [PokemonSummaryModel] {
+        try await withThrowingTaskGroup(of: PokemonSummaryModel?.self) { group in
             for result in results {
                 guard let pokemonID = result.extractedID else { continue }
 
@@ -64,7 +64,7 @@ struct PokemonListRepositoryImpl: PokemonListRepository {
                 }
             }
 
-            var models: [PokemonListModel] = []
+            var models: [PokemonSummaryModel] = []
             for try await model in group {
                 if let model {
                     models.append(model)

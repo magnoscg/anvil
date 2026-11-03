@@ -1,10 +1,10 @@
 import Foundation
 
-// MARK: - PokemonListModel
+// MARK: - PokemonSummaryModel
 
-/// Domain model representing a Pokemon for list display.
-/// Contains essential information for rendering a Pokemon card in a list.
-struct PokemonListModel: Equatable, Identifiable {
+/// Summary of a Pokemon: the fields needed wherever a Pokemon is listed or referenced
+/// (id, name, artwork and types). `PokemonDetailModel` holds the full profile.
+struct PokemonSummaryModel: Equatable, Identifiable {
     // MARK: - Properties
 
     /// The Pokemon's unique identifier.
