@@ -6,7 +6,9 @@ import Foundation
 /// It lives in Data so that Domain never depends on `APIError` or any other infrastructure type.
 extension DomainError {
     /// Runs a Data-layer operation and rethrows any failure as a `DomainError`.
-    /// `CancellationError` is rethrown unchanged so cancellation keeps propagating.
+    /// `CancellationError`, and any failure that arrives after the task was cancelled (for example
+    /// a retry backoff interrupted by cancellation and wrapped by the client), is rethrown as
+    /// `CancellationError` so cancellation keeps propagating instead of surfacing as an error.
     /// Repository implementations wrap their work in it, so Domain only ever sees domain errors.
     /// It runs in the caller's isolation (`#isolation`), so actor-isolated callers can capture their own state.
     nonisolated static func catching<T>(isolation: isolated (any Actor)? = #isolation,
@@ -14,6 +16,8 @@ extension DomainError {
         do {
             return try await operation()
         } catch is CancellationError {
+            throw CancellationError()
+        } catch where Task.isCancelled {
             throw CancellationError()
         } catch {
             throw map(error)

@@ -112,6 +112,26 @@ struct DomainErrorMappingTests {
         }
     }
 
+    @Test("catching treats a failure after cancellation as cancellation")
+    func catchingTreatsFailureAfterCancellationAsCancellation() async {
+        let task = Task { () async throws -> Int in
+            try await DomainError.catching { () async throws -> Int in
+                while !Task.isCancelled {
+                    await Task.yield()
+                }
+                throw APIError.unknown(SendableError(NSError(domain: "test", code: 1)))
+            }
+        }
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            Issue.record("Expected cancellation")
+        } catch {
+            #expect(error is CancellationError)
+        }
+    }
+
     @Test("catching rethrows CancellationError unchanged")
     func catchingRethrowsCancellation() async {
         await #expect(throws: CancellationError.self) {
