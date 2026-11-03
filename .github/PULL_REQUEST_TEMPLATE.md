@@ -6,7 +6,8 @@
 
 - [ ] `go test ./...`
 - [ ] `go test -race ./...`
-- [ ] `go vet ./...`
+- [ ] `go vet ./...` and `go vet -tags integration ./...`
+- [ ] `make test-integration`
 - [ ] `go mod verify`
 - [ ] `go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...`
 - [ ] `./scripts/validate-skill-content.sh`
