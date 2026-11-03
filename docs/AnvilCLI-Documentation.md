@@ -452,7 +452,7 @@ For each selected pack, the PackRenderer executes up to 10 steps:
 - `CLAUDE-section.md.tmpl` — Git conventions
 
 **github-actions:**
-- `workflows/` — `ci.yml.tmpl`, `release.yml.tmpl`
+- `workflows/` — `ci.yml.tmpl` builds and tests the first scheme on the newest available iPhone simulator; `release.yml.tmpl` creates a GitHub release with `gh` for `v*` tags. Actions are pinned by commit SHA and jobs default to `contents: read`.
 
 ---
 
