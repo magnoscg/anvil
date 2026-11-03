@@ -7,8 +7,8 @@ import Foundation
 /// an idempotent HTTP method, or any request carrying an `Idempotency-Key` header. A POST or PATCH
 /// whose response was lost may already have been applied, so it is sent once. Respects cancellation.
 /// An offline device is not retried: the session already waits for connectivity, and a retry a few
-/// seconds later would fail the same way. A `Retry-After` header on a 429 or 5xx replaces the backoff,
-/// and no retry starts after the policy's `maxElapsedTime`.
+/// seconds later would fail the same way. A `Retry-After` header on a 429 or 5xx, up to `maxDelay`, replaces
+/// the backoff, and no retry starts after the policy's `maxElapsedTime`.
 struct RetryInterceptor: RequestInterceptor {
     // MARK: - Properties
 
@@ -124,9 +124,13 @@ struct RetryInterceptor: RequestInterceptor {
     ]
 
     /// Returns how long to wait before the next attempt, or nil when no retry may start.
-    /// A `Retry-After` value replaces the backoff delay; no retry starts after the policy's time budget.
+    /// A `Retry-After` value up to `maxDelay` replaces the backoff delay; no retry starts after the policy's
+    /// time budget.
     private func delayBeforeRetry(attempt: Int, elapsed: Duration, retryAfter: TimeInterval?) -> TimeInterval? {
         guard policy.shouldRetry(attempt: attempt) else {
+            return nil
+        }
+        if let retryAfter, retryAfter > policy.maxDelay {
             return nil
         }
         let delay = retryAfter ?? policy.delay(for: attempt)

@@ -8,8 +8,8 @@ import os
 /// `Idempotency-Key` header) and that fail with retryable errors (network issues, server errors).
 /// A POST or PATCH whose response was lost may already have been applied by the server, so resending
 /// it could duplicate the side effect. Errors that describe the device state (offline, cellular data
-/// disabled, roaming off) are not retried: the session already waits for connectivity, and a retry a
-/// few seconds later would fail the same way.
+/// disabled, roaming off, an active call) are not retried: the session already waits for connectivity,
+/// and a retry a few seconds later would fail the same way.
 ///
 /// This struct is `nonisolated` because it's used in networking code that runs off the main actor.
 nonisolated struct RetryInterceptor: RequestInterceptor {
@@ -111,8 +111,7 @@ private extension RetryInterceptor {
                                                                      .networkConnectionLost,
                                                                      .cannotFindHost,
                                                                      .cannotConnectToHost,
-                                                                     .dnsLookupFailed,
-                                                                     .callIsActive]
+                                                                     .dnsLookupFailed]
 
     /// Determines if resending the request cannot duplicate a side effect on the server.
     static func isSafeToRetry(_ request: URLRequest) -> Bool {
@@ -143,9 +142,13 @@ private extension RetryInterceptor {
 
     /// Returns how long to wait before the next attempt, or nil when no retry may start.
     /// A `Retry-After` value from the server replaces the backoff delay. No retry is scheduled when
-    /// the attempts are used up or the retry would start after the policy's time budget.
+    /// the attempts are used up, the server asks to wait longer than `maxDelay`, or the retry would
+    /// start after the policy's time budget.
     func delayBeforeRetry(attempt: Int, elapsed: Duration, retryAfter: TimeInterval?) -> TimeInterval? {
         guard policy.shouldRetry(attempt: attempt) else {
+            return nil
+        }
+        if let retryAfter, retryAfter > policy.maxDelay {
             return nil
         }
         let delay = retryAfter ?? policy.delay(for: attempt)

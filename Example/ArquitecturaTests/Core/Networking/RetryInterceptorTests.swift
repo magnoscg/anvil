@@ -95,7 +95,10 @@ struct RetryInterceptorTests {
     // MARK: - Device State
 
     @Test("A GET that fails because the device is offline is not retried",
-          arguments: [URLError.Code.notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff])
+          arguments: [URLError.Code.notConnectedToInternet,
+                      .dataNotAllowed,
+                      .internationalRoamingOff,
+                      .callIsActive])
     func deviceStateFailureIsNotRetried(code: URLError.Code) async throws {
         let counter = CallCounter()
         let request = try makeRequest(method: "GET")
@@ -136,6 +139,11 @@ struct RetryInterceptorTests {
     func longRetryAfterIsNotRetried() async throws {
         let counter = CallCounter()
         let request = try makeRequest(method: "GET")
+        let interceptor = RetryInterceptor(policy: RetryPolicy(maxRetries: 2,
+                                                               baseDelay: 0.001,
+                                                               maxDelay: 600,
+                                                               jitterFactor: 0,
+                                                               maxElapsedTime: 30))
 
         let (_, response) = try await interceptor.intercept(request: request) { request in
             await counter.increment()
@@ -143,6 +151,25 @@ struct RetryInterceptorTests {
         }
 
         #expect(response.statusCode == 503)
+        let callCount = await counter.count
+        #expect(callCount == 1)
+    }
+
+    @Test("A Retry-After longer than maxDelay returns the response without retrying")
+    func retryAfterBeyondMaxDelayIsNotRetried() async throws {
+        let counter = CallCounter()
+        let request = try makeRequest(method: "GET")
+        let interceptor = RetryInterceptor(policy: RetryPolicy(maxRetries: 2,
+                                                               baseDelay: 0.001,
+                                                               maxDelay: 5,
+                                                               jitterFactor: 0,
+                                                               maxElapsedTime: 600))
+
+        _ = try await interceptor.intercept(request: request) { request in
+            await counter.increment()
+            return try Self.makeResponse(for: request, statusCode: 429, headerFields: ["Retry-After": "10"])
+        }
+
         let callCount = await counter.count
         #expect(callCount == 1)
     }

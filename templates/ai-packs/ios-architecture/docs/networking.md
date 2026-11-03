@@ -372,10 +372,10 @@ struct RetryInterceptor: RequestInterceptor {
 
 Features:
 - Retries on 5xx HTTP errors and 429 (rate limiting)
-- Retries on transient URLError codes (timeout, connection lost, DNS failure, etc.)
+- Retries on transient URLError codes (timeout, connection lost, DNS failure, etc.) while the retry still starts within the time budget. With the default 30 s budget and 30 s request timeout, a timed-out request is reported, not retried
 - Does not retry `notConnectedToInternet`: the session already waits for connectivity, and a retry seconds later fails the same way
-- Honors `Retry-After` on a 429 or 5xx, as delay-seconds or as an HTTP date, in place of its backoff
-- Starts no retry after the policy's `maxElapsedTime`; a `Retry-After` beyond it returns the response as is
+- Honors `Retry-After` on a 429 or 5xx, as delay-seconds or as an HTTP date, in place of its backoff. A wait longer than `maxDelay`, or one that would end after `maxElapsedTime`, returns the response as is
+- Starts no retry after the policy's `maxElapsedTime`
 - Respects cancellation — checks it before the first attempt and never retries a `CancellationError`
 - Uses `RetryPolicy` for backoff configuration
 
@@ -418,7 +418,7 @@ nonisolated struct RetryPolicy: Sendable, Equatable {
 }
 ```
 
-`maxElapsedTime` is a time budget measured from the first attempt: no retry starts after it.
+`maxElapsedTime` is a time budget measured from the first attempt: no retry starts after it. It bounds when the last attempt can start, not how long that attempt runs, so the worst case is the budget plus one resource timeout (about 90 s with the defaults).
 
 ### Preset Policies
 
