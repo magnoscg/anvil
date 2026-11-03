@@ -4,12 +4,14 @@
 {{ if not .IsToolsMode }}
 ## Project Summary
 
-- **Platform**: iOS **18.0+** Swift 6
+- **Platform**: iOS **{{ .IOSVersion }}+** Swift {{ .SwiftVersion }}
 - **UI**: **SwiftUI** (Views only)
 - **State / Observation**: **Observation** (`@Observable`)
-- **Architecture**: **MVVM + Router + Clean Architecture** (Feature-based)
-- **Persistence**: **SwiftData** (only in **Data** layer) using `ModelExecutor`
-- **Testing**: **Swift Testing** (`import Testing`) mapped to `Tests/Features`, `Tests/Domain`, `Tests/Data`
+- **Architecture**: **MVVM + Router + Clean Architecture-inspired layers** (Feature-based, single app target)
+- **Concurrency**: `SWIFT_STRICT_CONCURRENCY = complete`, **no** default actor isolation (types are nonisolated unless annotated)
+- **Dependency Injection**: manual constructor injection through `AppDependencies` + per-feature Factories (no DI container)
+- **Persistence**: {{ if .IncludeSwiftData }}**SwiftData** (only in **Data** layer) through `SwiftDataStack` and one `ModelExecutor` per repository{{ else }}**none** — the SwiftData stack was not generated for this project{{ end }}
+- **Testing**: **Swift Testing** (`import Testing`) in `{{ .ProjectName }}Tests/`, mirroring `Domain/`, `Data/` and `Features/`, plus shared `Mocks/`
 
 ## Build & Test
 
@@ -31,26 +33,53 @@
 {{ end }}
 ## Non-negotiable Rules
 
-### Layers (Clean)
+### Layers (Clean Architecture-inspired)
 
-- **Domain** layer is global: `Domain/<Feature>/` contains:
+- **App** (`App/`) — composition root and app-lifetime concerns:
+  - `Application/AppMain.swift` — `@main`; creates `AppDependencies`{{ if .IncludeSwiftData }}, `SwiftDataStack`{{ end }} and `AppRouterImpl`
+  - `Config/` — `AppDependencies`, `AppEnvironment`, `EnvironmentConfiguration`, `Xcconfig/`
+  - `Navigation/` — `AppRouter`, `AppRouterImpl`, `RootNavigationView`, `AppNavigationCoordinator`
+{{ if or .IncludeSwiftData .IsToolsMode }}  - `DI/PersistenceAssembly.swift` — SwiftData helpers (production / preview stacks), only when SwiftData is enabled
+{{ end }}- **Core** (`Core/`) — shared infrastructure, no feature knowledge:
+  - `Networking/` — `APIClient` + `APIClientImpl`, endpoints, `APIError`, interceptors, retry
+  - `Common/` — extensions, `Models/ErrorDecorator.swift`, `SwiftUI/{Builders,Components,Modifiers}/`
+  - `DesignSystem/Tokens/` — colors, typography, spacing, icons
+  - `Security/` — `KeychainHelper`
+{{ if or .IncludeSwiftData .IsToolsMode }}  - `Persistence/` — `SwiftDataStack`, `ModelContainer.shared` / `.preview`, only when SwiftData is enabled
+{{ end }}- **Domain** layer is global: `Domain/<Feature>/` contains:
   - `Models/` — Domain models (e.g., `<Feature>Model.swift`)
-  - `UseCases/` — Protocol + Implementation (e.g., `<Feature>UseCase.swift`, `<Feature>UseCaseImpl.swift`)
+  - `UseCases/` — Protocol + Implementation in separate files (`<Feature>UseCase.swift`, `<Feature>UseCaseImpl.swift`)
+  - `Domain/Common/` — `DomainError` and `DomainErrorMapping`
 - **Data** layer is global: `Data/<Feature>/` contains:
-  - `Repositories/` — Protocol + Implementation together
-  - `DataSources/` — Remote and Local data sources
+  - `Repositories/` — Repository **protocol** and its Impl, in separate files (the protocol lives here, not in Domain — see Known Deviations)
+  - `DataSources/` — Remote data source, plus optional Local (UserDefaults) and Keychain data sources (protocol + Impl in the same file)
   - `DTO/` — Data Transfer Objects
-  - `Mappers/` — DTO <-> Model transformations
+  - `Mappers/` — DTO -> Model transformations (protocol + Impl in the same file)
 - **Features** contain presentation only:
   - `DI/` — Factory
   - `UI/` — Views, State enum, Decorators, Components
   - `Presentation/ViewModels/` — ViewModels
-  - `Presentation/Mappers/` — DecoratorMapper (Domain -> UI)
+  - `Presentation/Mappers/` — DecoratorMapper (Domain -> UI, protocol + Impl in the same file)
   - `Navigation/` — Router (with Route enum inside) and, only when needed, RouteResolver
+- Layers are **folders in one app target**, not modules: the compiler does not enforce the dependency direction, so review must.
+
+### Known Deviations from Strict Clean Architecture
+
+These are deliberate, project-wide choices. Follow them consistently; changing any of them is a project-wide refactor, never a per-feature decision.
+
+- **Repository protocols live in `Data/<Feature>/Repositories/`**, so `<Feature>UseCaseImpl` (Domain) depends on a Data contract.
+- **`DomainError.map(_:)` knows `APIError`** (`Domain/Common/DomainErrorMapping.swift`), so Domain is not transport-independent.
+- **`ErrorDecorator` lives in `Core/Common/Models/`** even though it is a presentation type.
+
+### Dependency Injection
+
+- `AppDependencies` (`App/Config/AppDependencies.swift`) holds app-lifetime dependencies (the shared `APIClient`{{ if .IncludeSwiftData }} and `SwiftDataStack`{{ end }}). It is created once in `@main`.
+- Each feature has a `@MainActor enum <Feature>Factory` with `static func makeView(appRouter:dependencies:)`. Private `make*` helpers build DataSource -> Mapper -> Repository -> UseCase -> DecoratorMapper -> Router -> ViewModel -> View.
+- Factories build a new graph per screen. Keep constructors cheap: no file I/O, decoding or network work in `init` (see Factory + @State below).
 
 ### File Naming Convention
 
-**IMPORTANT**: All files related to a feature must start with the feature name.
+**IMPORTANT**: All files related to a feature must start with the feature name. UseCase and Repository protocols and their `Impl` go in **separate files**. DataSources, DTOMappers, DecoratorMappers and the Router keep protocol and `Impl` in **one file**.
 
 | Type | Pattern | Example |
 |------|---------|---------|
@@ -59,17 +88,19 @@
 | UseCase Impl | `<Feature>UseCaseImpl.swift` | `ArticleUseCaseImpl.swift` |
 | Repository Protocol | `<Feature>Repository.swift` | `ArticleRepository.swift` |
 | Repository Impl | `<Feature>RepositoryImpl.swift` | `ArticleRepositoryImpl.swift` |
-| Remote DataSource | `<Feature>RemoteDataSource.swift` | `ArticleRemoteDataSource.swift` |
+| DataSource (protocol + Impl) | `<Feature><Kind>DataSource.swift` (`Remote`, `Local`, `Keychain`) | `ArticleRemoteDataSource.swift` |
 | DTO | `<Feature>DTO.swift` | `ArticleDTO.swift` |
-| DTOMapper | `<Feature>DTOMapper.swift` | `ArticleDTOMapper.swift` |
+| DTOMapper (protocol + Impl) | `<Feature>DTOMapper.swift` | `ArticleDTOMapper.swift` |
 | View | `<Feature>View.swift` | `ArticleView.swift` |
 | State | `<Feature>State.swift` | `ArticleState.swift` |
 | Decorator | `<Feature>Decorator.swift` | `ArticleDecorator.swift` |
 | ViewModel | `<Feature>ViewModel.swift` | `ArticleViewModel.swift` |
-| DecoratorMapper | `<Feature>DecoratorMapper.swift` | `ArticleDecoratorMapper.swift` |
+| DecoratorMapper (protocol + Impl) | `<Feature>DecoratorMapper.swift` | `ArticleDecoratorMapper.swift` |
 | Router | `<Feature>Router.swift` | `ArticleRouter.swift` |
 | Optional RouteResolver | `<Feature>RouteResolver.swift` | `ArticleRouteResolver.swift` |
 | Factory | `<Feature>Factory.swift` | `ArticleFactory.swift` |
+| Optional Accessibility IDs | `<Feature>AccessibilityID.swift` | `ArticleAccessibilityID.swift` |
+| Test Mock | `Mocks/<Feature><Type>Mock.swift` (test target) | `ArticleRouterMock.swift` |
 
 ### Struct vs Class
 
@@ -98,17 +129,26 @@
 
 ### Concurrency
 
-- ViewModels are **@MainActor** with `async` API for loading/updating.
-- UseCases/Repos are **NOT** `@MainActor`; when they need SwiftData they must operate with their own isolated `ModelExecutor`/`ModelActor`, never with the main `ModelContext`.
-- Each SwiftData repository creates or receives a dedicated `ModelExecutor` (e.g., `DefaultSerialModelExecutor`) configured when initializing the container; don't access the global `modelContext` in background.
-- `Core/Persistence/ModelContainer+Shared.swift` exposes a `SwiftDataStack` that lives in `App/DI` and generates the `ModelExecutor` instances that factories inject into each repository.
-- Propagate cancellation (don't swallow `CancellationError`).
+{{ if .IsToolsMode }}- Check the target's `SWIFT_DEFAULT_ACTOR_ISOLATION` first. If it is `MainActor`, every unannotated type, UseCases and Repositories included, is `@MainActor`: work that must run off the main actor has to be marked `nonisolated` / `@concurrent` explicitly. The rules below assume no default isolation.
+{{ else }}- The target builds with `SWIFT_STRICT_CONCURRENCY = complete` and **no** default actor isolation: types are nonisolated unless annotated. Don't add `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` without revisiting these rules.
+{{ end }}- ViewModels, Routers, Factories, `AppRouter` and `AppNavigationCoordinator` are explicitly `@MainActor`.
+- ViewModels are `@MainActor @Observable final class` with `private(set) var state` and an `async` API for loading/updating.
+- UseCases, Repositories, DataSources and mappers are **NOT** `@MainActor`: they are `struct`s conforming to `Sendable` protocols.
+{{ if or .IncludeSwiftData .IsToolsMode }}- **SwiftData**{{ if .IsToolsMode }} (when enabled){{ end }}: repositories never use the main `ModelContext`. Each one receives its own `ModelExecutor` from `dependencies.swiftDataStack.makeBackgroundExecutor()` (a `DefaultSerialModelExecutor` over a fresh `ModelContext`), created in its Factory. Never share executors between repositories.
+- `SwiftDataStack` lives in `Core/Persistence/SwiftDataStack.swift`. It is created in `@main`, attached with `.modelContainer(...)` and passed into `AppDependencies`. `ModelContainer.shared` / `.preview` are in `Core/Persistence/ModelContainerShared.swift`, and `App/DI/PersistenceAssembly.swift` builds stacks for previews and tests.
+{{ end }}- Propagate cancellation:
+  - UseCases and Repositories rethrow `CancellationError` before handling any other error.
+  - ViewModels restore the previous state on cancellation instead of showing an error.
+  - A cancelled `URLSession` request surfaces as `URLError.cancelled`. Treat it as cancellation, not as a network error.
 
 ### Errors
 
-- Avoid `try?` / empty `catch {}` without justification.
+- Avoid `try?` / empty `catch {}` without justification. Don't turn a load failure into an empty result: it later surfaces as "not found" instead of an error.
 - Prefer typed errors over loose `String` when useful.
-- Map errors between layers: `APIError` -> `DomainError` -> `ErrorDecorator`.
+- Map errors between layers: `APIError` -> `DomainError` -> `ErrorDecorator`:
+  - Data throws `APIError` (from `APIClient`).
+  - `<Feature>UseCaseImpl` catches and converts with `DomainError.map(_:)`.
+  - The ViewModel converts with `ErrorDecorator.from(_:)` and sets `state = .error(...)`.
 
 ### Memory (closures)
 
@@ -129,16 +169,18 @@
 
 ### Router (Type-erased Pattern)
 
-- `AppRouter` protocol in `App/Navigation/AppRouter.swift`, implementation in `AppRouterImpl.swift`.
-- `AppRouter.push<R: Hashable>(_ route: R)` accepts **any** route type — it does NOT know about specific feature routes.
+- `AppRouter` protocol in `App/Navigation/AppRouter.swift`, implementation in `AppRouterImpl.swift` (`@MainActor @Observable`, owns a single `NavigationPath`).
+- `AppRouter.push(_ route: some Hashable & Codable)` accepts **any** route type — it does NOT know about specific feature routes.
 - Each feature always has `Features/<Feature>/Navigation/<Feature>Router.swift`:
-  - Route enum + protocol + impl in one file
-- Add `Features/<Feature>/Navigation/<Feature>RouteResolver.swift` only when the feature owns subroutes that must be resolved into views from the app root or a `NavigationStack`.
-- Features register their resolver in the app root only when that resolver exists.
+  - Route enum (`Hashable, Codable`) + `@MainActor` protocol + `struct ...RouterImpl` that delegates to `AppRouter`, in one file
+- Add `Features/<Feature>/Navigation/<Feature>RouteResolver.swift` only when the feature owns subroutes that must be resolved into views from the app root or a `NavigationStack`. It is a `ViewModifier` plus a `View.with<Feature>Routes(appRouter:dependencies:)` extension.
+- Features register their resolver in `App/Navigation/RootNavigationView.swift`, only when that resolver exists.
+- Deep links are parsed in `App/Navigation/AppNavigationCoordinator.swift`. It also persists the path to `@SceneStorage` with a debounce. A new deep-linkable route is added there.
 - ViewModels depend only on their `FeatureRouter` protocol, NOT on AppRouter directly.
 - If a feature only forwards to an already registered route, keep that logic inside `<Feature>Router.swift` and skip a resolver file.
-- **Factory + @State pattern**: when a RouteResolver exists, it calls Factory to create ViewModel and the View uses `@State` to preserve it.
+- **Factory + @State pattern**: when a RouteResolver exists, it calls the Factory inside `navigationDestination`, and the View stores the ViewModel with `@State` (`State(initialValue:)` in `init`).
 - **Why @State**: Without it, navigation back recreates View -> Factory creates NEW ViewModel -> state lost.
+- **Cost of the pattern**: SwiftUI can call the destination closure, and therefore the Factory, many times. `@State` keeps only the first ViewModel and the rest are built and thrown away, so Factories and the `init`s they call must stay cheap (no I/O or decoding).
 
 ## Anti-patterns to Avoid
 
@@ -147,9 +189,10 @@
 - **Don't put `import SwiftData`** in Domain or Presentation.
 - **Don't mix DTOs with Models** — always map between layers.
 - **Don't access network/persistence** from ViewModels directly.
-- **Don't put Repository protocol in Domain** — it goes in `Data/<Feature>/Repositories/`.
+- **Don't move a single Repository protocol to Domain** — today they all live in `Data/<Feature>/Repositories/` (see Known Deviations). Moving them is a project-wide refactor.
 - **Don't use boolean app state** (`isLoggedIn`, `hasOnboarded`) — use enum state machine.
-- **Don't put business logic in `@main`** — delegate to `AppStateController`.
+- **Don't put business logic in `@main`** — it only composes `AppDependencies`{{ if .IncludeSwiftData }}, `SwiftDataStack`{{ end }}, `AppRouterImpl` and the root view. Extract app-level state to an `@Observable` type in `App/`.
+- **Don't do I/O or decoding in initializers reached from a Factory** — load lazily inside an `async` / `throws` method.
 
 ### SwiftUI & State
 - **Don't use `@Published`** — that's Combine, use `@Observable`.
@@ -162,9 +205,9 @@
 - **Don't create custom Dark Mode toggle** — respect system preference.
 
 ### Concurrency (Swift 6)
-- **Don't pass SwiftData models between actors** — pass IDs, fetch on target context.
+{{ if or .IncludeSwiftData .IsToolsMode }}- **Don't pass SwiftData models between actors** — pass IDs, fetch on target context.
 - **Don't use `@Query` in ViewModels** — only in Views if needed, or use Repository.
-- **Don't silence errors** with `try?` or empty `catch {}`.
+{{ end }}- **Don't silence errors** with `try?` or empty `catch {}`.
 - **Don't forget Sendable on protocols** — mappers, use cases, repos need `: Sendable`.
 
 ### Navigation
@@ -209,7 +252,7 @@
 
 | Doc | When to read |
 |-----|--------------|
-| `.claude/docs/swiftdata.md` | SwiftData persistence patterns |
+| `.claude/docs/swiftdata.md` | SwiftData persistence patterns{{ if not (or .IncludeSwiftData .IsToolsMode) }} (only if you add SwiftData — not generated for this project){{ end }} |
 | `.claude/docs/networking.md` | URLSession, async networking, error handling |
 
 ### Security & Diagnostics
