@@ -4,7 +4,10 @@ import os
 // MARK: - RetryInterceptor
 
 /// Interceptor that implements retry logic with exponential backoff.
-/// Only retries requests that fail with retryable errors (network issues, server errors).
+/// Only retries requests that are safe to resend (an idempotent HTTP method, or any request carrying an
+/// `Idempotency-Key` header) and that fail with retryable errors (network issues, server errors).
+/// A POST or PATCH whose response was lost may already have been applied by the server, so resending
+/// it could duplicate the side effect.
 ///
 /// This struct is `nonisolated` because it's used in networking code that runs off the main actor.
 nonisolated struct RetryInterceptor: RequestInterceptor {
@@ -27,6 +30,12 @@ nonisolated struct RetryInterceptor: RequestInterceptor {
     func intercept(request: URLRequest,
                    next: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)) async throws -> (Data,
                                                                                                           HTTPURLResponse) {
+        try Task.checkCancellation()
+
+        guard Self.isSafeToRetry(request) else {
+            return try await next(request)
+        }
+
         var attempt = 0
 
         while true {
@@ -78,6 +87,9 @@ nonisolated struct RetryInterceptor: RequestInterceptor {
 private extension RetryInterceptor {
     // MARK: - Static Collections
 
+    private static let idempotentMethods: Set<String> = ["GET", "HEAD", "PUT", "DELETE", "OPTIONS", "TRACE"]
+    private static let idempotencyKeyHeader = "Idempotency-Key"
+
     private static let retryableURLErrorCodes: Set<URLError.Code> = [.timedOut,
                                                                      .networkConnectionLost,
                                                                      .notConnectedToInternet,
@@ -87,6 +99,16 @@ private extension RetryInterceptor {
                                                                      .internationalRoamingOff,
                                                                      .callIsActive,
                                                                      .dataNotAllowed]
+
+    /// Determines if resending the request cannot duplicate a side effect on the server.
+    static func isSafeToRetry(_ request: URLRequest) -> Bool {
+        if let idempotencyKey = request.value(forHTTPHeaderField: idempotencyKeyHeader),
+           !idempotencyKey.trimmingCharacters(in: .whitespaces).isEmpty {
+            return true
+        }
+        let method = (request.httpMethod ?? "GET").uppercased()
+        return idempotentMethods.contains(method)
+    }
 
     /// Determines if an HTTP status code is retryable.
     func isRetryableStatusCode(_ statusCode: Int) -> Bool {
