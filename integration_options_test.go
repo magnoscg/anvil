@@ -49,7 +49,7 @@ func TestIntegrationOptionsSwiftDataOnly(t *testing.T) {
 	}
 
 	// Example feature files should NOT exist
-	exampleDomain := filepath.Join(projectDir, "Domain", "Example")
+	exampleDomain := projectPath(projectDir, "Domain", "Example")
 	if _, err := os.Stat(exampleDomain); !os.IsNotExist(err) {
 		t.Error("Domain/Example/ should NOT exist when IncludeExample=false")
 	}
@@ -121,9 +121,9 @@ func TestIntegrationOptionsExampleFeature(t *testing.T) {
 
 	// Example feature files should exist across all layers
 	exampleDirs := []string{
-		filepath.Join(projectDir, "Domain", "Example"),
-		filepath.Join(projectDir, "Data", "Example"),
-		filepath.Join(projectDir, "Features", "Example"),
+		projectPath(projectDir, "Domain", "Example"),
+		projectPath(projectDir, "Data", "Example"),
+		projectPath(projectDir, "Features", "Example"),
 	}
 
 	for _, d := range exampleDirs {
@@ -134,9 +134,9 @@ func TestIntegrationOptionsExampleFeature(t *testing.T) {
 
 	// Verify specific Example feature files
 	exampleFiles := []string{
-		filepath.Join(projectDir, "Domain", "Example", "Models", "ExampleModel.swift"),
-		filepath.Join(projectDir, "Features", "Example", "UI", "ExampleView.swift"),
-		filepath.Join(projectDir, "Features", "Example", "Presentation", "ViewModels", "ExampleViewModel.swift"),
+		projectPath(projectDir, "Domain", "Example", "Models", "ExampleModel.swift"),
+		projectPath(projectDir, "Features", "Example", "UI", "ExampleView.swift"),
+		projectPath(projectDir, "Features", "Example", "Presentation", "ViewModels", "ExampleViewModel.swift"),
 	}
 
 	for _, f := range exampleFiles {
@@ -174,7 +174,7 @@ func TestIntegrationOptionsAllEnabled(t *testing.T) {
 	}
 
 	// Example feature
-	exampleVM := filepath.Join(projectDir, "Features", "Example", "Presentation", "ViewModels", "ExampleViewModel.swift")
+	exampleVM := projectPath(projectDir, "Features", "Example", "Presentation", "ViewModels", "ExampleViewModel.swift")
 	if _, err := os.Stat(exampleVM); os.IsNotExist(err) {
 		t.Error("ExampleViewModel.swift should exist when all options enabled")
 	}
@@ -219,7 +219,7 @@ func TestIntegrationOptionsNoneEnabled(t *testing.T) {
 	}
 
 	// Example should NOT exist
-	exampleDir := filepath.Join(projectDir, "Domain", "Example")
+	exampleDir := projectPath(projectDir, "Domain", "Example")
 	if _, err := os.Stat(exampleDir); !os.IsNotExist(err) {
 		t.Error("Domain/Example/ should NOT exist with no options")
 	}
