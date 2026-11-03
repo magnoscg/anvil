@@ -67,7 +67,7 @@ struct DomainErrorMappingTests {
     }
 
     @Test("Maps a local DecodingError to DomainError.parsing")
-    func mapsDecodingError() {
+    func mapsLocalDecodingError() {
         let context = DecodingError.Context(codingPath: [], debugDescription: "test")
         let result = DomainError.map(DecodingError.dataCorrupted(context))
         #expect(result == .parsing)
