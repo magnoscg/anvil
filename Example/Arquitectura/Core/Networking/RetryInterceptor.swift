@@ -7,7 +7,9 @@ import os
 /// Only retries requests that are safe to resend (an idempotent HTTP method, or any request carrying an
 /// `Idempotency-Key` header) and that fail with retryable errors (network issues, server errors).
 /// A POST or PATCH whose response was lost may already have been applied by the server, so resending
-/// it could duplicate the side effect.
+/// it could duplicate the side effect. Errors that describe the device state (offline, cellular data
+/// disabled, roaming off) are not retried: the session already waits for connectivity, and a retry a
+/// few seconds later would fail the same way.
 ///
 /// This struct is `nonisolated` because it's used in networking code that runs off the main actor.
 nonisolated struct RetryInterceptor: RequestInterceptor {
@@ -92,13 +94,10 @@ private extension RetryInterceptor {
 
     private static let retryableURLErrorCodes: Set<URLError.Code> = [.timedOut,
                                                                      .networkConnectionLost,
-                                                                     .notConnectedToInternet,
                                                                      .cannotFindHost,
                                                                      .cannotConnectToHost,
                                                                      .dnsLookupFailed,
-                                                                     .internationalRoamingOff,
-                                                                     .callIsActive,
-                                                                     .dataNotAllowed]
+                                                                     .callIsActive]
 
     /// Determines if resending the request cannot duplicate a side effect on the server.
     static func isSafeToRetry(_ request: URLRequest) -> Bool {

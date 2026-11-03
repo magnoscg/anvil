@@ -92,6 +92,25 @@ struct RetryInterceptorTests {
         #expect(callCount == 3)
     }
 
+    // MARK: - Device State
+
+    @Test("A GET that fails because the device is offline is not retried",
+          arguments: [URLError.Code.notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff])
+    func deviceStateFailureIsNotRetried(code: URLError.Code) async throws {
+        let counter = CallCounter()
+        let request = try makeRequest(method: "GET")
+
+        let interceptor = self.interceptor
+        await #expect(throws: URLError.self) {
+            _ = try await interceptor.intercept(request: request) { _ in
+                await counter.increment()
+                throw URLError(code)
+            }
+        }
+        let callCount = await counter.count
+        #expect(callCount == 1)
+    }
+
     // MARK: - Method and Header Matching
 
     @Test("Idempotent methods are retried regardless of case", arguments: ["get", "HEAD", "Delete", "OPTIONS"])
