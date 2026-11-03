@@ -13,7 +13,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink pushes feature route for valid URL")
     func handleDeepLinkPushesFeatureRoute() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://feature?id=clean-architecture"))
 
         coordinator.handleDeepLink(url)
@@ -24,7 +24,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink ignores URL with missing id")
     func handleDeepLinkIgnoresMissingId() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://feature"))
 
         coordinator.handleDeepLink(url)
@@ -35,7 +35,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink ignores URL with empty id")
     func handleDeepLinkIgnoresEmptyId() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://feature?id="))
 
         coordinator.handleDeepLink(url)
@@ -46,7 +46,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink ignores unknown host")
     func handleDeepLinkIgnoresUnknownHost() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://unknown?id=test"))
 
         coordinator.handleDeepLink(url)
@@ -57,7 +57,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink ignores overly long id")
     func handleDeepLinkIgnoresLongId() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let longId = String(repeating: "a", count: 257)
         let url = try #require(URL(string: "arquitectura://feature?id=\(longId)"))
 
@@ -71,7 +71,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink pushes pokemon detail for valid pokemon URL")
     func handleDeepLinkPushesPokemonDetail() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://pokemon?id=25"))
 
         coordinator.handleDeepLink(url)
@@ -82,7 +82,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink pushes pokedex list for valid pokedex URL")
     func handleDeepLinkPushesPokedex() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://pokedex"))
 
         coordinator.handleDeepLink(url)
@@ -93,7 +93,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink ignores pokemon URL with invalid id")
     func handleDeepLinkIgnoresInvalidPokemonId() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://pokemon?id=abc"))
 
         coordinator.handleDeepLink(url)
@@ -104,7 +104,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink ignores pokemon URL with zero id")
     func handleDeepLinkIgnoresZeroPokemonId() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         let url = try #require(URL(string: "arquitectura://pokemon?id=0"))
 
         coordinator.handleDeepLink(url)
@@ -117,7 +117,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink replaces the current stack instead of pushing on top")
     func handleDeepLinkReplacesStack() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         appRouter.push(ArchitectureRoute.detail(featureId: "first"))
         appRouter.push(ArchitectureRoute.detail(featureId: "second"))
         appRouter.push(ArchitectureRoute.detail(featureId: "third"))
@@ -134,7 +134,7 @@ struct AppNavigationCoordinatorTests {
     @Test("handleDeepLink keeps the current stack when the URL is invalid")
     func invalidDeepLinkKeepsStack() throws {
         let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let coordinator = makeRestoredCoordinator(appRouter: appRouter)
         appRouter.push(ArchitectureRoute.detail(featureId: "current"))
         let url = try #require(URL(string: "arquitectura://pokemon?id=abc"))
 
@@ -143,8 +143,21 @@ struct AppNavigationCoordinatorTests {
         #expect(appRouter.path.count == 1)
     }
 
-    @Test("restoreNavigationState is ignored after a deep link was handled")
-    func restoreIgnoredAfterDeepLink() throws {
+    // MARK: - Launch Ordering Tests
+
+    @Test("A deep link received before restoration is held until restoration runs")
+    func deepLinkBeforeRestoreIsHeld() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let url = try #require(URL(string: "arquitectura://pokedex"))
+
+        coordinator.handleDeepLink(url)
+
+        #expect(appRouter.path.isEmpty)
+    }
+
+    @Test("A deep link received before restoration replaces the restored stack")
+    func deepLinkBeforeRestoreWins() throws {
         let appRouter = AppRouterImpl()
         let coordinator = AppNavigationCoordinator(appRouter: appRouter)
         let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
@@ -158,21 +171,8 @@ struct AppNavigationCoordinatorTests {
         #expect(appRouter.path == expectedPath)
     }
 
-    @Test("restoreNavigationState still applies after an ignored deep link")
-    func restoreAppliesAfterIgnoredDeepLink() throws {
-        let appRouter = AppRouterImpl()
-        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
-        let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
-        let url = try #require(URL(string: "arquitectura://unknown"))
-
-        coordinator.handleDeepLink(url)
-        coordinator.restoreNavigationState(from: savedData)
-
-        #expect(appRouter.path.count == 2)
-    }
-
-    @Test("handleDeepLink after restoration replaces the restored stack")
-    func deepLinkAfterRestoreReplacesStack() throws {
+    @Test("A deep link received after restoration replaces the restored stack")
+    func deepLinkAfterRestoreWins() throws {
         let appRouter = AppRouterImpl()
         let coordinator = AppNavigationCoordinator(appRouter: appRouter)
         let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
@@ -186,23 +186,59 @@ struct AppNavigationCoordinatorTests {
         #expect(appRouter.path == expectedPath)
     }
 
+    @Test("An invalid deep link received before restoration keeps the restored stack")
+    func invalidDeepLinkBeforeRestoreKeepsRestoredStack() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
+        let url = try #require(URL(string: "arquitectura://unknown"))
+
+        coordinator.handleDeepLink(url)
+        coordinator.restoreNavigationState(from: savedData)
+
+        #expect(appRouter.path.count == 2)
+    }
+
+    @Test("Only the latest deep link received before restoration is applied")
+    func latestPendingDeepLinkWins() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let firstURL = try #require(URL(string: "arquitectura://pokemon?id=25"))
+        let latestURL = try #require(URL(string: "arquitectura://pokedex"))
+        var expectedPath = NavigationPath()
+        expectedPath.append(PokemonListRoute.list)
+
+        coordinator.handleDeepLink(firstURL)
+        coordinator.handleDeepLink(latestURL)
+        coordinator.restoreNavigationState(from: nil)
+
+        #expect(appRouter.path == expectedPath)
+    }
+
     // MARK: - State Persistence Tests
 
     @Test("restoreNavigationState restores from valid data")
     func restoreFromValidData() throws {
         let appRouter = AppRouterImpl()
         let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let savedData = try makeSavedPathData(featureIds: ["test-feature"])
 
-        appRouter.push(ArchitectureRoute.detail(featureId: "test-feature"))
-        let codableRep = try #require(appRouter.path.codable)
-        let data = try JSONEncoder().encode(codableRep)
+        coordinator.restoreNavigationState(from: savedData)
 
-        appRouter.popToRoot()
-        #expect(appRouter.path.isEmpty)
+        #expect(appRouter.path.count == 1)
+    }
 
-        coordinator.restoreNavigationState(from: data)
+    @Test("restoreNavigationState only restores once per window")
+    func restoreOnlyOnce() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
 
-        #expect(!appRouter.path.isEmpty)
+        coordinator.restoreNavigationState(from: nil)
+        appRouter.push(ArchitectureRoute.detail(featureId: "current"))
+        coordinator.restoreNavigationState(from: savedData)
+
+        #expect(appRouter.path.count == 1)
     }
 
     @Test("restoreNavigationState does nothing for nil data")
@@ -219,7 +255,7 @@ struct AppNavigationCoordinatorTests {
     func restoreFromCorruptedData() {
         let appRouter = AppRouterImpl()
         let coordinator = AppNavigationCoordinator(appRouter: appRouter)
-        let corruptedData = "not valid json".data(using: .utf8)!
+        let corruptedData = Data("not valid json".utf8)
 
         coordinator.restoreNavigationState(from: corruptedData)
 
@@ -234,7 +270,7 @@ struct AppNavigationCoordinatorTests {
 
         let data = try #require(coordinator.encodeNavigationState())
 
-        #expect(data.count > 0)
+        #expect(!data.isEmpty)
     }
 
     @Test("encodeNavigationState returns data for empty path")
@@ -265,6 +301,12 @@ struct AppNavigationCoordinatorTests {
     }
 
     // MARK: - Helpers
+
+    private func makeRestoredCoordinator(appRouter: AppRouterImpl) -> AppNavigationCoordinator {
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        coordinator.restoreNavigationState(from: nil)
+        return coordinator
+    }
 
     private func makeSavedPathData(featureIds: [String]) throws -> Data {
         var path = NavigationPath()
