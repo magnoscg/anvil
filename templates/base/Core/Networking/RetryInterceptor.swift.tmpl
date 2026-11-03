@@ -6,6 +6,8 @@ import Foundation
 /// Only retries transient errors (5xx, 429, network timeouts) on requests that are safe to resend:
 /// an idempotent HTTP method, or any request carrying an `Idempotency-Key` header. A POST or PATCH
 /// whose response was lost may already have been applied, so it is sent once. Respects cancellation.
+/// An offline device is not retried: the session already waits for connectivity, and a retry a few
+/// seconds later would fail the same way.
 struct RetryInterceptor: RequestInterceptor {
     // MARK: - Properties
 
@@ -79,7 +81,7 @@ struct RetryInterceptor: RequestInterceptor {
 
     private func isRetryableURLError(_ error: URLError) -> Bool {
         let retryableCodes: [URLError.Code] = [
-            .timedOut, .networkConnectionLost, .notConnectedToInternet,
+            .timedOut, .networkConnectionLost,
             .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
         ]
         return retryableCodes.contains(error.code)
