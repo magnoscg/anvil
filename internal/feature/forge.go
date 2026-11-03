@@ -22,8 +22,11 @@ func NewFeatureForge(renderer generator.TemplateRenderer) *DefaultFeatureForge {
 // Forge validates the config, renders all feature templates, and returns a
 // ForgeResult. If any step fails, previously created files are rolled back.
 func (s *DefaultFeatureForge) Forge(cfg config.FeatureConfig) (config.ForgeResult, error) {
-	// 1. Validate feature name
+	// 1. Validate the feature and project names
 	if err := ValidateFeatureName(cfg.FeatureName); err != nil {
+		return config.ForgeResult{}, err
+	}
+	if err := config.ValidateProjectName(cfg.ProjectName); err != nil {
 		return config.ForgeResult{}, err
 	}
 
