@@ -2,80 +2,30 @@ import Foundation
 
 // MARK: - URLSessionFactory
 
-/// Factory for creating configured URLSession instances.
-/// Handles SSL pinning configuration based on the environment.
+/// Creates the app's `URLSession` from the environment configuration.
+/// The session waits for connectivity instead of failing at once while offline, bounded by the
+/// resource timeout, and installs `SSLPinningDelegate` when pinning is enabled.
 enum URLSessionFactory {
     // MARK: - Public Methods
 
     /// Creates a URLSession configured for the given environment.
-    /// - Parameters:
-    ///   - configuration: The environment configuration containing SSL pinning settings.
-    ///   - additionalConfiguration: Optional closure to apply additional URLSessionConfiguration settings.
-    /// - Returns: A configured URLSession instance.
-    static func makeSession(configuration: EnvironmentConfiguration,
-                            additionalConfiguration: ((URLSessionConfiguration) -> Void)? = nil) -> URLSession {
-        let sessionConfig = URLSessionConfiguration.default
+    /// When pinning is enabled without any hash, the session pins to an empty set and rejects every
+    /// connection, so a misconfigured build fails closed instead of shipping without pinning.
+    /// - Parameter configuration: The environment configuration with timeouts and pinning settings.
+    /// - Returns: A URLSession owned by the caller, who must invalidate it when done.
+    static func makeSession(configuration: EnvironmentConfiguration) -> URLSession {
+        let sessionConfiguration = URLSessionConfiguration.default
+        sessionConfiguration.timeoutIntervalForRequest = configuration.requestTimeout
+        sessionConfiguration.timeoutIntervalForResource = configuration.requestTimeout * 2
+        sessionConfiguration.waitsForConnectivity = true
 
-        // Timeouts
-        sessionConfig.timeoutIntervalForRequest = configuration.requestTimeout
-        sessionConfig.timeoutIntervalForResource = configuration.requestTimeout * 2
-
-        // Wait for connectivity instead of failing immediately
-        sessionConfig.waitsForConnectivity = true
-
-        // Apply additional configuration if provided
-        additionalConfiguration?(sessionConfig)
-
-        // Validate SSL pinning configuration consistency
-        #if DEBUG
-        if configuration.sslPinningEnabled, configuration.sslPublicKeyHashes.isEmpty {
-            assertionFailure("SSL_PINNING_ENABLED=YES but SSL_PUBLIC_KEY_HASHES is empty in \(configuration.environment). Pinning will NOT be active.")
-        }
-        #endif
-
-        // Create session with SSL pinning if enabled
-        if configuration.sslPinningEnabled, !configuration.sslPublicKeyHashes.isEmpty {
-            let delegate = SSLPinningDelegate(publicKeyHashes: configuration.sslPublicKeyHashes,
-                                              isEnabled: true)
-            return URLSession(configuration: sessionConfig,
-                              delegate: delegate,
-                              delegateQueue: nil)
+        guard configuration.sslPinningEnabled else {
+            return URLSession(configuration: sessionConfiguration)
         }
 
-        // Return session without pinning
-        return URLSession(configuration: sessionConfig)
-    }
-
-    /// Creates a default URLSession without SSL pinning.
-    /// Useful for development or testing.
-    /// - Parameter timeout: Request timeout interval in seconds.
-    /// - Returns: A URLSession instance with default configuration.
-    static func makeDefaultSession(timeout: TimeInterval = 30.0) -> URLSession {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = timeout
-        config.timeoutIntervalForResource = timeout * 2
-        config.waitsForConnectivity = true
-        return URLSession(configuration: config)
-    }
-
-    /// Creates an ephemeral URLSession (no caching, cookies, or credentials stored).
-    /// Useful for sensitive requests or testing.
-    /// - Parameter configuration: The environment configuration.
-    /// - Returns: An ephemeral URLSession instance.
-    static func makeEphemeralSession(configuration: EnvironmentConfiguration) -> URLSession {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.timeoutIntervalForRequest = configuration.requestTimeout
-        sessionConfig.timeoutIntervalForResource = configuration.requestTimeout * 2
-        sessionConfig.waitsForConnectivity = true
-
-        if configuration.sslPinningEnabled, !configuration.sslPublicKeyHashes.isEmpty {
-            let delegate = SSLPinningDelegate(publicKeyHashes: configuration.sslPublicKeyHashes,
-                                              isEnabled: true)
-            return URLSession(configuration: sessionConfig,
-                              delegate: delegate,
-                              delegateQueue: nil)
-        }
-
-        return URLSession(configuration: sessionConfig)
+        assert(!configuration.sslPublicKeyHashes.isEmpty,
+               "SSL_PINNING_ENABLED=YES but SSL_PUBLIC_KEY_HASHES is empty in \(configuration.environment): every connection will be rejected.")
+        let delegate = SSLPinningDelegate(publicKeyHashes: configuration.sslPublicKeyHashes)
+        return URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 }
