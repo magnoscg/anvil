@@ -34,6 +34,7 @@ Sources live in `[Project]/` (one app target); tests live in `[Project]Tests/`. 
 |  |     +- Modifiers/                # All custom ViewModifiers
 |  +- DesignSystem/Tokens/            # AppColors, AppTypography, Spacing, AppIcons, IconSize
 |  +- Networking/                     # APIClient + Impl, Endpoint, APIEndpoint, APIError, interceptors
+|  |  +- Security/                    # URLSessionFactory, SSLPinningDelegate
 |  +- Persistence/                    # Only when SwiftData is enabled
 |  |  +- SwiftDataStack.swift
 |  |  +- ModelContainerShared.swift   # ModelContainer.shared / .preview

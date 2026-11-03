@@ -595,7 +595,7 @@ nonisolated enum APIError: Error, Sendable {
         switch self {
         case let .networkError(urlError):
             let retryableCodes: [URLError.Code] = [
-                .timedOut, .networkConnectionLost, .notConnectedToInternet,
+                .timedOut, .networkConnectionLost,
                 .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
             ]
             return retryableCodes.contains(urlError.code)

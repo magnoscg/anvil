@@ -4,7 +4,7 @@
 
 ## Overview
 
-This guide covers the async networking layer: dual-endpoint system, interceptor chain, error handling, retry policies, and connectivity monitoring.
+This guide covers the async networking layer: dual-endpoint system, interceptor chain, error handling, retry policies, SSL pinning, and connectivity monitoring.
 
 ---
 
@@ -48,6 +48,7 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
     // MARK: - Properties
 
     private let session: URLSession
+    private let ownsSession: Bool
     private let decoder: JSONDecoder
     private let interceptorChain: InterceptorChain
     private let configuration: EnvironmentConfiguration
@@ -60,7 +61,9 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
          interceptors: [any RequestInterceptor]? = nil)
 
     deinit {
-        session.invalidateAndCancel()
+        if ownsSession {
+            session.finishTasksAndInvalidate()
+        }
     }
 }
 ```
@@ -68,9 +71,9 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
 **Key design decisions:**
 - Created once in `AppDependencies` (`APIClientImpl(configuration: EnvironmentConfigurationImpl())`) and shared through `dependencies.apiClient`. Factories never create their own client.
 - `@unchecked Sendable` — safe because all properties are `let` and `URLSession` is thread-safe
-- Without an injected `session`, it builds one from `URLSessionConfiguration.default` with `requestTimeout` / `resourceTimeout` from `EnvironmentConfiguration`. **SSL pinning is not applied yet**: `sslPinningEnabled` and `sslPublicKeyHashes` are read from the xcconfig, but nothing consumes them until you add a pinning `URLSessionDelegate` (for example through a `URLSessionFactory`) and pass that session in
+- Without an injected `session`, it builds one with `URLSessionFactory.makeSession(configuration:)` (see Security below), which waits for connectivity and applies SSL pinning when the environment enables it
 - Requests go through an `InterceptorChain` (default: `[RetryInterceptor()]`)
-- `deinit` invalidates the session to prevent resource leaks
+- It invalidates only a session it created (`finishTasksAndInvalidate()` in `deinit`, which also releases the pinning delegate). An injected session belongs to the caller and may be shared, so the client never invalidates it
 
 ### Error Translation in APIClientImpl
 
@@ -249,7 +252,7 @@ extension APIError {
         switch self {
         case let .networkError(urlError):
             let retryableCodes: [URLError.Code] = [
-                .timedOut, .networkConnectionLost, .notConnectedToInternet,
+                .timedOut, .networkConnectionLost,
                 .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
             ]
             return retryableCodes.contains(urlError.code)
@@ -370,7 +373,10 @@ struct RetryInterceptor: RequestInterceptor {
 Features:
 - Retries on 5xx HTTP errors and 429 (rate limiting)
 - Retries on transient URLError codes (timeout, connection lost, DNS failure, etc.)
-- Respects cancellation — calls `Task.checkCancellation()` before each attempt and never retries a `CancellationError`
+- Does not retry `notConnectedToInternet`: the session already waits for connectivity, and a retry seconds later fails the same way
+- Honors `Retry-After` on a 429 or 5xx, as delay-seconds or as an HTTP date, in place of its backoff
+- Starts no retry after the policy's `maxElapsedTime`; a `Retry-After` beyond it returns the response as is
+- Respects cancellation — checks it before the first attempt and never retries a `CancellationError`
 - Uses `RetryPolicy` for backoff configuration
 
 ### Custom Interceptor Example (Auth)
@@ -404,20 +410,24 @@ nonisolated struct RetryPolicy: Sendable, Equatable {
     let baseDelay: TimeInterval
     let maxDelay: TimeInterval
     let jitterFactor: Double
+    let maxElapsedTime: TimeInterval
 
     func delay(for attempt: Int) -> TimeInterval
     func shouldRetry(attempt: Int) -> Bool
+    func fitsTimeBudget(elapsed: TimeInterval, delay: TimeInterval) -> Bool
 }
 ```
 
+`maxElapsedTime` is a time budget measured from the first attempt: no retry starts after it.
+
 ### Preset Policies
 
-| Policy | Max Retries | Base Delay | Max Delay | Use Case |
-|--------|-------------|------------|-----------|----------|
-| `.default` | 3 | 1.0s | 30.0s | Standard requests |
-| `.none` | 0 | 0 | 0 | No retries |
-| `.aggressive` | 5 | 2.0s | 60.0s | Critical operations |
-| `.quick` | 2 | 0.5s | 5.0s | Fast operations |
+| Policy | Max Retries | Base Delay | Max Delay | Time Budget | Use Case |
+|--------|-------------|------------|-----------|-------------|----------|
+| `.default` | 3 | 1.0s | 30.0s | 30s | Standard requests |
+| `.none` | 0 | 0 | 0 | 0 | No retries |
+| `.aggressive` | 5 | 2.0s | 60.0s | 120s | Critical operations |
+| `.quick` | 2 | 0.5s | 5.0s | 10s | Fast operations |
 
 ---
 
@@ -441,7 +451,40 @@ nonisolated enum ConnectionType: String, Sendable {
 }
 ```
 
-`NetworkMonitorImpl` is a `@MainActor @Observable final class` that uses `NWPathMonitor` and publishes updates on the main actor for SwiftUI. It is not part of `AppDependencies` by default; inject it where you need it.
+`NetworkMonitorImpl` is a `@MainActor @Observable final class` that uses `NWPathMonitor` and publishes updates on the main actor for SwiftUI. It reports no connection until the first path update arrives. It is not part of `AppDependencies` by default; inject it where you need it.
+
+Use it to show connectivity in the UI, never to decide whether to send a request (see "DON'T: Pre-flight Connectivity Checks").
+
+---
+
+## Security: SSL Pinning
+
+### URLSessionFactory
+
+```swift
+// Core/Networking/Security/URLSessionFactory.swift
+
+enum URLSessionFactory {
+    static func makeSession(configuration: EnvironmentConfiguration) -> URLSession
+}
+```
+
+- `waitsForConnectivity = true`: an offline request waits for a connection instead of failing at once. `resourceTimeout` (60 s by default) bounds the wait.
+- Low Data Mode is allowed. Mark only non-essential requests with `request.allowsConstrainedNetworkAccess = false`.
+- `SSL_PINNING_ENABLED = YES` installs `SSLPinningDelegate`. With no hashes the session pins to an empty set and rejects every connection (fail closed), with an assertion in debug builds.
+
+### SSLPinningDelegate
+
+After the system validates the certificate chain, the connection is accepted only if the SHA-256 of the SubjectPublicKeyInfo of a certificate in the chain matches a pin. Challenges other than server trust get the system's default handling. Supported keys: RSA 2048/3072/4096 and EC P-256/P-384/P-521.
+
+Compute a pin (the scheme xcconfig shows the full command):
+
+```bash
+openssl s_client -connect api.example.com:443 -servername api.example.com 2>/dev/null | \
+  openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
+```
+
+Set `SSL_PUBLIC_KEY_HASHES` to comma-separated `sha256/<base64>` values. Pin the current key and a backup key (or an intermediate) so the certificate can rotate without an app update. The generated Production scheme enables pinning with a placeholder hash, so it rejects every connection until you replace it.
 
 ---
 
@@ -469,11 +512,12 @@ nonisolated enum ConnectionType: String, Sendable {
 
 ### Security
 
-- [ ] SSL pinning implemented (a pinning `URLSessionDelegate` passed to `APIClientImpl`) and enabled in the production xcconfig (`SSL_PINNING_ENABLED`, `SSL_PUBLIC_KEY_HASHES`); the generated client does not pin by itself
+- [ ] Real pins, plus a backup pin, in the production xcconfig (`SSL_PINNING_ENABLED`, `SSL_PUBLIC_KEY_HASHES`)
 - [ ] Sensitive headers redacted in logs
 
 ### Performance
 
 - [ ] A dedicated `URLSession` (not `URLSession.shared`) owned by `APIClientImpl`
-- [ ] Consider `waitsForConnectivity` for resilience (not set by default)
-- [ ] Retry policy tuned per request type
+- [ ] `waitsForConnectivity` kept on the session (set by `URLSessionFactory`)
+- [ ] Retry policy tuned per request type, including its time budget
+- [ ] No connectivity check before sending a request
