@@ -13,7 +13,7 @@ build:
 test:
 	go test ./...
 
-## test-integration: Run integration tests (requires macOS + Xcode)
+## test-integration: Run integration tests (real templates; fake Xcode project and git runners)
 test-integration:
 	go test -tags integration -v -count=1 ./...
 
