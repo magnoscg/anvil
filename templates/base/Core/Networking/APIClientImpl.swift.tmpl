@@ -89,6 +89,8 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
             return try await interceptorChain.execute(request)
         } catch let apiError as APIError {
             throw apiError
+        } catch let urlError as URLError where urlError.code == .cancelled && Task.isCancelled {
+            throw CancellationError()
         } catch let urlError as URLError {
             throw APIError.networkError(urlError)
         } catch is CancellationError {

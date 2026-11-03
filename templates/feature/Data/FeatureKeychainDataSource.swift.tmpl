@@ -26,14 +26,19 @@ struct {{ .FeatureName }}KeychainDataSourceImpl: {{ .FeatureName }}KeychainDataS
     // MARK: - Public Methods
 
     func save(_ value: String, forKey key: String) throws {
-        try keychainHelper.save(value, forKey: key)
+        try keychainHelper.save(Data(value.utf8), for: key)
     }
 
     func read(forKey key: String) throws -> String? {
-        try keychainHelper.read(forKey: key)
+        do {
+            let data = try keychainHelper.retrieve(for: key)
+            return String(decoding: data, as: UTF8.self)
+        } catch KeychainError.itemNotFound {
+            return nil
+        }
     }
 
     func delete(forKey key: String) throws {
-        try keychainHelper.delete(forKey: key)
+        try keychainHelper.delete(for: key)
     }
 }

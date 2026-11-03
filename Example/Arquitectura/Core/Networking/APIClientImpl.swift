@@ -92,12 +92,14 @@ private extension APIClientImpl {
                 throw APIError.decodingError(error)
             }
         } catch let error as URLError {
-            if error.code == .cancelled {
+            if error.code == .cancelled, Task.isCancelled {
                 throw CancellationError()
             }
             throw APIError.networkError(error)
         } catch let error as APIError {
             throw error
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw APIError.unknown(SendableError(error))
         }
