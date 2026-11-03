@@ -112,6 +112,80 @@ struct AppNavigationCoordinatorTests {
         #expect(appRouter.path.isEmpty)
     }
 
+    // MARK: - Deep Link Stack Tests
+
+    @Test("handleDeepLink replaces the current stack instead of pushing on top")
+    func handleDeepLinkReplacesStack() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        appRouter.push(ArchitectureRoute.detail(featureId: "first"))
+        appRouter.push(ArchitectureRoute.detail(featureId: "second"))
+        appRouter.push(ArchitectureRoute.detail(featureId: "third"))
+        let url = try #require(URL(string: "arquitectura://pokemon?id=25"))
+        var expectedPath = NavigationPath()
+        expectedPath.append(PokemonListRoute.list)
+        expectedPath.append(PokemonListRoute.detail(pokemonId: 25))
+
+        coordinator.handleDeepLink(url)
+
+        #expect(appRouter.path == expectedPath)
+    }
+
+    @Test("handleDeepLink keeps the current stack when the URL is invalid")
+    func invalidDeepLinkKeepsStack() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        appRouter.push(ArchitectureRoute.detail(featureId: "current"))
+        let url = try #require(URL(string: "arquitectura://pokemon?id=abc"))
+
+        coordinator.handleDeepLink(url)
+
+        #expect(appRouter.path.count == 1)
+    }
+
+    @Test("restoreNavigationState is ignored after a deep link was handled")
+    func restoreIgnoredAfterDeepLink() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
+        let url = try #require(URL(string: "arquitectura://pokedex"))
+        var expectedPath = NavigationPath()
+        expectedPath.append(PokemonListRoute.list)
+
+        coordinator.handleDeepLink(url)
+        coordinator.restoreNavigationState(from: savedData)
+
+        #expect(appRouter.path == expectedPath)
+    }
+
+    @Test("restoreNavigationState still applies after an ignored deep link")
+    func restoreAppliesAfterIgnoredDeepLink() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
+        let url = try #require(URL(string: "arquitectura://unknown"))
+
+        coordinator.handleDeepLink(url)
+        coordinator.restoreNavigationState(from: savedData)
+
+        #expect(appRouter.path.count == 2)
+    }
+
+    @Test("handleDeepLink after restoration replaces the restored stack")
+    func deepLinkAfterRestoreReplacesStack() throws {
+        let appRouter = AppRouterImpl()
+        let coordinator = AppNavigationCoordinator(appRouter: appRouter)
+        let savedData = try makeSavedPathData(featureIds: ["saved-1", "saved-2"])
+        let url = try #require(URL(string: "arquitectura://feature?id=deep-link"))
+        var expectedPath = NavigationPath()
+        expectedPath.append(ArchitectureRoute.detail(featureId: "deep-link"))
+
+        coordinator.restoreNavigationState(from: savedData)
+        coordinator.handleDeepLink(url)
+
+        #expect(appRouter.path == expectedPath)
+    }
+
     // MARK: - State Persistence Tests
 
     @Test("restoreNavigationState restores from valid data")
@@ -188,5 +262,16 @@ struct AppNavigationCoordinatorTests {
         }
 
         #expect(persistedData != nil)
+    }
+
+    // MARK: - Helpers
+
+    private func makeSavedPathData(featureIds: [String]) throws -> Data {
+        var path = NavigationPath()
+        for featureId in featureIds {
+            path.append(ArchitectureRoute.detail(featureId: featureId))
+        }
+        let codableRepresentation = try #require(path.codable)
+        return try JSONEncoder().encode(codableRepresentation)
     }
 }
