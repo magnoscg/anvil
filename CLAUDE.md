@@ -372,7 +372,7 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 
 ## How to Work
 
-> **MANDATORY**: Before implementing any task, you **MUST use the Read tool** to read the relevant doc from `claude/docs/`. It's not enough to "know" it exists — read it in each session.
+> **MANDATORY**: Before implementing any task, you **MUST use the Read tool** to read the relevant doc from `.claude/docs/`. It's not enough to "know" it exists — read it in each session.
 
 When implementing something:
 
