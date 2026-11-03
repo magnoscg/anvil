@@ -93,7 +93,7 @@ Picking packs on an existing project writes them straight into it:
 | `swift-design-patterns` | 22 design pattern skills + 3 overview skills |
 | `ios-skills` | 7 skills: Swift Charts, Concurrency, SwiftUI Expert, Glass UI, Tech Docs |
 | `gitflow` | Git branching conventions and workflow skill |
-| `github-actions` | CI/CD workflows for Go + Swift |
+| `github-actions` | CI (build and test the first scheme) and release workflows for the iOS project |
 
 Pack installation is collision-safe: Anvil renders and validates the complete
 plan before writing, reports every conflict together, and never overwrites
