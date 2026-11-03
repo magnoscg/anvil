@@ -5,6 +5,7 @@ on:
     branches: [develop, main]
   pull_request:
     branches: [develop, main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -38,8 +39,8 @@ jobs:
           go vet ./...
           go vet -tags integration ./...
 
-      - name: Run Go tests
-        run: make test
+      - name: Run Go tests with the race detector
+        run: go test -race ./...
 
       - name: Run integration tests
         run: make test-integration
@@ -62,18 +63,22 @@ jobs:
 
       # A hardcoded device name silently rots when the runner image moves to a
       # new iPhone generation, so resolve whatever the image actually ships.
+      # Runtimes are compared numerically: as text, iOS-26-10 sorts below iOS-26-5.
       - name: Select an available iPhone simulator
         id: simulator
         run: |
           udid="$(xcrun simctl list devices available --json | jq -r '
             .devices
             | to_entries
-            | map(select(.key | contains("SimRuntime.iOS")))
-            | sort_by(.key)
-            | reverse
-            | .[0].value
-            | map(select(.name | startswith("iPhone")))
-            | .[0].udid
+            | map(select(.key | test("SimRuntime\\.iOS-[0-9]+(-[0-9]+)*$")))
+            | map({
+                version: (.key | capture("iOS-(?<v>[0-9-]+)$").v | split("-") | map(tonumber)),
+                iphones: (.value | map(select(.name | startswith("iPhone"))))
+              })
+            | map(select(.iphones | length > 0))
+            | sort_by(.version)
+            | last
+            | .iphones[0].udid // empty
           ')"
           if [ -z "$udid" ] || [ "$udid" = "null" ]; then
             echo "No available iPhone simulator on this runner" >&2
@@ -114,5 +119,9 @@ jobs:
           go-version-file: "go.mod"
           cache: true
 
+      # Only darwin binaries ship, so analyse darwin code paths. govulncheck is
+      # installed for the host first; GOOS applies to the analysis alone.
       - name: Scan reachable Go code
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          GOOS=darwin "$(go env GOPATH)/bin/govulncheck" ./...

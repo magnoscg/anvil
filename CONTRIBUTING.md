@@ -9,7 +9,8 @@ runs inside other people's projects.
 Development follows Gitflow:
 
 - branch `feature/*` from `develop` and open the pull request back to `develop`;
-- use `release/*` to prepare a semantic `X.Y.Z` release;
+- use `release/*` to prepare a semantic `X.Y.Z` release; the release workflow
+  runs the full CI on the tagged commit and refuses a tag that is not on `main`;
 - reserve `hotfix/*` for urgent fixes branched from `main`;
 - do not force-push shared `main` or `develop` branches.
 
@@ -21,6 +22,8 @@ Run the checks relevant to every change:
 go test ./...
 go test -race ./...
 go vet ./...
+go vet -tags integration ./...
+make test-integration
 go mod verify
 go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 ./scripts/validate-skill-content.sh
