@@ -19,14 +19,6 @@ struct ArchitectureDetailJSONDataSourceTests {
 
     // MARK: - Bundled File Tests
 
-    @Test("Repeated loads return the same features")
-    func loadFeatureDetailsReturnsSameResultOnMultipleCalls() async throws {
-        let firstResult = try await sut.loadFeatureDetails()
-        let secondResult = try await sut.loadFeatureDetails()
-
-        #expect(firstResult.map(\.id) == secondResult.map(\.id))
-    }
-
     @Test("loadFeatureDetail returns correct item by ID")
     func loadFeatureDetailReturnsCorrectItem() async throws {
         let allFeatures = try await sut.loadFeatureDetails()

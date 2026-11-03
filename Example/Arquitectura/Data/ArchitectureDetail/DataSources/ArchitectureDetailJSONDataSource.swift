@@ -20,5 +20,4 @@ protocol ArchitectureDetailJSONDataSource: Sendable {
 
 nonisolated enum DataSourceError: Error {
     case fileNotFound(String)
-    case decodingFailed(String)
 }
