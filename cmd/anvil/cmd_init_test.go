@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/magnoscg/anvil/internal/deps"
+	"github.com/magnoscg/anvil/internal/tui"
 )
 
 func TestWarnMissingAxiomStaysQuietWithoutThePack(t *testing.T) {
@@ -45,5 +46,13 @@ func TestWarnMissingAxiomMentionsInstallCommands(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("warnMissingAxiom() output missing %q, got:\n%s", want, got)
 		}
+	}
+}
+
+func TestFinishInitSucceedsWhenTheWizardEndedWithoutAnError(t *testing.T) {
+	var out bytes.Buffer
+
+	if err := finishInit(&out, tui.NewWizardModel(nil, nil)); err != nil {
+		t.Fatalf("finishInit() = %v, want nil", err)
 	}
 }

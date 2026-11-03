@@ -77,6 +77,16 @@ func (m WizardModel) InstalledPacks() []string {
 	return m.cfg.AIPacks
 }
 
+// Err reports why the wizard could not produce a project or toolset: the
+// generation error, or a failure while preparing its configuration. It returns
+// nil when generation succeeded or the user left before starting it.
+func (m WizardModel) Err() error {
+	if m.generateView.done && m.generateView.err != nil {
+		return m.generateView.err
+	}
+	return m.err
+}
+
 // Update implements tea.Model.
 func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
