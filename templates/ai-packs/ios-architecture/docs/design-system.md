@@ -55,26 +55,42 @@ Color.accentColor  // Uses app's accent color from asset catalog
 
 ### Custom Colors (When Necessary)
 
+The generated tokens use semantic system colors where possible and `Color.adaptive(light:dark:)` (from `Core/Common/Extensions/ColorHex.swift`) for brand colors, so every custom color has a Dark Mode variant:
+
 ```swift
 // Core/DesignSystem/Tokens/AppColors.swift
 import SwiftUI
 
+// MARK: - AppColors
+
 enum AppColors {
-    static let brand = Color("BrandColor")
+    // MARK: - Brand / Accent
 
-    static let primaryBackground = Color(.systemBackground)
-    static let secondaryBackground = Color(.secondarySystemBackground)
-    static let groupedBackground = Color(.systemGroupedBackground)
+    static let secondary = Color.adaptive(light: "5856D6", dark: "5E5CE6")
+    static let accent = Color.adaptive(light: "FF9500", dark: "FF9F0A")
+    static let primary = Color(.systemBlue)
 
-    static let primaryText = Color(.label)
-    static let secondaryText = Color(.secondaryLabel)
+    // MARK: - Status
 
-    static let success = Color(.systemGreen)
-    static let warning = Color(.systemOrange)
+    static let success = Color.adaptive(light: "34C759", dark: "30D158")
+    static let warning = Color.adaptive(light: "FFCC00", dark: "FFD60A")
     static let error = Color(.systemRed)
-    static let info = Color(.systemBlue)
+
+    // MARK: - Surfaces
+
+    static let background = Color(.systemBackground)
+    static let surface = Color(.secondarySystemBackground)
+    static let cardBackground = Color(.secondarySystemBackground)
+
+    // MARK: - Text
+
+    static let text = Color(.label)
+    static let textSecondary = Color(.secondaryLabel)
+    static let textTertiary = Color(.tertiaryLabel)
 }
 ```
+
+The generated file also defines `cardBorder`, `divider` and `shadowColor`.
 
 ### Dark Mode Rules
 
@@ -112,21 +128,49 @@ enum AppColors {
 
 ### Typography Tokens
 
+`AppTypography` is an enum of semantic text styles; each case maps to a Dynamic Type `Font` through `.font` (no fixed sizes):
+
 ```swift
 // Core/DesignSystem/Tokens/AppTypography.swift
 import SwiftUI
 
+// MARK: - AppTypography
+
 enum AppTypography {
-    static let screenTitle = Font.largeTitle.weight(.bold)
-    static let sectionTitle = Font.title2.weight(.semibold)
-    static let cardTitle = Font.headline
+    case largeTitle
+    case title1
+    case title2
+    case title3
+    case headline
+    case body
+    case callout
+    case subheadline
+    case footnote
+    case caption1
+    case caption2
 
-    static let bodyRegular = Font.body
-    static let bodyEmphasized = Font.body.weight(.medium)
+    // MARK: - Font
 
-    static let caption = Font.caption
-    static let footnote = Font.footnote
+    var font: Font {
+        switch self {
+        case .largeTitle: .largeTitle
+        case .title1: .title
+        case .title2: .title2
+        case .title3: .title3
+        case .headline: .headline
+        case .body: .body
+        case .callout: .callout
+        case .subheadline: .subheadline
+        case .footnote: .footnote
+        case .caption1: .caption
+        case .caption2: .caption2
+        }
+    }
 }
+
+// Usage
+Text(error.title)
+    .font(AppTypography.title2.font)
 ```
 
 ### Dynamic Type Support
@@ -225,35 +269,21 @@ HStack {
 // Core/DesignSystem/Tokens/Spacing.swift
 import SwiftUI
 
+// MARK: - Spacing
+
 enum Spacing {
-    /// 4pt
-    static let xxxs: CGFloat = 4
-
-    /// 8pt
-    static let xxs: CGFloat = 8
-
-    /// 12pt
-    static let xs: CGFloat = 12
-
-    /// 16pt - Default spacing
-    static let sm: CGFloat = 16
-
-    /// 20pt
-    static let md: CGFloat = 20
-
-    /// 24pt
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 16
     static let lg: CGFloat = 24
-
-    /// 32pt
     static let xl: CGFloat = 32
+    static let xxl: CGFloat = 48
 
-    /// 40pt
-    static let xxl: CGFloat = 40
-
-    /// 48pt
-    static let xxxl: CGFloat = 48
+    static let zero: CGFloat = 0
 }
 ```
+
+`Spacing.md` (16pt) is the default padding used by the generated screens.
 
 ### Usage
 
@@ -272,9 +302,13 @@ VStack(spacing: Spacing.sm) {
 ### Buttons
 
 ```swift
-// Primary action
+// Primary action (system style)
 Button("Save") { }
     .buttonStyle(.borderedProminent)
+
+// Primary action (generated design-system modifier, Core/Common/SwiftUI/Modifiers/PrimaryButtonStyle.swift)
+Button("Save") { }
+    .primaryButtonStyle()
 
 // Secondary action
 Button("Cancel") { }

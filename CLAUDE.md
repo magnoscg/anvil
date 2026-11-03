@@ -126,7 +126,8 @@ mcp__sosumi__fetchAppleDocumentation(path: "/documentation/swiftui/state")
 ### Layers (Clean Architecture-inspired)
 
 - **App** (`App/`) — composition root and app-lifetime concerns:
-  - `ArquitecturaApp.swift` — `@main`; creates `AppDependencies` and `AppRouterImpl`, switches on `AppLaunchState` (`splash` / `ready`)
+  - `ArquitecturaApp.swift` — `@main`; creates `AppDependencies` and the app-wide `AppLaunchState` (`splash` / `ready`)
+  - `Application/AppRootView.swift` — one per window: owns that window's `AppRouterImpl` and `AppNavigationCoordinator`, shows the splash or `RootNavigationView`, and installs `.onOpenURL`
   - `Application/` — app-level screens (`SplashScreen/`)
   - `Config/` — `AppDependencies`, `AppEnvironment`, `EnvironmentConfiguration`, `Xcconfig/`
   - `Navigation/` — `AppRouter`, `AppRouterImpl`, `RootNavigationView`, `AppNavigationCoordinator`
@@ -228,8 +229,8 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 - Use structured concurrency for parallel work: `withThrowingTaskGroup` (see `PokemonListRepositoryImpl`) or `async let` (see `PokemonDetailRepositoryImpl`).
 - With approachable concurrency, a plain `nonisolated async` function runs on the caller's actor. Work that must leave the main actor (heavy decoding, disk I/O) has to be marked `@concurrent` explicitly.
 - Propagate cancellation:
-  - `APIClientImpl` turns `URLError.cancelled` into `CancellationError`.
-  - `DomainError.catching` rethrows `CancellationError` unchanged; repositories that catch errors themselves (e.g., optional sub-requests) rethrow it first.
+  - `APIClientImpl` turns `URLError.cancelled` into `CancellationError` only when `Task.isCancelled` (a rejected pinning challenge also reports `.cancelled` and must stay an error), and rethrows the `CancellationError` of the retry backoff unchanged.
+  - `DomainError.catching` runs in the caller's isolation (`#isolation`). It rethrows `CancellationError`, treats any failure that arrives after the task was cancelled as cancellation, and maps everything else to `DomainError`. Repositories that catch errors themselves (e.g., optional sub-requests) rethrow `CancellationError` first.
   - ViewModels restore the previous state on cancellation instead of showing an error.
 
 ### Errors
@@ -261,13 +262,18 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 
 ### Router (Type-erased Pattern)
 
-- `AppRouter` protocol in `App/Navigation/AppRouter.swift`, implementation in `AppRouterImpl.swift` (`@MainActor @Observable`, owns a single `NavigationPath`).
+- `AppRouter` protocol in `App/Navigation/AppRouter.swift`, implementation in `AppRouterImpl.swift` (`@MainActor @Observable`, owns the window's `NavigationPath`).
+- The protocol only offers `push`, `pop` and `popToRoot`: features never read or replace the whole path. `path` lives on `AppRouterImpl` and only the App layer uses it (`RootNavigationView` binds it, `AppNavigationCoordinator` restores and persists it).
+- Navigation is **per window**: `AppRootView` creates one `AppRouterImpl` + `AppNavigationCoordinator` per window, so iPad windows navigate and restore independently.
 - `AppRouter.push(_ route: some Hashable & Codable)` accepts **any** route type — it does NOT know about specific feature routes.
 - Each feature always has `Features/<Feature>/Navigation/<Feature>Router.swift`:
   - Route enum (`Hashable, Codable`) + `@MainActor` protocol + `struct ...RouterImpl` that delegates to `AppRouter`, in one file
 - Add `Features/<Feature>/Navigation/<Feature>RouteResolver.swift` only when the feature owns subroutes that must be resolved into views from the app root or a `NavigationStack`. It is a `ViewModifier` plus a `View.with<Feature>Routes(...)` extension.
 - Features register their resolver in `App/Navigation/RootNavigationView.swift`, only when that resolver exists: `.withArchitectureRoutes(appRouter:)`, `.withPokemonListRoutes(appRouter:dependencies:)`.
-- Deep links (`arquitectura://`) are parsed in `App/Navigation/AppNavigationCoordinator.swift`. It also persists the path to `@SceneStorage` with a debounce. A new deep-linkable route is added there.
+- Deep links (`arquitectura://`) are parsed in `App/Navigation/AppNavigationCoordinator.swift`; a new deep-linkable route is added there.
+  - A valid link builds a `NavigationPath` and **replaces** the stack (never pushes on top).
+  - Links received before `restoreNavigationState(from:)` runs (the URL that launched the app) are held and applied right after restoring, so the result does not depend on whether `.onOpenURL` or the restoration `.task` runs first. Restoration runs once per window.
+  - The coordinator also saves the path to `@SceneStorage` with a debounce; a failed encode writes nothing, keeping the last good state.
 - ViewModels depend only on their `FeatureRouter` protocol, NOT on AppRouter directly.
 - If a feature only forwards to an already registered route, keep that logic inside `<Feature>Router.swift` and skip a resolver file.
 - **Factory + @State pattern**: when a RouteResolver exists, it calls the Factory inside `navigationDestination`, and the View stores the ViewModel with `@State` (`State(initialValue:)` in `init`).
@@ -284,7 +290,8 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 - **Don't put Repository protocols in Data** — they belong to `Domain/<Feature>/Repositories/`; Data holds only the Impl.
 - **Don't reference `APIError` (or any infrastructure type) from Domain** — repositories translate errors with `DomainError.catching`.
 - **Don't use boolean app state** (`isLoggedIn`, `hasOnboarded`) — use enum state machine (e.g., `AppLaunchState`).
-- **Don't put business logic in `@main`** — it only composes `AppDependencies`, `AppRouterImpl` and the root view. If app-level state grows beyond `AppLaunchState`, extract it to an `@Observable` type in `App/`.
+- **Don't put business logic in `@main`** — it only composes `AppDependencies`, the app-wide `AppLaunchState` and `AppRootView`. If app-level state grows beyond `AppLaunchState`, extract it to an `@Observable` type in `App/`.
+- **Don't share one `AppRouterImpl` across windows** — each `AppRootView` owns its own.
 - **Don't do I/O or decoding in initializers reached from a Factory** — load lazily inside an `async` / `throws` method.
 
 ### SwiftUI & State

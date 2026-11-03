@@ -4,92 +4,108 @@
 
 ## Complete Structure
 
+Sources live in `[Project]/` (one app target); tests live in `[Project]Tests/`. Layers are folders, not modules.
+
 ```text
-MyApp/
+[Project]/
 +- App/
-|  +- Application/                    # AppDelegate, SceneDelegate, @main
-|  +- Navigation/                     # Generic AppRouter (protocol + impl)
-|  |  +- AppRouter.swift              # Protocol only
-|  |  +- AppRouterImpl.swift          # Implementation
-|  +- Config/                         # Configuration, feature flags
+|  +- Application/
+|  |  +- AppMain.swift                # @main: creates AppDependencies, AppRouterImpl (+ SwiftDataStack)
+|  +- Config/
+|  |  +- AppDependencies.swift        # App-lifetime dependencies (APIClient, SwiftDataStack)
+|  |  +- AppEnvironment.swift
+|  |  +- EnvironmentConfiguration.swift
+|  |  +- Xcconfig/                    # Base.xcconfig + one xcconfig per scheme
+|  +- Navigation/
+|  |  +- AppRouter.swift              # @MainActor protocol: push / pop / popToRoot
+|  |  +- AppRouterImpl.swift          # Owns the NavigationPath (`path`)
+|  |  +- AppNavigationCoordinator.swift # Deep links, state restoration, debounced save
+|  |  +- RootNavigationView.swift     # NavigationStack, .onOpenURL, @SceneStorage, resolvers
+|  +- DI/
+|     +- PersistenceAssembly.swift    # Only when SwiftData is enabled
 |
 +- Core/
-|  +- DesignSystem/                   # Reusable UI (Buttons, Tokens)
-|  +- Networking/                     # APIClient shared
-|  +- Persistence/                    # SwiftDataStack shared
-|  +- Common/                         # Extensions, Formatters
+|  +- Common/
+|  |  +- Extensions/
+|  |  +- Models/ErrorDecorator.swift  # Shared presentation error model
+|  |  +- SwiftUI/
+|  |     +- Builders/                 # @ViewBuilder helpers
+|  |     +- Components/               # Shared views (ErrorView, LoadingStateView)
+|  |     +- Modifiers/                # All custom ViewModifiers
+|  +- DesignSystem/Tokens/            # AppColors, AppTypography, Spacing, AppIcons, IconSize
+|  +- Networking/                     # APIClient + Impl, Endpoint, APIEndpoint, APIError, interceptors
+|  +- Persistence/                    # Only when SwiftData is enabled
+|  |  +- SwiftDataStack.swift
+|  |  +- ModelContainerShared.swift   # ModelContainer.shared / .preview
+|  +- Security/KeychainHelper.swift
 |
-+- Domain/                            # GLOBAL DOMAIN LAYER
++- Domain/                            # GLOBAL, organized by domain concept
+|  +- Common/DomainError.swift
 |  +- <Feature>/                      # Example: Article
-|     +- Models/                      # Domain models
+|     +- Models/
 |     |  +- <Feature>Model.swift      # e.g., ArticleModel.swift
-|     +- UseCases/                    # Business logic
-|        +- <Feature>UseCase.swift    # Protocol
-|        +- <Feature>UseCaseImpl.swift # Implementation
+|     +- UseCases/
+|     |  +- <Feature>UseCase.swift    # Protocol
+|     |  +- <Feature>UseCaseImpl.swift # Implementation
+|     +- Repositories/
+|        +- <Feature>Repository.swift # Protocol (owned by Domain)
 |
-+- Data/                              # GLOBAL DATA LAYER
++- Data/                              # GLOBAL, mirrors Domain
+|  +- Common/DomainErrorMapping.swift # DomainError.map + DomainError.catching
 |  +- <Feature>/                      # Example: Article
-|     +- Repositories/                # Protocol + Implementation together
-|     |  +- <Feature>Repository.swift # Protocol
-|     |  +- <Feature>RepositoryImpl.swift
-|     +- DataSources/                 # Remote and Local sources
+|     +- Repositories/
+|     |  +- <Feature>RepositoryImpl.swift  # Impl only
+|     +- DataSources/                 # Protocol + Impl in one file
 |     |  +- <Feature>RemoteDataSource.swift
-|     |  +- <Feature>RemoteDataSourceImpl.swift
-|     |  +- <Feature>LocalDataSource.swift
-|     |  +- <Feature>LocalDataSourceImpl.swift
-|     +- DTO/                         # Data Transfer Objects
+|     |  +- <Feature>LocalDataSource.swift     # Optional (UserDefaults)
+|     |  +- <Feature>KeychainDataSource.swift  # Optional
+|     +- DTO/
 |     |  +- <Feature>DTO.swift
-|     +- Mappers/                     # DTO <-> Model transformations
-|        +- <Feature>DTOMapper.swift  # Protocol
-|        +- <Feature>DTOMapperImpl.swift
+|     +- Mappers/
+|        +- <Feature>DTOMapper.swift  # Protocol + Impl in one file
 |
-+- Features/                          # PRESENTATION LAYER ONLY
++- Features/                          # PRESENTATION ONLY, one folder per screen
 |  +- <Feature>/                      # Example: Article
-|     +- DI/                          # Dependency Injection / Factory
+|     +- DI/
 |     |  +- <Feature>Factory.swift
-|     |
-|     +- UI/                          # UI (SwiftUI Views ONLY)
+|     +- UI/
 |     |  +- <Feature>View.swift       # Main view
 |     |  +- <Feature>State.swift      # State enum only
-|     |  +- <Feature>Decorator.swift  # UI decorators (section, item, error)
-|     |  +- Components/               # Feature-specific subviews
-|     |     +- <Feature>FeatureRow.swift
-|     |     +- <Feature>DetailView.swift
-|     |
-|     +- Presentation/                # PRESENTATION LOGIC
+|     |  +- <Feature>Decorator.swift  # UI decorators
+|     |  +- <Feature>AccessibilityID.swift # Optional (UI tests)
+|     |  +- Components/               # Feature-specific subviews (add when needed)
+|     +- Presentation/
 |     |  +- ViewModels/
 |     |  |  +- <Feature>ViewModel.swift
-|     |  +- Mappers/                  # Domain -> UI decorator mapping
-|     |     +- <Feature>DecoratorMapper.swift  # Protocol
-|     |     +- <Feature>DecoratorMapperImpl.swift
-|     |
-|     +- Navigation/                  # NAVIGATION (2 files only)
+|     |  +- Mappers/
+|     |     +- <Feature>DecoratorMapper.swift  # Protocol + Impl in one file
+|     +- Navigation/
 |        +- <Feature>Router.swift     # Route enum + Protocol + Impl
-|        +- <Feature>RouteResolver.swift
+|        +- <Feature>RouteResolver.swift # Optional
 |
-+- Resources/                         # Assets, Strings
-|
-+- [Project]Tests/
-   +- Domain/                         # Domain layer tests
-   |  +- <Feature>/
-   |     +- UseCases/
-   |        +- <Feature>UseCaseTests.swift
-   +- Data/                           # Data layer tests
-   |  +- <Feature>/
-   |     +- Repositories/
-   |        +- <Feature>RepositoryTests.swift
-   +- Features/                       # Presentation tests
-   |  +- <Feature>/
-   |     +- Presentation/
-   |        +- ViewModels/
-   |        |  +- <Feature>ViewModelTests.swift
-   |        +- Mappers/
-   |           +- <Feature>DecoratorMapperTests.swift
-   +- Mocks/                          # Shared mocks
-      +- Mock<Feature>UseCase.swift
-      +- Mock<Feature>Repository.swift
-      +- Mock<Feature>Router.swift
++- Resources/                         # Assets.xcassets, Strings/Localizable.xcstrings
++- Info.plist
+
+[Project]Tests/
++- Domain/<Feature>/UseCases/<Feature>UseCaseTests.swift
++- Data/<Feature>/
+|  +- Repositories/<Feature>RepositoryTests.swift
+|  +- Mappers/<Feature>DTOMapperTests.swift
++- Features/<Feature>/Presentation/
+|  +- ViewModels/<Feature>ViewModelTests.swift
+|  +- Mappers/<Feature>DecoratorMapperTests.swift
++- Mocks/                             # Shared mocks: <Feature><Type>Mock.swift
+|  +- <Feature>UseCaseMock.swift
+|  +- <Feature>RepositoryMock.swift
+|  +- <Feature>RouterMock.swift
+|  +- <Feature>RemoteDataSourceMock.swift
+|  +- <Feature>DTOMapperMock.swift
+|  +- <Feature>DecoratorMapperMock.swift
++- DataStubs/<Feature>/               # Optional (UI tests)
++- UITests/                           # Optional (UI tests): Screens/, Support/Screens/
 ```
+
+> `Domain/` and `Data/` are organized by **concept**. `anvil feature` starts with one folder per feature; merge them (for example `Domain/Article/`) when several screens share a concept. `Features/` stays one folder per screen.
 
 ## Quick Guide: Where Does Each Thing Go?
 
@@ -97,17 +113,20 @@ MyApp/
 
 | Folder | Content | Example |
 | --- | --- | --- |
+| **Domain/Common/** | `DomainError` (shared by every feature) | `DomainError.swift` |
 | **Domain/\<Feature\>/Models/** | Domain models (Sendable) | `ArticleModel.swift` |
-| **Domain/\<Feature\>/UseCases/** | Protocol + Implementation | `ArticleUseCase.swift`, `ArticleUseCaseImpl.swift` |
+| **Domain/\<Feature\>/UseCases/** | Protocol + Implementation (separate files) | `ArticleUseCase.swift`, `ArticleUseCaseImpl.swift` |
+| **Domain/\<Feature\>/Repositories/** | Repository protocol | `ArticleRepository.swift` |
 
 ### Data Layer (Global)
 
 | Folder | Content | Example |
 | --- | --- | --- |
-| **Data/\<Feature\>/Repositories/** | Protocol + Implementation | `ArticleRepository.swift`, `ArticleRepositoryImpl.swift` |
-| **Data/\<Feature\>/DataSources/** | Remote (API) and/or Local (Database) | `ArticleRemoteDataSource.swift` (API), `ArticleLocalDataSource.swift` (DB) |
+| **Data/Common/** | `DomainError.map` / `DomainError.catching` | `DomainErrorMapping.swift` |
+| **Data/\<Feature\>/Repositories/** | Repository Impl only (conforms to the Domain protocol) | `ArticleRepositoryImpl.swift` |
+| **Data/\<Feature\>/DataSources/** | Remote (API), optional Local (UserDefaults) / Keychain; protocol + Impl in one file | `ArticleRemoteDataSource.swift`, `ArticleLocalDataSource.swift` |
 | **Data/\<Feature\>/DTO/** | Data Transfer Objects (only if API) | `ArticleDTO.swift` |
-| **Data/\<Feature\>/Mappers/** | DTO -> Model mappers (only if API) | `ArticleDTOMapper.swift`, `ArticleDTOMapperImpl.swift` |
+| **Data/\<Feature\>/Mappers/** | DTO -> Model mappers; protocol + Impl in one file | `ArticleDTOMapper.swift` |
 
 ### Features (Presentation Only)
 
@@ -115,28 +134,27 @@ MyApp/
 | --- | --- | --- |
 | **DI/** | Factory / Assembly. Returns `some View`. | `ArticleFactory.swift` |
 | **UI/** | SwiftUI Views, State enum, Decorators. | `ArticleView.swift`, `ArticleState.swift`, `ArticleDecorator.swift` |
-| **UI/Components/** | Feature-specific subviews. | `ArticleFeatureRow.swift`, `ArticleDetailView.swift` |
-| **Presentation/ViewModels/** | `@Observable` classes. | `ArticleViewModel.swift` |
-| **Presentation/Mappers/** | Domain -> Decorator mappers. | `ArticleDecoratorMapper.swift`, `ArticleDecoratorMapperImpl.swift` |
-| **Navigation/** | Route enum (inside Router) + RouteResolver. | `ArticleRouter.swift`, `ArticleRouteResolver.swift` |
+| **UI/Components/** | Feature-specific subviews. | `ArticleRow.swift`, `ArticleDetailView.swift` |
+| **Presentation/ViewModels/** | `@MainActor @Observable` classes. | `ArticleViewModel.swift` |
+| **Presentation/Mappers/** | Domain -> Decorator mappers; protocol + Impl in one file. | `ArticleDecoratorMapper.swift` |
+| **Navigation/** | Route enum (inside Router) + optional RouteResolver. | `ArticleRouter.swift`, `ArticleRouteResolver.swift` |
 
-### Navigation Structure (2 Files Pattern)
-
-Each feature defines 2 navigation files:
+### Navigation Structure
 
 | File | Purpose | Example |
 | --- | --- | --- |
-| `<Feature>Router.swift` | Route enum + Protocol + Implementation | `ArticleRouter.swift` |
-| `<Feature>RouteResolver.swift` | ViewModifier resolving routes to views | `ArticleRouteResolver.swift` |
+| `<Feature>Router.swift` | **Always**. Route enum + `@MainActor` protocol + `struct` Impl | `ArticleRouter.swift` |
+| `<Feature>RouteResolver.swift` | **Optional**. `ViewModifier` + `View.with<Feature>Routes(appRouter:dependencies:)` | `ArticleRouteResolver.swift` |
 
-**Note**: The Route enum lives inside the Router file, not in a separate file.
+**Note**: The Route enum lives inside the Router file, not in a separate file. Add a resolver only when the feature owns destinations, and register it in `App/Navigation/RootNavigationView.swift`.
 
 ### Tests Structure
 
 | Folder | What to test |
 | --- | --- |
 | `[Project]Tests/Domain/<Feature>/UseCases/` | UseCase tests with mocked repositories |
-| `[Project]Tests/Data/<Feature>/Repositories/` | Repository tests with mocked data sources |
+| `[Project]Tests/Data/<Feature>/Repositories/` | Repository tests with mocked data sources and mappers (incl. error mapping) |
+| `[Project]Tests/Data/<Feature>/Mappers/` | DTOMapper tests |
 | `[Project]Tests/Features/<Feature>/Presentation/ViewModels/` | ViewModel tests with mocked use cases |
 | `[Project]Tests/Features/<Feature>/Presentation/Mappers/` | DecoratorMapper tests |
 | `[Project]Tests/Mocks/` | Shared mocks |
@@ -146,13 +164,13 @@ Each feature defines 2 navigation files:
 ### Domain Layer
 - **NO** imports of SwiftUI, SwiftData, URLSession
 - **ONLY** pure Swift, Foundation for basic types
-- Contains: Models, UseCases (protocol + impl)
-- **Does NOT contain**: Repository protocols (moved to Data)
+- Contains: Models, UseCases (protocol + impl), Repository **protocols**, `DomainError`
+- **Does NOT reference**: `APIError`, DTOs or any other infrastructure type
 
 ### Data Layer
 - **CAN** import: Foundation, SwiftData (for persistence), networking
 - **CANNOT** import: SwiftUI
-- Contains: Repository protocols + implementations, DataSources, DTOs, Mappers
+- Contains: Repository **implementations**, DataSources, DTOs, DTOMappers, `DomainErrorMapping`
 
 ### Features (Presentation)
 - **CAN** import: SwiftUI, Domain layer protocols
@@ -161,32 +179,33 @@ Each feature defines 2 navigation files:
 
 ## File Naming Conventions
 
-**IMPORTANT**: All files related to a feature must start with the feature name.
+**IMPORTANT**: All files related to a feature must start with the feature name. UseCase and Repository protocols and their `Impl` go in **separate files**; DataSources, DTOMappers, DecoratorMappers and the Router keep protocol and `Impl` in **one file**.
 
 | Type | Pattern | Example |
 | --- | --- | --- |
 | Domain Model | `<Feature>Model.swift` | `ArticleModel.swift` |
 | UseCase Protocol | `<Feature>UseCase.swift` | `ArticleUseCase.swift` |
 | UseCase Impl | `<Feature>UseCaseImpl.swift` | `ArticleUseCaseImpl.swift` |
-| Repository Protocol | `<Feature>Repository.swift` | `ArticleRepository.swift` |
-| Repository Impl | `<Feature>RepositoryImpl.swift` | `ArticleRepositoryImpl.swift` |
-| Remote DataSource | `<Feature>RemoteDataSource.swift` | `ArticleRemoteDataSource.swift` |
-| Remote DataSource Impl | `<Feature>RemoteDataSourceImpl.swift` | `ArticleRemoteDataSourceImpl.swift` |
-| Local DataSource | `<Feature>LocalDataSource.swift` | `ArticleLocalDataSource.swift` |
+| Repository Protocol (Domain) | `<Feature>Repository.swift` | `ArticleRepository.swift` |
+| Repository Impl (Data) | `<Feature>RepositoryImpl.swift` | `ArticleRepositoryImpl.swift` |
+| Remote DataSource (protocol + Impl) | `<Feature>RemoteDataSource.swift` | `ArticleRemoteDataSource.swift` |
+| Local DataSource (protocol + Impl) | `<Feature>LocalDataSource.swift` | `ArticleLocalDataSource.swift` |
+| Keychain DataSource (protocol + Impl) | `<Feature>KeychainDataSource.swift` | `ArticleKeychainDataSource.swift` |
 | DTO | `<Feature>DTO.swift` | `ArticleDTO.swift` |
-| DTO Mapper | `<Feature>DTOMapper.swift` | `ArticleDTOMapper.swift` |
+| DTOMapper (protocol + Impl) | `<Feature>DTOMapper.swift` | `ArticleDTOMapper.swift` |
 | View | `<Feature>View.swift` | `ArticleView.swift` |
 | State | `<Feature>State.swift` | `ArticleState.swift` |
 | Decorator | `<Feature>Decorator.swift` | `ArticleDecorator.swift` |
 | ViewModel | `<Feature>ViewModel.swift` | `ArticleViewModel.swift` |
-| DecoratorMapper | `<Feature>DecoratorMapper.swift` | `ArticleDecoratorMapper.swift` |
+| DecoratorMapper (protocol + Impl) | `<Feature>DecoratorMapper.swift` | `ArticleDecoratorMapper.swift` |
 | Factory | `<Feature>Factory.swift` | `ArticleFactory.swift` |
 | Router | `<Feature>Router.swift` | `ArticleRouter.swift` |
-| RouteResolver | `<Feature>RouteResolver.swift` | `ArticleRouteResolver.swift` |
+| RouteResolver (optional) | `<Feature>RouteResolver.swift` | `ArticleRouteResolver.swift` |
+| Accessibility IDs (optional) | `<Feature>AccessibilityID.swift` | `ArticleAccessibilityID.swift` |
 
 ### Tests & Mocks
 
 | Type | Pattern | Example |
 | --- | --- | --- |
 | Test File | `<ComponentName>Tests.swift` | `ArticleUseCaseTests.swift` |
-| Mock | `Mock<ProtocolName>.swift` | `MockArticleRepository.swift` |
+| Mock | `[Project]Tests/Mocks/<Feature><Type>Mock.swift` | `ArticleRepositoryMock.swift` |

@@ -137,9 +137,9 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 {{ if or .IncludeSwiftData .IsToolsMode }}- **SwiftData**{{ if .IsToolsMode }} (when enabled){{ end }}: repositories never use the main `ModelContext`. Each one receives its own `ModelExecutor` from `dependencies.swiftDataStack.makeBackgroundExecutor()` (a `DefaultSerialModelExecutor` over a fresh `ModelContext`), created in its Factory. Never share executors between repositories.
 - `SwiftDataStack` lives in `Core/Persistence/SwiftDataStack.swift`. It is created in `@main`, attached with `.modelContainer(...)` and passed into `AppDependencies`. `ModelContainer.shared` / `.preview` are in `Core/Persistence/ModelContainerShared.swift`, and `App/DI/PersistenceAssembly.swift` builds stacks for previews and tests.
 {{ end }}- Propagate cancellation:
-  - `DomainError.catching` rethrows `CancellationError` unchanged; repositories that catch errors themselves rethrow it first.
+  - `DomainError.catching` runs in the caller's isolation (`#isolation`). It rethrows `CancellationError`, treats any failure that arrives after the task was cancelled as cancellation, and maps everything else to `DomainError`. Repositories that catch errors themselves rethrow `CancellationError` first.
   - ViewModels restore the previous state on cancellation instead of showing an error.
-  - A cancelled `URLSession` request surfaces as `URLError.cancelled`. Treat it as cancellation, not as a network error.
+  - `APIClientImpl` turns `URLError.cancelled` into `CancellationError` only when `Task.isCancelled`; any other `.cancelled` (e.g., a rejected pinning challenge) stays `APIError.networkError`.
 
 ### Errors
 
@@ -171,12 +171,16 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 ### Router (Type-erased Pattern)
 
 - `AppRouter` protocol in `App/Navigation/AppRouter.swift`, implementation in `AppRouterImpl.swift` (`@MainActor @Observable`, owns a single `NavigationPath`).
+- The protocol only offers `push`, `pop` and `popToRoot`: features never read or replace the whole path. `path` lives on `AppRouterImpl` and only the App layer uses it (`RootNavigationView` binds it, `AppNavigationCoordinator` restores and persists it).
 - `AppRouter.push(_ route: some Hashable & Codable)` accepts **any** route type — it does NOT know about specific feature routes.
 - Each feature always has `Features/<Feature>/Navigation/<Feature>Router.swift`:
   - Route enum (`Hashable, Codable`) + `@MainActor` protocol + `struct ...RouterImpl` that delegates to `AppRouter`, in one file
 - Add `Features/<Feature>/Navigation/<Feature>RouteResolver.swift` only when the feature owns subroutes that must be resolved into views from the app root or a `NavigationStack`. It is a `ViewModifier` plus a `View.with<Feature>Routes(appRouter:dependencies:)` extension.
-- Features register their resolver in `App/Navigation/RootNavigationView.swift`, only when that resolver exists.
-- Deep links are parsed in `App/Navigation/AppNavigationCoordinator.swift`. It also persists the path to `@SceneStorage` with a debounce. A new deep-linkable route is added there.
+- Features register their resolver in `App/Navigation/RootNavigationView.swift` with `.with<Feature>Routes(appRouter:dependencies:)`, only when that resolver exists.
+- Deep links are parsed in `App/Navigation/AppNavigationCoordinator.swift` (`navigate(to:)`); a new deep-linkable route is added there.
+  - A link builds a `NavigationPath` and assigns it to `appRouter.path`, **replacing** the stack.
+  - Links received before `restoreNavigationState(from:)` runs are held and applied right after restoring, so a launch URL is never overwritten by the saved state. Restoration runs once.
+  - The coordinator also saves the path to `@SceneStorage` with a debounce; a failed encode writes nothing.
 - ViewModels depend only on their `FeatureRouter` protocol, NOT on AppRouter directly.
 - If a feature only forwards to an already registered route, keep that logic inside `<Feature>Router.swift` and skip a resolver file.
 - **Factory + @State pattern**: when a RouteResolver exists, it calls the Factory inside `navigationDestination`, and the View stores the ViewModel with `@State` (`State(initialValue:)` in `init`).

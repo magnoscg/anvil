@@ -11,12 +11,15 @@
 |----------|-----------|----------------|
 | High | UseCase | Success / error / edge cases / business logic |
 | High | ViewModel | State transitions (loading -> loaded, loading -> error) |
-| High | Error Mappers | APIError -> DomainError correctly |
+| High | Error Mapping | `APIError` -> `DomainError` (`DomainError.map` / repository tests) |
 | Medium | Repository | Data and error mapping |
+| Medium | DTOMapper | DTO -> Model mapping |
 | Medium | DecoratorMapper | Model -> Decorator mapping |
 | Low | Router | Emits correct routes |
 
 ## File Structure
+
+`anvil feature` generates the Domain, Data, Features and Mocks files below for every feature. The test target builds with the same `SWIFT_STRICT_CONCURRENCY = complete` and no default actor isolation as the app.
 
 ```
 [Project]Tests/
@@ -27,7 +30,9 @@
 +- Data/
 |  +- <Feature>/
 |     +- Repositories/
-|        +- <Feature>RepositoryTests.swift
+|     |  +- <Feature>RepositoryTests.swift
+|     +- Mappers/
+|        +- <Feature>DTOMapperTests.swift
 +- Features/
 |  +- <Feature>/
 |     +- Presentation/
@@ -35,13 +40,16 @@
 |        |  +- <Feature>ViewModelTests.swift
 |        +- Mappers/
 |           +- <Feature>DecoratorMapperTests.swift
-+- Core/
++- Core/                                  # Add by hand when needed
 |  +- Networking/
 |     +- APIClientTests.swift
 +- Mocks/
-   +- Mock<Feature>UseCase.swift
-   +- Mock<Feature>Repository.swift
-   +- Mock<Feature>Router.swift
+   +- <Feature>UseCaseMock.swift
+   +- <Feature>RepositoryMock.swift
+   +- <Feature>RouterMock.swift
+   +- <Feature>RemoteDataSourceMock.swift
+   +- <Feature>DTOMapperMock.swift
+   +- <Feature>DecoratorMapperMock.swift
 ```
 
 ## Naming & Structure
@@ -81,19 +89,20 @@ struct ArticleViewModelTests {
 
     // MARK: - Properties
 
-    private var useCaseMock: MockArticleUseCase
-    private var routerMock: MockArticleRouter
+    private var useCaseMock: ArticleUseCaseMock
+    private var decoratorMapperMock: ArticleDecoratorMapperMock
+    private var routerMock: ArticleRouterMock
     private var sut: ArticleViewModel
 
     // MARK: - Setup
 
-    init() async {
-        useCaseMock = MockArticleUseCase()
-        routerMock = MockArticleRouter()
-        sut = ArticleViewModel(
-            useCase: useCaseMock,
-            router: routerMock
-        )
+    init() {
+        useCaseMock = ArticleUseCaseMock()
+        decoratorMapperMock = ArticleDecoratorMapperMock()
+        routerMock = ArticleRouterMock()
+        sut = ArticleViewModel(useCase: useCaseMock,
+                               decoratorMapper: decoratorMapperMock,
+                               router: routerMock)
     }
 
     // MARK: - Success
@@ -102,7 +111,7 @@ struct ArticleViewModelTests {
     func testGivenSuccessWhenLoadThenStateIsLoaded() async {
         // Given
         let models = [ArticleModel.stub(id: "123", title: "Test Article")]
-        await useCaseMock.setExecuteResult(.success(models))
+        useCaseMock.executeResult = .success(models)
 
         // When
         await sut.loadArticles()
@@ -113,14 +122,15 @@ struct ArticleViewModelTests {
             return
         }
         #expect(sections.count >= 1)
+        #expect(useCaseMock.executeCallCount == 1)
     }
 
     // MARK: - Error
 
-    @Test("Given error, when loadArticles, then state is error")
+    @Test("Given DomainError.network, when loadArticles, then state is the network error")
     func testGivenErrorWhenLoadThenError() async {
         // Given
-        await useCaseMock.setExecuteResult(.failure(NSError(domain: "test", code: 1)))
+        useCaseMock.executeResult = .failure(DomainError.network)
 
         // When
         await sut.loadArticles()
@@ -130,7 +140,7 @@ struct ArticleViewModelTests {
             Issue.record("Expected error state, got \(sut.state)")
             return
         }
-        #expect(errorDecorator.isRetryable == true)
+        #expect(errorDecorator.title == ErrorDecorator.network.title)
     }
 
     // MARK: - Navigation
@@ -150,94 +160,75 @@ struct ArticleViewModelTests {
 }
 ```
 
-## Mocks (Actors for Concurrency)
+## Mocks
 
 ### Rules
 
 - Simple mocks, no external frameworks.
-- Use `actor` for mocks that need concurrency safety.
-- Track calls with `private(set) var callCount: Int = 0`.
-- Naming: `Mock<ProtocolName>` (prefix).
+- Naming: `<Feature><Type>Mock` (suffix), one per file in `[Project]Tests/Mocks/`.
+- Mocks of nonisolated protocols (UseCase, Repository, DataSource, mappers) are `final class ...: <Protocol>, @unchecked Sendable`, configured by assigning `Result` properties directly (no async setters). Each test owns its own instances, so the unchecked conformance is safe.
+- Mocks of `@MainActor` protocols (Routers) are `@MainActor final class`.
+- Track calls with plain counters (`var executeCallCount = 0`) and captured arguments.
 
-### Template: Mock UseCase
+### Template: UseCase Mock
 
 ```swift
-// [Project]Tests/Mocks/MockArticleUseCase.swift
+// [Project]Tests/Mocks/ArticleUseCaseMock.swift
 import Foundation
 @testable import MyApp
 
-actor MockArticleUseCase: ArticleUseCase {
+// MARK: - ArticleUseCaseMock
 
+final class ArticleUseCaseMock: ArticleUseCase, @unchecked Sendable {
     // MARK: - Properties
 
     var executeResult: Result<[ArticleModel], Error> = .success([])
     var executeCallCount = 0
 
-    // MARK: - Test Helpers
-
-    func setExecuteResult(_ result: Result<[ArticleModel], Error>) {
-        executeResult = result
-    }
-
     // MARK: - ArticleUseCase
 
     func execute() async throws -> [ArticleModel] {
         executeCallCount += 1
-
-        switch executeResult {
-        case .success(let models):
-            return models
-        case .failure(let error):
-            throw error
-        }
+        return try executeResult.get()
     }
 }
 ```
 
-### Template: Mock Repository
+### Template: Repository Mock
 
 ```swift
-// [Project]Tests/Mocks/MockArticleRepository.swift
+// [Project]Tests/Mocks/ArticleRepositoryMock.swift
 import Foundation
 @testable import MyApp
 
-actor MockArticleRepository: ArticleRepository {
+// MARK: - ArticleRepositoryMock
 
+final class ArticleRepositoryMock: ArticleRepository, @unchecked Sendable {
     // MARK: - Properties
 
     var fetchArticlesResult: Result<[ArticleModel], Error> = .success([])
     var fetchArticlesCallCount = 0
 
-    // MARK: - Test Helpers
-
-    func setFetchArticlesResult(_ result: Result<[ArticleModel], Error>) {
-        fetchArticlesResult = result
-    }
-
     // MARK: - ArticleRepository
 
     func fetchArticles() async throws -> [ArticleModel] {
         fetchArticlesCallCount += 1
-
-        switch fetchArticlesResult {
-        case .success(let models):
-            return models
-        case .failure(let error):
-            throw error
-        }
+        return try fetchArticlesResult.get()
     }
 }
 ```
 
-### Template: Mock Router
+### Template: Router Mock
 
 ```swift
-// [Project]Tests/Mocks/MockArticleRouter.swift
+// [Project]Tests/Mocks/ArticleRouterMock.swift
 import Foundation
 @testable import MyApp
 
+// MARK: - ArticleRouterMock
+
 @MainActor
-final class MockArticleRouter: ArticleRouter {
+final class ArticleRouterMock: ArticleRouter {
 
     // MARK: - Properties
 
@@ -265,44 +256,72 @@ final class MockArticleRouter: ArticleRouter {
 import Testing
 @testable import MyApp
 
-@MainActor
-@Suite("ArticleUseCase Tests")
-struct ArticleUseCaseTests {
+@Suite("ArticleUseCaseImpl Tests")
+struct ArticleUseCaseImplTests {
+    // MARK: - Properties
+
+    private var repositoryMock: ArticleRepositoryMock
+    private var sut: ArticleUseCaseImpl
+
+    // MARK: - Setup
+
+    init() {
+        repositoryMock = ArticleRepositoryMock()
+        sut = ArticleUseCaseImpl(repository: repositoryMock)
+    }
 
     // MARK: - Tests
 
     @Test("Execute returns articles")
     func executeReturnsArticles() async throws {
         // Given
-        let mockRepository = MockArticleRepository()
-        await mockRepository.setFetchArticlesResult(.success([.stub(), .stub()]))
-
-        let useCase = ArticleUseCaseImpl(repository: mockRepository)
+        repositoryMock.fetchArticlesResult = .success([.stub(), .stub()])
 
         // When
-        let result = try await useCase.execute()
+        let result = try await sut.execute()
 
         // Then
         #expect(result.count == 2)
+        #expect(repositoryMock.fetchArticlesCallCount == 1)
     }
 
-    @Test("Execute propagates repository error")
+    @Test("Execute propagates the repository DomainError unchanged")
     func executePropagatesError() async {
         // Given
-        let expectedError = NSError(domain: "test", code: 42)
-        let mockRepository = MockArticleRepository()
-        await mockRepository.setFetchArticlesResult(.failure(expectedError))
-
-        let useCase = ArticleUseCaseImpl(repository: mockRepository)
+        repositoryMock.fetchArticlesResult = .failure(DomainError.network)
 
         // When/Then
         do {
-            _ = try await useCase.execute()
+            _ = try await sut.execute()
             Issue.record("Expected error to be thrown")
         } catch {
-            let nsError = error as NSError
-            #expect(nsError.code == 42)
+            #expect(error as? DomainError == .network)
         }
+    }
+}
+```
+
+UseCase suites don't need `@MainActor`: UseCases are nonisolated.
+
+## Repository Tests (Error Mapping)
+
+The repository is where `APIError` becomes `DomainError`, so test the mapping there:
+
+```swift
+// [Project]Tests/Data/Article/Repositories/ArticleRepositoryTests.swift
+
+@Test("Given data source throws HTTP 404, when fetch, then throws DomainError.notFound")
+func fetchMapsNotFound() async {
+    // Given
+    remoteDataSourceMock.fetchArticlesResult = .failure(APIError.httpError(statusCode: 404, data: nil))
+
+    // When / Then
+    do {
+        _ = try await sut.fetchArticles()
+        Issue.record("Expected error to be thrown")
+    } catch {
+        #expect(error as? DomainError == .notFound)
+        #expect(dtoMapperMock.mapMultipleCallCount == 0)
     }
 }
 ```
@@ -339,11 +358,11 @@ extension ArticleModel {
 | Case | What to Verify |
 |------|----------------|
 | Success | State `.loaded`, sections with correct data |
-| Known error | State `.error`, ErrorDecorator with correct `isRetryable` |
-| Unknown error | State `.error` with generic decorator |
+| Known error | `DomainError` -> State `.error` with the matching `ErrorDecorator` (`ErrorDecorator.from(_:)`) |
+| Unknown error | State `.error` with `.generic` decorator |
 | Loading | State `.loading` before completion |
-| Idempotency | Call twice, verify expected behavior |
-| Cancellation | Doesn't change state if Task was cancelled |
+| Idempotency | Call twice, verify expected behavior (`load()` ignores calls while `.loading`) |
+| Cancellation | `CancellationError` restores the previous state, no error shown |
 | Parameters | Mock captured correct parameters |
 
 ## Tips
