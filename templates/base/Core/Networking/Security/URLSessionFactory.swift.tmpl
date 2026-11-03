@@ -1,0 +1,31 @@
+import Foundation
+
+// MARK: - URLSessionFactory
+
+/// Creates the app's `URLSession` from the environment configuration.
+/// The session waits for connectivity instead of failing at once while offline, bounded by the
+/// resource timeout, and installs `SSLPinningDelegate` when pinning is enabled.
+enum URLSessionFactory {
+    // MARK: - Public Methods
+
+    /// Creates a URLSession configured for the given environment.
+    /// When pinning is enabled without any hash, the session pins to an empty set and rejects every
+    /// connection, so a misconfigured build fails closed instead of shipping without pinning.
+    /// - Parameter configuration: The environment configuration with timeouts and pinning settings.
+    /// - Returns: A URLSession owned by the caller, who must invalidate it when done.
+    static func makeSession(configuration: EnvironmentConfiguration) -> URLSession {
+        let sessionConfiguration = URLSessionConfiguration.default
+        sessionConfiguration.timeoutIntervalForRequest = configuration.requestTimeout
+        sessionConfiguration.timeoutIntervalForResource = configuration.resourceTimeout
+        sessionConfiguration.waitsForConnectivity = true
+
+        guard configuration.sslPinningEnabled else {
+            return URLSession(configuration: sessionConfiguration)
+        }
+
+        assert(!configuration.sslPublicKeyHashes.isEmpty,
+               "SSL_PINNING_ENABLED=YES but SSL_PUBLIC_KEY_HASHES is empty: every connection will be rejected.")
+        let delegate = SSLPinningDelegate(publicKeyHashes: configuration.sslPublicKeyHashes)
+        return URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
+    }
+}

@@ -24,16 +24,12 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
         interceptors: [any RequestInterceptor]? = nil
     ) {
         self.configuration = configuration
-        // TODO: In a real project, use URLSessionFactory.makeSession(configuration:) here
         let resolvedSession: URLSession
         if let session {
             resolvedSession = session
             ownsSession = false
         } else {
-            let sessionConfig = URLSessionConfiguration.default
-            sessionConfig.timeoutIntervalForRequest = configuration.requestTimeout
-            sessionConfig.timeoutIntervalForResource = configuration.resourceTimeout
-            resolvedSession = URLSession(configuration: sessionConfig)
+            resolvedSession = URLSessionFactory.makeSession(configuration: configuration)
             ownsSession = true
         }
         self.session = resolvedSession

@@ -18,6 +18,12 @@ PRODUCT_NAME = {{ .ProjectName }}{{ .ProductNameSuffix }}
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 
 // MARK: - SSL Pinning
+// Pins are comma-separated "sha256/<base64>" values: the SHA-256 of the server key's
+// SubjectPublicKeyInfo. Compute one with:
+// openssl s_client -connect api.example.com:443 -servername api.example.com 2>/dev/null | \
+//   openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
+// Pin the current key and a backup key so the certificate can rotate without an app update.
+// With pinning enabled, a connection whose chain matches no pin is rejected.
 
 SSL_PINNING_ENABLED = {{ .SSLEnabled }}
 SSL_PUBLIC_KEY_HASHES = {{ .SSLHashes }}

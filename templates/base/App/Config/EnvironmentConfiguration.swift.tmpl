@@ -21,7 +21,7 @@ extension EnvironmentConfiguration {
     }
 
     var resourceTimeout: TimeInterval {
-        300.0
+        60.0
     }
 }
 
@@ -74,7 +74,7 @@ struct EnvironmentConfigurationImpl: EnvironmentConfiguration {
             self.requestTimeout = 30.0
         }
 
-        self.resourceTimeout = 300.0
+        self.resourceTimeout = 60.0
 
         let sslEnabledString = infoDictionary["SSL_PINNING_ENABLED"] as? String ?? "NO"
         self.sslPinningEnabled = sslEnabledString.uppercased() == "YES"
@@ -92,7 +92,7 @@ struct EnvironmentConfigurationImpl: EnvironmentConfiguration {
          baseURL: URL,
          apiVersion: String = "v1",
          requestTimeout: TimeInterval = 30.0,
-         resourceTimeout: TimeInterval = 300.0,
+         resourceTimeout: TimeInterval = 60.0,
          sslPinningEnabled: Bool = false,
          sslPublicKeyHashes: [String] = []) {
         self.environment = environment

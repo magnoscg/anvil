@@ -1,0 +1,154 @@
+import CryptoKit
+import Foundation
+import Security
+
+// MARK: - SSLPinningDelegate
+
+/// URLSessionDelegate that implements SSL public key pinning.
+/// The system first validates the certificate chain; the connection is then accepted only if the
+/// SHA-256 hash of the SubjectPublicKeyInfo of a certificate in the chain matches a pinned hash.
+/// Pins use the `sha256/<base64>` format produced by
+/// `openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64`
+/// (see `SSL_PUBLIC_KEY_HASHES` in the xcconfig files).
+/// Pinning the current leaf key plus a backup key lets the certificate rotate without an app update.
+/// Challenges other than server trust get the system's default handling.
+///
+/// Thread Safety: Conforms to `Sendable` via `@unchecked` because:
+/// - All stored properties are immutable (`let` constants)
+/// - URLSessionDelegate methods are called from arbitrary URLSession threads
+/// - The pin helpers are pure functions with no shared mutable state
+///
+/// - Warning: DO NOT add mutable (`var`) properties to this class without re-analyzing
+///   thread safety. Any shared mutable state requires proper synchronization.
+final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
+    // MARK: - Properties
+
+    private let pinnedPublicKeyHashes: Set<String>
+    private let isEnabled: Bool
+
+    // MARK: - Init
+
+    /// Creates an SSL Pinning delegate.
+    /// - Parameters:
+    ///   - publicKeyHashes: Base64-encoded SHA-256 hashes of SubjectPublicKeyInfo, formatted as "sha256/..."
+    ///   - isEnabled: Whether pinning validation is enabled. When false, default handling is used.
+    init(publicKeyHashes: [String], isEnabled: Bool = true) {
+        self.pinnedPublicKeyHashes = Set(publicKeyHashes)
+        self.isEnabled = isEnabled
+        super.init()
+    }
+
+    // MARK: - URLSessionDelegate
+
+    func urlSession(_ session: URLSession,
+                    didReceive challenge: URLAuthenticationChallenge) async
+        -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        guard isEnabled,
+              challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let serverTrust = challenge.protectionSpace.serverTrust else {
+            return (.performDefaultHandling, nil)
+        }
+
+        let policies = [SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString)]
+        SecTrustSetPolicies(serverTrust, policies as CFArray)
+
+        guard SecTrustEvaluateWithError(serverTrust, nil),
+              Self.publicKeyPins(in: serverTrust).contains(where: pinnedPublicKeyHashes.contains) else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
+
+        return (.useCredential, URLCredential(trust: serverTrust))
+    }
+}
+
+// MARK: - Public Key Pins
+
+extension SSLPinningDelegate {
+    /// Returns the pin of every certificate in the trust's chain, leaf first.
+    /// - Parameter trust: The server trust object from the authentication challenge.
+    /// - Returns: The `sha256/` pins of the chain's supported public keys.
+    static func publicKeyPins(in trust: SecTrust) -> [String] {
+        guard let certificates = SecTrustCopyCertificateChain(trust) as? [SecCertificate] else {
+            return []
+        }
+        return certificates.compactMap { SecCertificateCopyKey($0).flatMap(publicKeyPin(for:)) }
+    }
+
+    /// Returns the pin of a public key: SHA-256 of its DER SubjectPublicKeyInfo, base64-encoded.
+    /// `SecKeyCopyExternalRepresentation` omits the SubjectPublicKeyInfo header, so it is added back
+    /// to match the hash that `openssl` computes.
+    /// - Parameter key: The public key to pin.
+    /// - Returns: The `sha256/` pin, or nil for an unsupported key type or size.
+    static func publicKeyPin(for key: SecKey) -> String? {
+        guard let attributes = SecKeyCopyAttributes(key) as? [CFString: Any],
+              let keyType = attributes[kSecAttrKeyType] as? String,
+              let keySize = attributes[kSecAttrKeySizeInBits] as? Int,
+              let header = SubjectPublicKeyInfoHeader.header(keyType: keyType, keySizeInBits: keySize),
+              let keyData = SecKeyCopyExternalRepresentation(key, nil) as Data? else {
+            return nil
+        }
+        let digest = SHA256.hash(data: header + keyData)
+        return "sha256/" + Data(digest).base64EncodedString()
+    }
+}
+
+// MARK: - SubjectPublicKeyInfoHeader
+
+/// DER SubjectPublicKeyInfo prefixes for the key types and sizes that pinning supports.
+private enum SubjectPublicKeyInfoHeader {
+    // MARK: - Headers
+
+    private static let rsaKeyType = kSecAttrKeyTypeRSA as String
+    private static let ellipticCurveKeyType = kSecAttrKeyTypeECSECPrimeRandom as String
+
+    private static let rsaHeaders: [Int: Data] = [
+        2048: Data([0x30, 0x82, 0x01, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
+                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0F, 0x00]),
+        3072: Data([0x30, 0x82, 0x01, 0xA2, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
+                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x8F, 0x00]),
+        4096: Data([0x30, 0x82, 0x02, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
+                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x02, 0x0F, 0x00])
+    ]
+
+    private static let ellipticCurveHeaders: [Int: Data] = [
+        256: Data([0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01,
+                   0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00]),
+        384: Data([0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02,
+                   0x01, 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22, 0x03, 0x62, 0x00]),
+        521: Data([0x30, 0x81, 0x9B, 0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02,
+                   0x01, 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23, 0x03, 0x81, 0x86, 0x00])
+    ]
+
+    // MARK: - Lookup
+
+    static func header(keyType: String, keySizeInBits: Int) -> Data? {
+        switch keyType {
+        case rsaKeyType:
+            rsaHeaders[keySizeInBits]
+        case ellipticCurveKeyType:
+            ellipticCurveHeaders[keySizeInBits]
+        default:
+            nil
+        }
+    }
+}
+
+// MARK: - SSLPinningError
+
+/// Errors that can occur during SSL pinning validation.
+enum SSLPinningError: Error, LocalizedError {
+    case invalidCertificate
+    case publicKeyExtractionFailed
+    case hashMismatch
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidCertificate:
+            "Server certificate is invalid"
+        case .publicKeyExtractionFailed:
+            "Failed to extract public key from certificate"
+        case .hashMismatch:
+            "Server public key does not match pinned keys"
+        }
+    }
+}

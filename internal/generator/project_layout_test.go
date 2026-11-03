@@ -47,6 +47,8 @@ func buildTestFS() fstest.MapFS {
 		"base/Core/Networking/RequestInterceptor.swift.tmpl",
 		"base/Core/Networking/RetryInterceptor.swift.tmpl",
 		"base/Core/Networking/RetryPolicy.swift.tmpl",
+		"base/Core/Networking/Security/SSLPinningDelegate.swift.tmpl",
+		"base/Core/Networking/Security/URLSessionFactory.swift.tmpl",
 		"base/Core/Security/KeychainHelper.swift.tmpl",
 		"base/Domain/Common/DomainError.swift.tmpl",
 		"base/Data/Common/DomainErrorMapping.swift.tmpl",
@@ -124,8 +126,8 @@ func TestProjectLayoutBaseOnly(t *testing.T) {
 
 	// base has 45 files in list, minus 1 skipped (Scheme.xcconfig.tmpl) = 44
 	// .gitkeep (non-tmpl) is skipped, xcodeproj/ dir is skipped entirely
-	if len(jobs) != 44 {
-		t.Errorf("base-only: got %d jobs, want 44", len(jobs))
+	if len(jobs) != 46 {
+		t.Errorf("base-only: got %d jobs, want 46", len(jobs))
 		for _, j := range jobs {
 			t.Logf("  %s -> %s (tmpl=%v)", j.TemplatePath, j.DestinationPath, j.IsTemplate)
 		}
@@ -151,8 +153,8 @@ func TestProjectLayoutBaseWithSwiftData(t *testing.T) {
 	}
 
 	// 44 base + 3 swiftdata = 47
-	if len(jobs) != 47 {
-		t.Errorf("base+swiftdata: got %d jobs, want 47", len(jobs))
+	if len(jobs) != 49 {
+		t.Errorf("base+swiftdata: got %d jobs, want 49", len(jobs))
 	}
 
 	sdCount := 0
@@ -179,8 +181,8 @@ func TestProjectLayoutBaseWithClaude(t *testing.T) {
 	}
 
 	// 44 base + 14 claude = 58
-	if len(jobs) != 58 {
-		t.Errorf("base+claude: got %d jobs, want 58", len(jobs))
+	if len(jobs) != 60 {
+		t.Errorf("base+claude: got %d jobs, want 60", len(jobs))
 		for _, j := range jobs {
 			if j.Condition == "AIPack:ios-architecture" {
 				t.Logf("  claude: %s -> %s (tmpl=%v)", j.TemplatePath, j.DestinationPath, j.IsTemplate)
@@ -234,8 +236,8 @@ func TestProjectLayoutAllOptions(t *testing.T) {
 	}
 
 	// 44 base + 3 swiftdata + 14 claude = 61
-	if len(jobs) != 61 {
-		t.Errorf("all options: got %d jobs, want 61", len(jobs))
+	if len(jobs) != 63 {
+		t.Errorf("all options: got %d jobs, want 63", len(jobs))
 	}
 }
 
