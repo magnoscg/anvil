@@ -1,29 +1,9 @@
 import Foundation
 
-// MARK: - PokemonListModel
-
-/// Domain model representing a Pokemon for list display.
-/// Contains essential information for rendering a Pokemon card in a list.
-struct PokemonListModel: Equatable, Identifiable {
-    // MARK: - Properties
-
-    /// The Pokemon's unique identifier.
-    let id: Int
-
-    /// The Pokemon's display name (e.g., "Pikachu").
-    let name: String
-
-    /// URL for the Pokemon's image (official artwork or sprite).
-    let imageURL: URL?
-
-    /// Array of Pokemon types (e.g., [.electric] for Pikachu, [.fire, .flying] for Charizard).
-    let types: [PokemonType]
-}
-
 // MARK: - PokemonType
 
 /// Represents all 18 Pokemon types as defined in the games.
-/// Used for type-based filtering, sorting, and UI color mapping.
+/// Shared by every Pokemon model (summary and detail) and used for filtering, sorting, and UI color mapping.
 enum PokemonType: String, Equatable, CaseIterable {
     // MARK: - Cases
 
