@@ -79,6 +79,19 @@ extension SSLPinningDelegate {
         pins.contains(where: pinnedPublicKeyHashes.contains)
     }
 
+    /// Checks that a pin is `sha256/` followed by the base64 of a 32-byte SHA-256 digest.
+    /// A placeholder, or a pin cut short by a `//` that an xcconfig file reads as a comment, fails.
+    /// - Parameter pin: A configured pin.
+    /// - Returns: True if the pin can match a public key.
+    nonisolated static func isValidPin(_ pin: String) -> Bool {
+        let prefix = "sha256/"
+        guard pin.hasPrefix(prefix),
+              let digest = Data(base64Encoded: String(pin.dropFirst(prefix.count))) else {
+            return false
+        }
+        return digest.count == 32
+    }
+
     /// Returns the pin of every certificate in the trust's chain, leaf first.
     /// - Parameter trust: The server trust object from the authentication challenge.
     /// - Returns: The `sha256/` pins of the chain's supported public keys.

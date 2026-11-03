@@ -23,7 +23,11 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 // openssl s_client -connect api.example.com:443 -servername api.example.com 2>/dev/null | \
 //   openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
 // Pin the current key and a backup key so the certificate can rotate without an app update.
-// With pinning enabled, a connection whose chain matches no pin is rejected.
+// With pinning enabled, a connection to the API host whose chain matches no pin is rejected. A generated
+// Production scheme starts with a placeholder pin, so it rejects every API connection until you set real pins.
+// An xcconfig file reads `//` as the start of a comment, even inside a value: write any `//` in a pin
+// as `/$()/`, as API_BASE_URL does. The app logs a fault and asserts in debug builds when a pin is
+// not "sha256/" plus the base64 of 32 bytes.
 
 SSL_PINNING_ENABLED = {{ .SSLEnabled }}
 SSL_PUBLIC_KEY_HASHES = {{ .SSLHashes }}

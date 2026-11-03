@@ -58,6 +58,22 @@ struct SSLPinningDelegateTests {
         #expect(SSLPinningDelegate.publicKeyPins(in: serverTrust).first == Self.p256Pin)
     }
 
+    // MARK: - Pin Format Tests
+
+    @Test("A sha256 pin of a 32-byte digest is valid")
+    func digestPinIsValid() {
+        #expect(SSLPinningDelegate.isValidPin(Self.p256Pin))
+    }
+
+    @Test("Placeholders, truncated pins and pins without the prefix are invalid",
+          arguments: ["sha256/REPLACE_WITH_YOUR_PRODUCTION_CERTIFICATE_HASH=",
+                      "sha256/3vIDjxskFtq6dc",
+                      "3vIDjxskFtq6dc/Typn71SiUYMhzEKL5UjYAu1WBcgs=",
+                      "sha256/"])
+    func malformedPinIsInvalid(pin: String) {
+        #expect(!SSLPinningDelegate.isValidPin(pin))
+    }
+
     // MARK: - Chain Decision Tests
 
     @Test("A chain is accepted when any of its keys is pinned")

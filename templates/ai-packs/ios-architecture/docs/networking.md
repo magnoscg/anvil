@@ -471,7 +471,7 @@ enum URLSessionFactory {
 
 - `waitsForConnectivity = true`: an offline request waits for a connection instead of failing at once. `resourceTimeout` (60 s by default) bounds the wait.
 - Low Data Mode is allowed. Mark only non-essential requests with `request.allowsConstrainedNetworkAccess = false`.
-- `SSL_PINNING_ENABLED = YES` installs `SSLPinningDelegate` for the `baseURL` host. With no hashes the session pins to an empty set and rejects every connection (fail closed), with an assertion in debug builds.
+- `SSL_PINNING_ENABLED = YES` installs `SSLPinningDelegate` for the `baseURL` host. Without valid hashes (none, the generated placeholder, or a pin cut short by an xcconfig `//` comment) connections to the API host are rejected (fail closed), a fault is logged, and debug builds assert.
 
 ### SSLPinningDelegate
 
@@ -484,7 +484,7 @@ openssl s_client -connect api.example.com:443 -servername api.example.com 2>/dev
   openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
 ```
 
-Set `SSL_PUBLIC_KEY_HASHES` to comma-separated `sha256/<base64>` values. Pin the current key and a backup key (or an intermediate) so the certificate can rotate without an app update. The generated Production scheme enables pinning with a placeholder hash, so it rejects every connection until you replace it.
+Set `SSL_PUBLIC_KEY_HASHES` to comma-separated `sha256/<base64>` values, writing any `//` inside a pin as `/$()/` because an xcconfig reads `//` as a comment. Pin the current key and a backup key (or an intermediate) so the certificate can rotate without an app update. The generated Production scheme enables pinning with a placeholder hash, so it rejects every connection until you replace it.
 
 ---
 
