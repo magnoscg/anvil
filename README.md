@@ -144,7 +144,7 @@ make test
 # Social preview dimensions, size, provenance, and reviewed SHA-256
 make validate-public-assets
 
-# Integration tests (requires Xcode)
+# Integration tests (real templates; no Xcode needed)
 make test-integration
 ```
 
