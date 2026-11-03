@@ -8,9 +8,13 @@ extension DomainError {
     /// Runs a Data-layer operation and rethrows any failure as a `DomainError`.
     /// `CancellationError` is rethrown unchanged so cancellation keeps propagating.
     /// Repository implementations wrap their work in it, so Domain only ever sees domain errors.
-    /// - Parameter operation: The data access to perform.
+    /// It runs in the caller's isolation, so a repository moved off the main actor stays off it.
+    /// - Parameters:
+    ///   - isolation: The caller's isolation, inferred with `#isolation`.
+    ///   - operation: The data access to perform.
     /// - Returns: The operation's result.
-    static func catching<T>(_ operation: () async throws -> T) async throws -> T {
+    nonisolated static func catching<T>(isolation: isolated (any Actor)? = #isolation,
+                                        _ operation: () async throws -> T) async throws -> T {
         do {
             return try await operation()
         } catch is CancellationError {
@@ -23,7 +27,7 @@ extension DomainError {
     /// Maps any error to a typed DomainError.
     /// - Parameter error: The error to map
     /// - Returns: A typed DomainError
-    static func map(_ error: Error) -> DomainError {
+    nonisolated static func map(_ error: Error) -> DomainError {
         if let domainError = error as? DomainError {
             return domainError
         }
@@ -41,7 +45,7 @@ extension DomainError {
 
     // MARK: - Private
 
-    private static func mapAPIError(_ error: APIError) -> DomainError {
+    private nonisolated static func mapAPIError(_ error: APIError) -> DomainError {
         switch error {
         case .networkError:
             .network

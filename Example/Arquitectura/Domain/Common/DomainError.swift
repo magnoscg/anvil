@@ -5,7 +5,8 @@ import Foundation
 /// Domain-level error type used across all features.
 /// Repository implementations translate Data-layer errors into it (`Data/Common/DomainError+Mapping.swift`),
 /// so repositories expose only `DomainError` or `CancellationError`. Presentation maps it to `ErrorDecorator`.
-enum DomainError: Error {
+/// `nonisolated` because it is a plain value that crosses isolation boundaries with every thrown error.
+nonisolated enum DomainError: Error {
     /// A network-related error occurred (connectivity, timeout, etc.)
     case network
 

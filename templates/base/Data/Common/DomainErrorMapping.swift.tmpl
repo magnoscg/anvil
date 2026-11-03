@@ -8,7 +8,9 @@ extension DomainError {
     /// Runs a Data-layer operation and rethrows any failure as a `DomainError`.
     /// `CancellationError` is rethrown unchanged so cancellation keeps propagating.
     /// Repository implementations wrap their work in it, so Domain only ever sees domain errors.
-    static func catching<T>(_ operation: () async throws -> T) async throws -> T {
+    /// It runs in the caller's isolation (`#isolation`), so actor-isolated callers can capture their own state.
+    nonisolated static func catching<T>(isolation: isolated (any Actor)? = #isolation,
+                                        _ operation: () async throws -> T) async throws -> T {
         do {
             return try await operation()
         } catch is CancellationError {
