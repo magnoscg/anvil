@@ -39,7 +39,7 @@ struct ArchitectureDetailRepositoryTests {
         }
     }
 
-    @Test("getFeatureDetail throws a DomainError when the catalogue cannot be loaded")
+    @Test("getFeatureDetail throws DomainError.unknown when the catalogue file is missing")
     func missingCatalogueThrowsDomainError() async {
         let repository = ArchitectureDetailRepositoryImpl(dataSource: ArchitectureDetailJSONDataSourceImpl(fileURL: nil),
                                                           mapper: ArchitectureDetailDTOMapperImpl())
@@ -48,7 +48,7 @@ struct ArchitectureDetailRepositoryTests {
             _ = try await repository.getFeatureDetail(id: "any")
             Issue.record("Expected an error to be thrown")
         } catch {
-            #expect(error is DomainError)
+            #expect(error as? DomainError == .unknown)
         }
     }
 }
