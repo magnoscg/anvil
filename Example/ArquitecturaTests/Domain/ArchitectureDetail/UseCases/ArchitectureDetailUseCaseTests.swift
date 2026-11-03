@@ -91,12 +91,11 @@ struct ArchitectureDetailUseCaseTests {
         #expect(callCount == 1)
     }
 
-    @Test("Execute maps repository error to DomainError")
+    @Test("Execute propagates the repository's DomainError")
     func executePropagatesError() async {
         // Given
-        let expectedError = NSError(domain: "test", code: 42)
         let mockRepository = MockArchitectureDetailRepository()
-        await mockRepository.setGetFeatureDetailResult(.failure(expectedError))
+        await mockRepository.setGetFeatureDetailResult(.failure(DomainError.parsing))
 
         let useCase = ArchitectureDetailUseCaseImpl(repository: mockRepository)
 
@@ -105,8 +104,7 @@ struct ArchitectureDetailUseCaseTests {
             _ = try await useCase.execute(id: "test-id")
             #expect(Bool(false), "Expected error to be thrown")
         } catch {
-            #expect(error is DomainError)
-            #expect(error as? DomainError == .unknown)
+            #expect(error as? DomainError == .parsing)
         }
     }
 }

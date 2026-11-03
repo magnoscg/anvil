@@ -11,7 +11,7 @@ protocol PokemonListRepository: Sendable {
     ///   - limit: Maximum number of Pokemon to fetch.
     ///   - offset: Starting index for pagination.
     /// - Returns: Result containing Pokemon models and pagination info.
-    /// - Throws: Error if any network request fails.
+    /// - Throws: `DomainError` if the list request fails, or `CancellationError`.
     func getPokemonList(limit: Int, offset: Int) async throws -> PokemonListRepositoryResult
 }
 

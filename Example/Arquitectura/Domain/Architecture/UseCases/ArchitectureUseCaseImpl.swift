@@ -17,13 +17,7 @@ struct ArchitectureUseCaseImpl: ArchitectureUseCase {
     // MARK: - Public Methods
 
     func execute() async throws -> [ArchitectureModel] {
-        do {
-            let features = try await repository.getFeatures()
-            return features.sorted { $0.category.rawValue < $1.category.rawValue }
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw DomainError.map(error)
-        }
+        let features = try await repository.getFeatures()
+        return features.sorted { $0.category.rawValue < $1.category.rawValue }
     }
 }

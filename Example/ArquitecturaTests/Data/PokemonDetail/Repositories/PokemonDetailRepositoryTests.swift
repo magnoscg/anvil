@@ -53,10 +53,10 @@ struct PokemonDetailRepositoryTests {
         #expect(model.genus == nil)
     }
 
-    @Test("Fetch with detail failure propagates the error")
+    @Test("Fetch with detail failure throws the mapped DomainError")
     func fetchWithDetailFailure() async {
         // Given
-        let expectedError = NSError(domain: "test", code: 500)
+        let expectedError = APIError.httpError(statusCode: 500, data: nil)
 
         let mockDataSource = MockPokemonDetailRemoteDataSource()
         await mockDataSource.setFetchDetailResult(.failure(expectedError))
@@ -70,9 +70,7 @@ struct PokemonDetailRepositoryTests {
             _ = try await repository.fetchPokemonDetail(id: 25)
             #expect(Bool(false), "Expected error to be thrown")
         } catch {
-            let nsError = error as NSError
-            #expect(nsError.domain == "test")
-            #expect(nsError.code == 500)
+            #expect(error as? DomainError == .server)
         }
     }
 

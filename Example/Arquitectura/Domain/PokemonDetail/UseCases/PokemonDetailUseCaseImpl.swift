@@ -20,12 +20,6 @@ struct PokemonDetailUseCaseImpl: PokemonDetailUseCase {
     // MARK: - PokemonDetailUseCase
 
     func execute(pokemonId: Int) async throws -> PokemonDetailModel {
-        do {
-            return try await repository.fetchPokemonDetail(id: pokemonId)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw DomainError.map(error)
-        }
+        try await repository.fetchPokemonDetail(id: pokemonId)
     }
 }

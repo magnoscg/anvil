@@ -3,7 +3,8 @@ import Foundation
 // MARK: - DomainError
 
 /// Domain-level error type used across all features.
-/// Maps from data layer errors (e.g., `APIError`) and is mapped to `ErrorDecorator` in the presentation layer.
+/// Repository implementations translate Data-layer errors into it (`Data/Common/DomainError+Mapping.swift`),
+/// so repositories expose only `DomainError` or `CancellationError`. Presentation maps it to `ErrorDecorator`.
 enum DomainError: Error {
     /// A network-related error occurred (connectivity, timeout, etc.)
     case network

@@ -28,10 +28,12 @@ struct PokemonDetailRepositoryImpl: PokemonDetailRepository {
     // MARK: - PokemonDetailRepository
 
     func fetchPokemonDetail(id: Int) async throws -> PokemonDetailModel {
-        async let detail = remoteDataSource.fetchPokemonDetail(id: id)
-        async let species = try fetchSpeciesOptional(id: id)
+        try await DomainError.catching {
+            async let detail = remoteDataSource.fetchPokemonDetail(id: id)
+            async let species = try fetchSpeciesOptional(id: id)
 
-        return try await dtoMapper.map(detailDTO: detail, speciesDTO: species)
+            return try await dtoMapper.map(detailDTO: detail, speciesDTO: species)
+        }
     }
 
     // MARK: - Private Methods

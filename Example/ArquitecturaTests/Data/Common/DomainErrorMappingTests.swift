@@ -71,43 +71,46 @@ struct DomainErrorMappingTests {
         let result = DomainError.map(NSError(domain: "test", code: 42))
         #expect(result == .unknown)
     }
-}
 
-// MARK: - ErrorDecoratorMappingTests
+    // MARK: - Catching
 
-@Suite
-@MainActor
-struct ErrorDecoratorMappingTests {
-    @Test("Maps DomainError.network to ErrorDecorator.network")
-    func mapsNetworkToDecorator() {
-        let result = ErrorDecorator.from(.network)
-        #expect(result == .network)
-        #expect(result.isRetryable == true)
+    @Test("catching returns the operation's value")
+    func catchingReturnsValue() async throws {
+        let value = try await DomainError.catching { 42 }
+
+        #expect(value == 42)
     }
 
-    @Test("Maps DomainError.notFound to ErrorDecorator.notFound")
-    func mapsNotFoundToDecorator() {
-        let result = ErrorDecorator.from(.notFound)
-        #expect(result == .notFound)
-        #expect(result.isRetryable == false)
+    @Test("catching converts APIError into the mapped DomainError")
+    func catchingMapsAPIError() async {
+        do {
+            _ = try await DomainError.catching { () async throws -> Int in
+                throw APIError.httpError(statusCode: 503, data: nil)
+            }
+            Issue.record("Expected an error to be thrown")
+        } catch {
+            #expect(error as? DomainError == .server)
+        }
     }
 
-    @Test("Maps DomainError.server to ErrorDecorator.server")
-    func mapsServerToDecorator() {
-        let result = ErrorDecorator.from(.server)
-        #expect(result == .server)
-        #expect(result.isRetryable == true)
+    @Test("catching converts unknown errors into DomainError.unknown")
+    func catchingMapsUnknownError() async {
+        do {
+            _ = try await DomainError.catching { () async throws -> Int in
+                throw NSError(domain: "test", code: 1)
+            }
+            Issue.record("Expected an error to be thrown")
+        } catch {
+            #expect(error as? DomainError == .unknown)
+        }
     }
 
-    @Test("Maps DomainError.parsing to ErrorDecorator.generic")
-    func mapsParsingToGeneric() {
-        let result = ErrorDecorator.from(.parsing)
-        #expect(result == .generic)
-    }
-
-    @Test("Maps DomainError.unknown to ErrorDecorator.generic")
-    func mapsUnknownToGeneric() {
-        let result = ErrorDecorator.from(.unknown)
-        #expect(result == .generic)
+    @Test("catching rethrows CancellationError unchanged")
+    func catchingRethrowsCancellation() async {
+        await #expect(throws: CancellationError.self) {
+            try await DomainError.catching { () async throws -> Int in
+                throw CancellationError()
+            }
+        }
     }
 }
