@@ -15,8 +15,8 @@ extension DomainError {
     ///   - isolation: The caller's isolation, inferred with `#isolation`.
     ///   - operation: The data access to perform.
     /// - Returns: The operation's result.
-    nonisolated static func catching<T>(isolation: isolated (any Actor)? = #isolation,
-                                        _ operation: () async throws -> T) async throws -> T {
+    static func catching<T>(isolation: isolated (any Actor)? = #isolation,
+                            _ operation: () async throws -> T) async throws -> T {
         do {
             return try await operation()
         } catch is CancellationError {
