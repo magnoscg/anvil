@@ -66,6 +66,13 @@ struct DomainErrorMappingTests {
         #expect(result == .notFound)
     }
 
+    @Test("Maps a local DecodingError to DomainError.parsing")
+    func mapsDecodingError() {
+        let context = DecodingError.Context(codingPath: [], debugDescription: "test")
+        let result = DomainError.map(DecodingError.dataCorrupted(context))
+        #expect(result == .parsing)
+    }
+
     @Test("Maps arbitrary Error to DomainError.unknown")
     func mapsArbitraryError() {
         let result = DomainError.map(NSError(domain: "test", code: 42))

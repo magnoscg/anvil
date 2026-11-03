@@ -22,6 +22,23 @@ struct ArchitectureDetailRepositoryTests {
         #expect(model?.id == firstFeature.id)
     }
 
+    @Test("getFeatureDetail throws DomainError.parsing when the catalogue is invalid")
+    func invalidCatalogueThrowsParsing() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: "invalid-catalogue-\(UUID().uuidString).json")
+        try Data("not valid json".utf8).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let repository = ArchitectureDetailRepositoryImpl(dataSource: ArchitectureDetailJSONDataSourceImpl(fileURL: fileURL),
+                                                          mapper: ArchitectureDetailDTOMapperImpl())
+
+        do {
+            _ = try await repository.getFeatureDetail(id: "any")
+            Issue.record("Expected an error to be thrown")
+        } catch {
+            #expect(error as? DomainError == .parsing)
+        }
+    }
+
     @Test("getFeatureDetail throws a DomainError when the catalogue cannot be loaded")
     func missingCatalogueThrowsDomainError() async {
         let repository = ArchitectureDetailRepositoryImpl(dataSource: ArchitectureDetailJSONDataSourceImpl(fileURL: nil),
