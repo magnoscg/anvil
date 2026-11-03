@@ -262,8 +262,7 @@ func TestForgePartialFailureTriggersRollback(t *testing.T) {
 			if renderCount == 5 {
 				return fmt.Errorf("simulated render failure")
 			}
-			w := generator.NewDiskWriter()
-			return w.CreateFile(destPath, []byte("// generated"), 0644)
+			return renderLikeTheRealRenderer(destPath)
 		},
 	}
 
@@ -283,10 +282,122 @@ func TestForgePartialFailureTriggersRollback(t *testing.T) {
 	// Verify that the first 4 created files were rolled back
 	jobs := FeatureLayout(cfg)
 	for i := 0; i < 4 && i < len(jobs); i++ {
-		absPath := filepath.Join(dir, jobs[i].DestPath)
+		absPath := filepath.Join(dir, generator.MapToProjectPath(jobs[i].DestPath, cfg.ProjectName))
 		if _, statErr := os.Stat(absPath); !os.IsNotExist(statErr) {
 			t.Errorf("rolled-back file %s should not exist", jobs[i].DestPath)
 		}
+	}
+	assertEmptyDir(t, dir)
+}
+
+func TestForgeFailureRemovesCreatedDirectoriesSoARetrySucceeds(t *testing.T) {
+	dir := t.TempDir()
+	existingDomain := filepath.Join(dir, "MyApp", "Domain")
+	if err := os.MkdirAll(existingDomain, 0o755); err != nil {
+		t.Fatalf("create existing directory: %v", err)
+	}
+	cfg := config.FeatureConfig{
+		FeatureName: "Pokemon",
+		ProjectRoot: dir,
+		ProjectName: "MyApp",
+	}
+	jobs := FeatureLayout(cfg)
+	failingTemplate := jobs[len(jobs)-1].TemplatePath
+	failing := &stubRenderer{
+		renderFunc: func(tmplPath string, ctx any, destPath string) error {
+			if tmplPath == failingTemplate {
+				return fmt.Errorf("simulated render failure")
+			}
+			return renderLikeTheRealRenderer(destPath)
+		},
+	}
+
+	if _, err := NewFeatureForge(failing).Forge(cfg); err == nil {
+		t.Fatal("expected the failing render to fail the forge")
+	}
+
+	assertEmptyDir(t, existingDomain)
+	for _, sub := range []string{"Data", "Features"} {
+		if _, err := os.Lstat(filepath.Join(dir, "MyApp", sub)); !os.IsNotExist(err) {
+			t.Errorf("directory MyApp/%s created by the failed forge should be removed, stat err = %v", sub, err)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "MyAppTests")); !os.IsNotExist(err) {
+		t.Errorf("directory MyAppTests created by the failed forge should be removed, stat err = %v", err)
+	}
+
+	result, err := NewFeatureForge(&stubRenderer{}).Forge(cfg)
+	if err != nil {
+		t.Fatalf("retry after a failed forge: %v", err)
+	}
+	if len(result.FilesCreated) != len(jobs) {
+		t.Fatalf("retry created %d files, want %d", len(result.FilesCreated), len(jobs))
+	}
+}
+
+func TestForgeRefusesAnExistingDestinationBeforeWriting(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.FeatureConfig{
+		FeatureName: "Pokemon",
+		ProjectRoot: dir,
+		ProjectName: "MyApp",
+	}
+	jobs := FeatureLayout(cfg)
+	collision := filepath.Join(dir, generator.MapToProjectPath(jobs[len(jobs)-1].DestPath, cfg.ProjectName))
+	if err := os.MkdirAll(filepath.Dir(collision), 0o755); err != nil {
+		t.Fatalf("create collision directory: %v", err)
+	}
+	if err := os.WriteFile(collision, []byte("// user code"), 0o644); err != nil {
+		t.Fatalf("create colliding file: %v", err)
+	}
+	renders := 0
+	renderer := &stubRenderer{
+		renderFunc: func(string, any, string) error {
+			renders++
+			return nil
+		},
+	}
+
+	_, err := NewFeatureForge(renderer).Forge(cfg)
+
+	var exists config.FeatureExistsError
+	if !errors.As(err, &exists) || exists.ExistingDir != collision {
+		t.Fatalf("error = %v, want FeatureExistsError for %s", err, collision)
+	}
+	if renders != 0 {
+		t.Fatalf("rendered %d files before detecting the collision", renders)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "MyApp")); !os.IsNotExist(err) {
+		t.Fatalf("a refused forge must not create source directories, stat err = %v", err)
+	}
+	data, err := os.ReadFile(collision)
+	if err != nil || string(data) != "// user code" {
+		t.Fatalf("existing file changed: %q, %v", data, err)
+	}
+}
+
+// renderLikeTheRealRenderer creates missing parent directories before the
+// file, as generator.DefaultRenderer does.
+func renderLikeTheRealRenderer(destPath string) error {
+	w := generator.NewDiskWriter()
+	if err := w.EnsureDir(filepath.Dir(destPath)); err != nil {
+		return err
+	}
+	return w.CreateFile(destPath, []byte("// generated"), 0644)
+}
+
+func assertEmptyDir(t *testing.T, dir string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	if len(entries) != 0 {
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Fatalf("%s should be empty after rollback, found %v", dir, names)
 	}
 }
 

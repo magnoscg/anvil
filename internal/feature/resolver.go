@@ -28,8 +28,8 @@ func WiringInstructions(cfg config.FeatureConfig) []string {
 	} else {
 		instructions = append(instructions,
 			fmt.Sprintf(
-				"No RouteResolver was generated: %sRouterImpl can only push routes that an existing resolver already handles. If %s needs its own destinations, re-run anvil feature and answer yes to \"Include RouteResolver?\".",
-				name, name,
+				"No RouteResolver was generated: %sRouterImpl can only push routes that an existing resolver already handles. If %s needs its own destinations, add Features/%s/Navigation/%sRouteResolver.swift (a ViewModifier plus a View extension, the shape anvil feature generates when you answer yes to \"Include RouteResolver?\") and register it in App/Navigation/RootNavigationView.swift.",
+				name, name, name, name,
 			),
 		)
 	}
