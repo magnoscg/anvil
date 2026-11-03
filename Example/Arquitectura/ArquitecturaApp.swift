@@ -10,6 +10,9 @@ enum AppLaunchState: Equatable {
 
 // MARK: - ArquitecturaApp
 
+/// Composition root. The root navigation is always installed so that `.onOpenURL`
+/// and state restoration are active from launch; the splash is drawn on top of it
+/// until its animation finishes, which keeps deep links received during the splash.
 @main
 struct ArquitecturaApp: App {
     // MARK: - Properties
@@ -33,19 +36,18 @@ struct ArquitecturaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                switch launchState {
-                case .splash:
-                    SplashScreenFactory.makeView {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            launchState = .ready
+            RootNavigationView(appRouter: appRouter,
+                               dependencies: dependencies)
+                .accessibilityHidden(launchState == .splash)
+                .overlay {
+                    if launchState == .splash {
+                        SplashScreenFactory.makeView {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                launchState = .ready
+                            }
                         }
                     }
-                case .ready:
-                    RootNavigationView(appRouter: appRouter,
-                                       dependencies: dependencies)
                 }
-            }
         }
     }
 }
