@@ -393,45 +393,173 @@ func TestRenderPacksCopiesSkillsGlobalScope(t *testing.T) {
 	}
 }
 
-func TestRenderPacksSkillsAlreadyExistReturnsConflict(t *testing.T) {
-	memFS := fstest.MapFS{
+func skillPackFS(content string) fstest.MapFS {
+	return fstest.MapFS{
 		"ai-packs/test-pack":                                &fstest.MapFile{Mode: 0755 | os.ModeDir},
 		"ai-packs/test-pack/skills":                         &fstest.MapFile{Mode: 0755 | os.ModeDir},
 		"ai-packs/test-pack/skills/existing-skill":          &fstest.MapFile{Mode: 0755 | os.ModeDir},
-		"ai-packs/test-pack/skills/existing-skill/SKILL.md": &fstest.MapFile{Data: []byte("# New version\n")},
+		"ai-packs/test-pack/skills/existing-skill/SKILL.md": &fstest.MapFile{Data: []byte(content)},
+		"ai-packs/test-pack/CLAUDE.md.tmpl":                 &fstest.MapFile{Data: []byte("# Pack\n")},
 	}
+}
 
-	renderer := NewRenderer(memFS, NewDiskWriter())
-	merger := &mockSettingsMerger{}
-	pr := NewPackRenderer(memFS, renderer, NewDiskWriter(), merger)
+func writeSkill(t *testing.T, dir, content string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("creating skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0644); err != nil {
+		t.Fatalf("writing skill: %v", err)
+	}
+}
 
+func planAndPreflight(t *testing.T, memFS fstest.MapFS, scope, projectDir string) (*DefaultPackRenderer, PackInstallPlan, error) {
+	t.Helper()
+	pr := NewPackRenderer(memFS, NewRenderer(memFS, NewDiskWriter()), NewDiskWriter(), &mockSettingsMerger{})
+	plan, err := pr.PlanPacks([]string{"test-pack"}, scope, ProjectTemplateContext{}, projectDir)
+	if err != nil {
+		t.Fatalf("PlanPacks: %v", err)
+	}
+	return pr, plan, pr.Preflight(&plan)
+}
+
+func TestGlobalSkillThatDiffersIsKeptAndReported(t *testing.T) {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
-
-	// Pre-create the skill directory at the global location
 	existingSkillDir := filepath.Join(tmpHome, ".claude", "skills", "existing-skill")
-	if err := os.MkdirAll(existingSkillDir, 0755); err != nil {
-		t.Fatalf("creating existing skill dir: %v", err)
+	writeSkill(t, existingSkillDir, "# Old version\n")
+	projectDir := t.TempDir()
+
+	pr, plan, err := planAndPreflight(t, skillPackFS("# New version\n"), "global", projectDir)
+	if err != nil {
+		t.Fatalf("Preflight = %v, want an existing global skill to be kept, not a conflict", err)
 	}
-	existingContent := []byte("# Old version\n")
-	if err := os.WriteFile(filepath.Join(existingSkillDir, "SKILL.md"), existingContent, 0644); err != nil {
-		t.Fatalf("writing existing skill: %v", err)
+	created, err := pr.Apply(plan)
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
 	}
 
+	want := []KeptSkill{{Path: "~/.claude/skills/existing-skill", Identical: false}}
+	if got := plan.KeptSkills(); len(got) != 1 || got[0] != want[0] {
+		t.Fatalf("KeptSkills() = %+v, want %+v", got, want)
+	}
+	content, err := os.ReadFile(filepath.Join(existingSkillDir, "SKILL.md"))
+	if err != nil || string(content) != "# Old version\n" {
+		t.Fatalf("existing skill changed: %q, %v", content, err)
+	}
+	for _, path := range created {
+		if strings.Contains(path, "existing-skill") {
+			t.Fatalf("Apply reported %s as created, but the skill was kept", path)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, "CLAUDE.md")); err != nil {
+		t.Fatalf("the rest of the pack should still be installed: %v", err)
+	}
+}
+
+func TestGlobalSkillThatMatchesIsReusedAsIdentical(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	writeSkill(t, filepath.Join(tmpHome, ".claude", "skills", "existing-skill"), "# Same\n")
+	if err := os.WriteFile(filepath.Join(tmpHome, ".claude", "skills", "existing-skill", ".DS_Store"), []byte("finder"), 0644); err != nil {
+		t.Fatalf("writing .DS_Store: %v", err)
+	}
+
+	_, plan, err := planAndPreflight(t, skillPackFS("# Same\n"), "global", t.TempDir())
+	if err != nil {
+		t.Fatalf("Preflight: %v", err)
+	}
+
+	if got := plan.KeptSkills(); len(got) != 1 || !got[0].Identical {
+		t.Fatalf("KeptSkills() = %+v, want one identical skill", got)
+	}
+}
+
+func TestGlobalSkillWithExtraFilesIsNotIdentical(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	skillDir := filepath.Join(tmpHome, ".claude", "skills", "existing-skill")
+	writeSkill(t, skillDir, "# Same\n")
+	if err := os.WriteFile(filepath.Join(skillDir, "notes.md"), []byte("mine"), 0644); err != nil {
+		t.Fatalf("writing extra file: %v", err)
+	}
+
+	_, plan, err := planAndPreflight(t, skillPackFS("# Same\n"), "global", t.TempDir())
+	if err != nil {
+		t.Fatalf("Preflight: %v", err)
+	}
+
+	if got := plan.KeptSkills(); len(got) != 1 || got[0].Identical {
+		t.Fatalf("KeptSkills() = %+v, want one skill that is not identical", got)
+	}
+}
+
+func TestGlobalSkillSymlinkIsKeptWithoutWritingThroughIt(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	target := filepath.Join(t.TempDir(), "my-skill")
+	writeSkill(t, target, "# Mine\n")
+	skillsDir := filepath.Join(tmpHome, ".claude", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("creating skills dir: %v", err)
+	}
+	if err := os.Symlink(target, filepath.Join(skillsDir, "existing-skill")); err != nil {
+		t.Fatalf("symlinking skill: %v", err)
+	}
+
+	pr, plan, err := planAndPreflight(t, skillPackFS("# New\n"), "global", t.TempDir())
+	if err != nil {
+		t.Fatalf("Preflight: %v", err)
+	}
+	if _, err := pr.Apply(plan); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+
+	if got := plan.KeptSkills(); len(got) != 1 || got[0].Identical {
+		t.Fatalf("KeptSkills() = %+v, want the symlinked skill kept as different", got)
+	}
+	content, err := os.ReadFile(filepath.Join(target, "SKILL.md"))
+	if err != nil || string(content) != "# Mine\n" {
+		t.Fatalf("symlink target changed: %q, %v", content, err)
+	}
+}
+
+func TestProjectScopeSkillThatExistsStillConflicts(t *testing.T) {
 	projectDir := t.TempDir()
-	_, err := pr.RenderPacks([]string{"test-pack"}, "global", ProjectTemplateContext{}, projectDir)
+	writeSkill(t, filepath.Join(projectDir, ".claude", "skills", "existing-skill"), "# Old\n")
+
+	_, plan, err := planAndPreflight(t, skillPackFS("# New\n"), "project", projectDir)
+
 	var conflictErr config.InstallConflictError
 	if !errors.As(err, &conflictErr) {
-		t.Fatalf("error = %v, want InstallConflictError", err)
+		t.Fatalf("error = %v, want InstallConflictError for a project-scope skill", err)
+	}
+	if kept := plan.KeptSkills(); kept != nil {
+		t.Fatalf("project-scope skills must not be kept, got %+v", kept)
+	}
+}
+
+func TestRollbackNeverRemovesAKeptGlobalSkill(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	skillDir := filepath.Join(tmpHome, ".claude", "skills", "existing-skill")
+	writeSkill(t, skillDir, "# Old\n")
+	projectDir := t.TempDir()
+
+	pr, plan, err := planAndPreflight(t, skillPackFS("# New\n"), "global", projectDir)
+	if err != nil {
+		t.Fatalf("Preflight: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "CLAUDE.md"), []byte("appeared after preflight"), 0644); err != nil {
+		t.Fatalf("creating late collision: %v", err)
 	}
 
-	// The existing skill should NOT be overwritten
-	content, err := os.ReadFile(filepath.Join(existingSkillDir, "SKILL.md"))
-	if err != nil {
-		t.Fatalf("reading skill after render: %v", err)
+	if _, err := pr.Apply(plan); err == nil {
+		t.Fatal("Apply should fail on the file that appeared after preflight")
 	}
-	if string(content) != "# Old version\n" {
-		t.Errorf("existing skill was overwritten, got %q, want %q", string(content), "# Old version\n")
+	content, err := os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
+	if err != nil || string(content) != "# Old\n" {
+		t.Fatalf("rollback touched the kept skill: %q, %v", content, err)
 	}
 }
 
