@@ -91,61 +91,81 @@ extension SSLPinningDelegate {
     }
 
     /// Returns the pin of a public key: SHA-256 of its DER SubjectPublicKeyInfo, base64-encoded.
-    /// `SecKeyCopyExternalRepresentation` omits the SubjectPublicKeyInfo header, so it is added back
-    /// to match the hash that `openssl` computes.
+    /// `SecKeyCopyExternalRepresentation` returns only the raw key, so the SubjectPublicKeyInfo is rebuilt
+    /// around it to match the hash that `openssl` computes.
     /// - Parameter key: The public key to pin.
-    /// - Returns: The `sha256/` pin, or nil for an unsupported key type or size.
+    /// - Returns: The `sha256/` pin, or nil for a key that is neither RSA nor EC P-256/P-384/P-521.
     static func publicKeyPin(for key: SecKey) -> String? {
         guard let attributes = SecKeyCopyAttributes(key) as? [CFString: Any],
               let keyType = attributes[kSecAttrKeyType] as? String,
               let keySize = attributes[kSecAttrKeySizeInBits] as? Int,
-              let header = SubjectPublicKeyInfoHeader.header(keyType: keyType, keySizeInBits: keySize),
-              let keyData = SecKeyCopyExternalRepresentation(key, nil) as Data? else {
+              let keyData = SecKeyCopyExternalRepresentation(key, nil) as Data?,
+              let subjectPublicKeyInfo = SubjectPublicKeyInfo.encode(keyType: keyType,
+                                                                     keySizeInBits: keySize,
+                                                                     keyData: keyData) else {
             return nil
         }
-        let digest = SHA256.hash(data: header + keyData)
+        let digest = SHA256.hash(data: subjectPublicKeyInfo)
         return "sha256/" + Data(digest).base64EncodedString()
     }
 }
 
-// MARK: - SubjectPublicKeyInfoHeader
+// MARK: - SubjectPublicKeyInfo
 
-/// DER SubjectPublicKeyInfo prefixes for the key types and sizes that pinning supports.
-private enum SubjectPublicKeyInfoHeader {
-    // MARK: - Headers
+/// Builds the DER SubjectPublicKeyInfo of a public key from its algorithm and raw key bytes,
+/// so any RSA key (whatever its size or exponent) and EC P-256/P-384/P-521 keys can be pinned.
+private enum SubjectPublicKeyInfo {
+    // MARK: - Algorithm Identifiers
 
     private static let rsaKeyType = kSecAttrKeyTypeRSA as String
     private static let ellipticCurveKeyType = kSecAttrKeyTypeECSECPrimeRandom as String
 
-    private static let rsaHeaders: [Int: Data] = [
-        2048: Data([0x30, 0x82, 0x01, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
-                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0F, 0x00]),
-        3072: Data([0x30, 0x82, 0x01, 0xA2, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
-                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x8F, 0x00]),
-        4096: Data([0x30, 0x82, 0x02, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
-                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x02, 0x0F, 0x00])
+    private static let rsaAlgorithm = Data([0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01,
+                                            0x01, 0x05, 0x00])
+
+    private static let ellipticCurveAlgorithms: [Int: Data] = [
+        256: Data([0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x08, 0x2A, 0x86, 0x48,
+                   0xCE, 0x3D, 0x03, 0x01, 0x07]),
+        384: Data([0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x05, 0x2B, 0x81, 0x04,
+                   0x00, 0x22]),
+        521: Data([0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x05, 0x2B, 0x81, 0x04,
+                   0x00, 0x23])
     ]
 
-    private static let ellipticCurveHeaders: [Int: Data] = [
-        256: Data([0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01,
-                   0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00]),
-        384: Data([0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02,
-                   0x01, 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22, 0x03, 0x62, 0x00]),
-        521: Data([0x30, 0x81, 0x9B, 0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02,
-                   0x01, 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23, 0x03, 0x81, 0x86, 0x00])
-    ]
+    // MARK: - Encoding
 
-    // MARK: - Lookup
-
-    static func header(keyType: String, keySizeInBits: Int) -> Data? {
-        switch keyType {
+    /// Encodes `SEQUENCE { algorithm, BIT STRING { keyData } }`.
+    static func encode(keyType: String, keySizeInBits: Int, keyData: Data) -> Data? {
+        let algorithm: Data? = switch keyType {
         case rsaKeyType:
-            rsaHeaders[keySizeInBits]
+            rsaAlgorithm
         case ellipticCurveKeyType:
-            ellipticCurveHeaders[keySizeInBits]
+            ellipticCurveAlgorithms[keySizeInBits]
         default:
             nil
         }
+        guard let algorithm else {
+            return nil
+        }
+        let bitString = element(tag: 0x03, content: Data([0x00]) + keyData)
+        return element(tag: 0x30, content: algorithm + bitString)
+    }
+
+    private static func element(tag: UInt8, content: Data) -> Data {
+        Data([tag]) + length(of: content.count) + content
+    }
+
+    private static func length(of count: Int) -> Data {
+        guard count >= 0x80 else {
+            return Data([UInt8(count)])
+        }
+        var bytes: [UInt8] = []
+        var remaining = count
+        while remaining > 0 {
+            bytes.insert(UInt8(remaining & 0xFF), at: 0)
+            remaining >>= 8
+        }
+        return Data([0x80 | UInt8(bytes.count)] + bytes)
     }
 }
 

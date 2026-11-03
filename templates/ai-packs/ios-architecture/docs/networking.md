@@ -475,7 +475,7 @@ enum URLSessionFactory {
 
 ### SSLPinningDelegate
 
-Only the API host (`baseURL`) is pinned. After the system validates the certificate chain, the connection is accepted only if the SHA-256 of the SubjectPublicKeyInfo of a certificate in the chain matches a pin. Other hosts reached through the same session (any external `APIEndpoint`) and challenges other than server trust get the system's default handling. To pin an external host too, pass its host and pins to `SSLPinningDelegate` in `URLSessionFactory`. Supported keys: RSA 2048/3072/4096 and EC P-256/P-384/P-521.
+Only the API host (`baseURL`) is pinned. After the system validates the certificate chain, the connection is accepted only if the SHA-256 of the SubjectPublicKeyInfo of a certificate in the chain matches a pin. Other hosts reached through the same session (any external `APIEndpoint`) and challenges other than server trust get the system's default handling. To pin an external host too, pass its host and pins to `SSLPinningDelegate` in `URLSessionFactory`. Supported keys: RSA of any size or exponent, and EC P-256/P-384/P-521.
 
 Compute a pin (the scheme xcconfig shows the full command):
 

@@ -33,11 +33,18 @@ struct SSLPinningDelegateTests {
         #expect(SSLPinningDelegate.publicKeyPin(for: key) == "sha256/dqgJKXodWLPPu/gepFgJWBvteuUdR0L1ytsQLsyuhJM=")
     }
 
-    @Test("An unsupported key size has no pin")
-    func unsupportedKeyHasNoPin() throws {
+    @Test("The pin of an RSA 1024 key matches the SubjectPublicKeyInfo hash from openssl")
+    func rsa1024PinMatchesOpenSSL() throws {
         let key = try Self.publicKey(of: Self.rsa1024Certificate)
 
-        #expect(SSLPinningDelegate.publicKeyPin(for: key) == nil)
+        #expect(SSLPinningDelegate.publicKeyPin(for: key) == "sha256/nsGKAao6/urYqItwlyKY8DbhO29efit5/rqc39Zgsts=")
+    }
+
+    @Test("The pin of an RSA key with exponent 3 matches the SubjectPublicKeyInfo hash from openssl")
+    func rsaExponentThreePinMatchesOpenSSL() throws {
+        let key = try Self.publicKey(of: Self.rsa2048ExponentThreeCertificate)
+
+        #expect(SSLPinningDelegate.publicKeyPin(for: key) == "sha256/EwuMUg/k0QU9bmbbbtjC/SFEoFxjfJAgT28YQvYusM4=")
     }
 
     @Test("The pins of a trust start with its leaf certificate")
@@ -166,6 +173,27 @@ struct SSLPinningDelegateTests {
                                           "5VZjW4eAi6MA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDZwAwZAIwNJRVVNOvpgxip",
                                           "IbsNiVuhQ95VaOmOn+GzYPoC3yxxVlfEYlr30qDZiX25mA8AcOJAjBCQIcBxuWi6NRXn7+O",
                                           "GiLBDMUFobPz1iLRdqn+7ibO+hDnLfC+PACmU/IzuXXX5ZU="]
+
+    private static let rsa2048ExponentThreeCertificate = ["MIIDIzCCAgugAwIBAgIUYvyIFfBtvU5lUPlz36PTaImUd8wwDQYJKoZ",
+                                                          "IhvcNAQELBQAwIjEgMB4GA1UEAwwXcGlubmluZy10ZXN0LXJzYTIwND",
+                                                          "gtZTMwHhcNMjYxMTAzMTUyMzMyWhcNMzYxMDMxMTUyMzMyWjAiMSAwH",
+                                                          "gYDVQQDDBdwaW5uaW5nLXRlc3QtcnNhMjA0OC1lMzCCASAwDQYJKoZI",
+                                                          "hvcNAQEBBQADggENADCCAQgCggEBALGl5LS4TrB+LeGnBXSEruKcUB1",
+                                                          "dhku3IvRi7ijocMWxvJNM+1E8n7LHkEsyT9cA30GTLsLsWtYWbcs6Ze",
+                                                          "KrmazcpRx2lVy2sZp8VAtyEZdjB7PpkRROMxNInCgWihJAaFUohj67G",
+                                                          "o4n/eFJgqR8iveEZWRuUmFFjdjxvhyrvN/8HdgeUqeX4oEuLswV2PG1",
+                                                          "Kzh1kj5dzt4FzkGNWzF9uE0EQ6HcUXKNjjLzuSu25MxpTGoxZtdWzb3",
+                                                          "Td5VZmVzKanwP4/Cn8hmzCppH2N4d1qr6Imywf6vtEXX1dFhc+eD4EP",
+                                                          "60WZxWSoWV0DbV29P/KhdK+0UACF9CfFAUaUdfP7kCAQOjUzBRMB0GA",
+                                                          "1UdDgQWBBTMWHZe+9WI8WAdppWT6bFi5cmsuDAfBgNVHSMEGDAWgBTM",
+                                                          "WHZe+9WI8WAdppWT6bFi5cmsuDAPBgNVHRMBAf8EBTADAQH/MA0GCSq",
+                                                          "GSIb3DQEBCwUAA4IBAQB1c7ynxPTCtkU1v+j+AhBfTtMDWOnk+jw3VY",
+                                                          "GF2iU2SdUNwODK97ZoLU81/44B8HbKIErSMsfmaZlL1jVrtXFCFo/6R",
+                                                          "mTPFSyAQYXbLO6fPFS2fecXANJ2a7Wr1FJTqVeboJ/ltEZth2a5nYS7",
+                                                          "8BYMxbM/TH1vAriWK28dI0CywYIE4aUIvMx8RHHzZl/oqiE4bjeSG7l",
+                                                          "9dL+1wI3dGTWQ7+ZgXRePBmIeJ395n0sDqD0rYL5LKOWSDZZDGZgAgC",
+                                                          "VDwht9XDs038gZ/W/2wzJ1BjGSun3k40FYqmB8YdpwIgFJVtB0xGMiQ",
+                                                          "6dbc0dh7sy7DLYOXeepbnBCggr9OWB6"]
 
     private static let rsa1024Certificate = ["MIICGjCCAYOgAwIBAgIUGKpG3v79HCcgBhwfF5wXB7CP1pMwDQYJKoZIhvcNAQELBQAw",
                                              "HzEdMBsGA1UEAwwUcGlubmluZy10ZXN0LXJzYTEwMjQwHhcNMjYxMTAzMTUwMjE0WhcN",
