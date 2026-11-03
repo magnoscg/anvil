@@ -6,6 +6,21 @@
 
 Swift 6 enforces strict concurrency checking. This guide covers patterns to achieve data-race safety while maintaining Clean Architecture.
 
+### Project Settings (generated)
+
+| Setting | Value | Consequence |
+|---------|-------|-------------|
+| `SWIFT_VERSION` | `6.0` by default (Swift 6 language mode) | Data-race errors are compile errors |
+| `SWIFT_STRICT_CONCURRENCY` | `complete` (app and test targets) | Full `Sendable` checking |
+| `SWIFT_DEFAULT_ACTOR_ISOLATION` | not set (no default isolation) | Types are **nonisolated** unless annotated |
+
+Because there is no default actor isolation, isolation is explicit:
+
+- **`@MainActor`**: ViewModels, Routers (protocol + Impl), Factories, `AppRouter` / `AppRouterImpl`, `AppNavigationCoordinator` (and `SwiftDataStack` / `PersistenceAssembly` when SwiftData is enabled).
+- **Nonisolated `Sendable` structs**: UseCases, Repositories, DataSources, DTOMappers and DecoratorMappers. Their `async` methods run off the main actor.
+
+Don't add `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` without revisiting these rules: it would make every unannotated type, UseCases and Repositories included, `@MainActor`.
+
 ---
 
 ## Sendable Requirements
@@ -51,7 +66,7 @@ protocol ArticleRepository: Sendable {
 }
 
 protocol ArticleDTOMapper: Sendable {
-    func mapToDomain(_ dto: ArticleDTO) -> ArticleModel
+    func map(_ dto: ArticleDTO) -> ArticleModel
 }
 ```
 
@@ -75,23 +90,38 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
 
 ### @MainActor for ViewModels
 
-ViewModels are always `@MainActor` because they update UI state:
+ViewModels are always explicitly `@MainActor` because they update UI state:
 
 ```swift
+// MARK: - ArticleViewModel
+
 @MainActor
 @Observable
 final class ArticleViewModel {
+    // MARK: - Properties
+
     private(set) var state: ArticleState = .idle
 
     private let useCase: ArticleUseCase
+    private let decoratorMapper: ArticleDecoratorMapper
+
+    // MARK: - Public Methods
 
     func loadArticles() async {
+        guard state != .loading else { return }
+
+        let previousState = state
         state = .loading
+
         do {
             let models = try await useCase.execute()
-            state = .loaded(models)
+            state = .loaded(models.map { decoratorMapper.map($0) })
+        } catch is CancellationError {
+            state = previousState
+        } catch let error as DomainError {
+            state = .error(ErrorDecorator.from(error))
         } catch {
-            state = .error(ErrorDecorator.generic)
+            state = .error(.generic)
         }
     }
 }
@@ -99,11 +129,17 @@ final class ArticleViewModel {
 
 ### Non-isolated UseCases and Repositories
 
-UseCases and Repositories are NOT `@MainActor` — they run in the caller's context:
+UseCases and Repositories are NOT `@MainActor`. They are nonisolated `Sendable` structs, so when a `@MainActor` ViewModel awaits them, their `async` methods run off the main actor and the ViewModel resumes on the main actor afterwards:
 
 ```swift
+// MARK: - ArticleUseCaseImpl
+
 struct ArticleUseCaseImpl: ArticleUseCase {
+    // MARK: - Properties
+
     private let repository: ArticleRepository
+
+    // MARK: - Public Methods
 
     func execute() async throws -> [ArticleModel] {
         try await repository.fetchArticles()
@@ -113,68 +149,51 @@ struct ArticleUseCaseImpl: ArticleUseCase {
 
 ### Mapper Isolation Rules
 
-Different mappers have different isolation needs:
+All mappers are nonisolated `Sendable` structs. Their protocol and Impl live in one file, and no `nonisolated` keyword is needed because nothing is isolated by default.
 
-| Mapper Type | Location | Isolation | Reason |
-|-------------|----------|-----------|--------|
-| **DecoratorMapper** | `Features/.../Presentation/Mappers/` | `@MainActor` | Called from ViewModels, outputs to Views |
-| **DTOMapper** | `Data/.../Mappers/` | `nonisolated` | Called from Repositories (any context) |
-| **SDModelMapper** | `Data/.../Mappers/` | `nonisolated` | Called from background ModelExecutor |
-
-#### DecoratorMapper (@MainActor)
+| Mapper Type | Location | Isolation | Called from |
+|-------------|----------|-----------|-------------|
+| **DecoratorMapper** | `Features/.../Presentation/Mappers/` | nonisolated | ViewModels (main actor) |
+| **DTOMapper** | `Data/.../Mappers/` | nonisolated | Repositories (any context) |
+| **SDModelMapper** (SwiftData only) | `Data/.../Mappers/` | nonisolated | The repository's background `ModelExecutor` |
 
 ```swift
-@MainActor
+// MARK: - FeatureDecoratorMapper
+
 protocol FeatureDecoratorMapper: Sendable {
-    func map(_ model: DomainModel) -> ItemDecorator
+    func map(_ model: FeatureModel) -> FeatureDecorator
 }
 
-@MainActor
+// MARK: - FeatureDecoratorMapperImpl
+
 struct FeatureDecoratorMapperImpl: FeatureDecoratorMapper {
-    func map(_ model: DomainModel) -> ItemDecorator {
-        // Simple transformation, runs on main actor
+    // MARK: - Public Methods
+
+    func map(_ model: FeatureModel) -> FeatureDecorator {
+        FeatureDecorator(id: model.id, displayName: model.name, subtitle: model.description)
     }
 }
-```
 
-#### DTOMapper / SDModelMapper (nonisolated)
+// MARK: - FeatureDTOMapper
 
-```swift
 protocol FeatureDTOMapper: Sendable {
-    nonisolated func mapToDomain(_ dto: FeatureDTO) -> FeatureModel
+    func map(_ dto: FeatureDTO) -> FeatureModel
 }
+
+// MARK: - FeatureDTOMapperImpl
 
 struct FeatureDTOMapperImpl: FeatureDTOMapper {
-    nonisolated func mapToDomain(_ dto: FeatureDTO) -> FeatureModel {
-        FeatureModel(id: dto.id, name: dto.name)
+    // MARK: - Public Methods
+
+    func map(_ dto: FeatureDTO) -> FeatureModel {
+        FeatureModel(id: dto.id, name: dto.name, description: dto.description)
     }
 }
 ```
 
-### Domain Models with nonisolated init
+### Domain Models and Memberwise Inits
 
-With Main Actor Mode enabled, Swift auto-generates `@MainActor` memberwise inits.
-Domain models created from Data layer need explicit `nonisolated` init.
-
-**IMPORTANT**: The init must be inside the struct body (not an extension) to suppress the auto-generated memberwise init:
-
-```swift
-struct FeatureModel: Sendable, Equatable {
-    let id: String
-    let name: String
-    let customField: String?
-
-    // MARK: - Initializer
-
-    nonisolated init(id: String,
-                     name: String,
-                     customField: String? = nil) {
-        self.id = id
-        self.name = name
-        self.customField = customField
-    }
-}
-```
+Without default actor isolation, a struct's memberwise init is nonisolated, so Data-layer code running off the main actor can create Domain models directly. No explicit `nonisolated init` is needed. If a target ever enables `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, unannotated types (and their memberwise inits) become `@MainActor`, and the models, mappers and repositories used off the main actor must then be marked `nonisolated` explicitly.
 
 ### Custom Actors for Shared State
 
@@ -232,6 +251,8 @@ func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 
 ## SwiftData Concurrency
 
+> Applies only when the project was generated with SwiftData (see `swiftdata.md`).
+
 ### The Golden Rule
 
 > **NEVER pass SwiftData models between actors. Pass IDs instead.**
@@ -260,23 +281,42 @@ class ArticleViewModel {
 
 ### ModelExecutor for Background Operations
 
+Each SwiftData repository receives its own `ModelExecutor`, created in its Factory with `dependencies.swiftDataStack.makeBackgroundExecutor()`. Never share an executor between repositories and never use the main `ModelContext` from a repository.
+
+`ModelExecutor` only exposes `modelContext`; it cannot run a closure for you. The repository is therefore an `actor` conforming to `ModelActor`: the actor runs on the injected executor, and its methods use the protocol-provided `modelContext`. This is what `@ModelActor` generates, except that the executor is injected (the Factory passes `swiftDataStack.makeBackgroundExecutor()` and `swiftDataStack.container`) so each repository gets its own.
+
 ```swift
-struct ArticleRepositoryImpl: ArticleRepository {
-    private let modelExecutor: ModelExecutor
+// MARK: - ArticleRepositoryImpl
+
+actor ArticleRepositoryImpl: ArticleRepository, ModelActor {
+    // MARK: - Properties
+
+    nonisolated let modelExecutor: any ModelExecutor
+    nonisolated let modelContainer: ModelContainer
+
+    // MARK: - Init
+
+    init(modelExecutor: any ModelExecutor, modelContainer: ModelContainer) {
+        self.modelExecutor = modelExecutor
+        self.modelContainer = modelContainer
+    }
+
+    // MARK: - ArticleRepository
 
     func fetchArticle(id: UUID) async throws -> ArticleModel? {
-        try await modelExecutor.perform {
+        do {
             let descriptor = FetchDescriptor<ArticleSDModel>(
                 predicate: #Predicate { $0.id == id }
             )
-            guard let sdModel = try modelExecutor.modelContext.fetch(descriptor).first else {
-                return nil
-            }
-            return ArticleModel(from: sdModel)
+            return try modelContext.fetch(descriptor).first?.toDomain()
+        } catch {
+            throw DomainError.map(error)
         }
     }
 }
 ```
+
+The `@Model` object stays inside the actor; only the `Sendable` Domain model is returned. See `swiftdata.md` for the full repository and its Factory.
 
 ---
 
@@ -284,22 +324,33 @@ struct ArticleRepositoryImpl: ArticleRepository {
 
 ### Task Cancellation
 
-Always handle cancellation properly:
+Always handle cancellation properly. Cancellation is not an error: restore the previous state instead of showing an error screen.
 
 ```swift
 func loadArticles() async {
+    guard state != .loading else { return }
+
+    let previousState = state
     state = .loading
 
     do {
         let articles = try await useCase.execute()
         state = .loaded(articles)
     } catch is CancellationError {
-        return
+        state = previousState
+    } catch let error as DomainError {
+        state = .error(ErrorDecorator.from(error))
     } catch {
-        state = .error(ErrorDecorator.generic)
+        state = .error(.generic)
     }
 }
 ```
+
+Cancellation reaches the ViewModel as `CancellationError` through every layer:
+
+- `APIClientImpl` turns `URLError.cancelled` into `CancellationError` only when `Task.isCancelled` is true. Any other `URLError.cancelled` (for example a rejected authentication challenge or an invalidated session) stays `APIError.networkError`, so it is not silently hidden.
+- `RetryInterceptor` checks `Task.checkCancellation()` before each attempt and never retries a `CancellationError`.
+- `DomainError.catching` rethrows `CancellationError` unchanged; repositories that catch errors themselves must rethrow it first.
 
 ### Structured Concurrency in Views
 
@@ -330,10 +381,14 @@ final class SearchViewModel {
 
     func search(_ query: String) {
         searchTask?.cancel()
-        searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(300))
+        searchTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+            } catch {
+                return
+            }
             guard !Task.isCancelled else { return }
-            await performSearch(query)
+            await self?.performSearch(query)
         }
     }
 }
@@ -397,7 +452,8 @@ func process(completion: @escaping @Sendable () -> Void) async {
 | Pattern | When to Use |
 |---------|-------------|
 | `Sendable` | All types crossing actor boundaries |
-| `@MainActor` | ViewModels, UI-related classes |
+| `@MainActor` | ViewModels, Routers, Factories, `AppRouter`, `AppNavigationCoordinator`, UI-related classes |
+| nonisolated `Sendable` struct | UseCases, Repositories, DataSources, mappers |
 | `actor` | Shared mutable state |
 | `@preconcurrency` | Legacy API imports |
 | `assumeIsolated` | Known context, compiler unaware |
