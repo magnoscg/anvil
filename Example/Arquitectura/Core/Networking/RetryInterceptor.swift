@@ -38,49 +38,64 @@ nonisolated struct RetryInterceptor: RequestInterceptor {
             return try await next(request)
         }
 
+        let clock = ContinuousClock()
+        let start = clock.now
         var attempt = 0
 
         while true {
+            let delay: TimeInterval
             do {
                 let (data, response) = try await next(request)
-
-                if isRetryableStatusCode(response.statusCode), policy.shouldRetry(attempt: attempt) {
-                    let delay = policy.delay(for: attempt)
-                    logRetry(attempt: attempt, delay: delay, reason: "HTTP \(response.statusCode)")
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                    attempt += 1
-                    continue
+                guard isRetryableStatusCode(response.statusCode),
+                      let retryDelay = delayBeforeRetry(attempt: attempt,
+                                                        elapsed: start.duration(to: clock.now),
+                                                        retryAfter: Self.retryAfter(from: response)) else {
+                    return (data, response)
                 }
-
-                return (data, response)
-
-            } catch let error as URLError {
-                if isRetryableURLError(error), policy.shouldRetry(attempt: attempt) {
-                    let delay = policy.delay(for: attempt)
-                    logRetry(attempt: attempt, delay: delay, reason: error.localizedDescription)
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                    attempt += 1
-                    continue
-                }
-                throw error
-
-            } catch let error as APIError {
-                if error.isRetryable, policy.shouldRetry(attempt: attempt) {
-                    let delay = policy.delay(for: attempt)
-                    logRetry(attempt: attempt, delay: delay, reason: error.localizedDescription)
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                    attempt += 1
-                    continue
-                }
-                throw error
-
+                logRetry(attempt: attempt, delay: retryDelay, reason: "HTTP \(response.statusCode)")
+                delay = retryDelay
             } catch is CancellationError {
                 throw CancellationError()
-
             } catch {
-                throw error
+                guard isRetryable(error),
+                      let retryDelay = delayBeforeRetry(attempt: attempt,
+                                                        elapsed: start.duration(to: clock.now),
+                                                        retryAfter: nil) else {
+                    throw error
+                }
+                logRetry(attempt: attempt, delay: retryDelay, reason: error.localizedDescription)
+                delay = retryDelay
             }
+            try await Task.sleep(for: .seconds(delay))
+            attempt += 1
         }
+    }
+}
+
+// MARK: - Retry-After
+
+extension RetryInterceptor {
+    /// Reads the `Retry-After` header of a response, as delay-seconds or as an HTTP date.
+    /// - Parameters:
+    ///   - response: The HTTP response that may carry the header.
+    ///   - now: The current date, used to turn an HTTP date into a delay.
+    /// - Returns: The delay in seconds the server asked for, or nil when the header is absent or invalid.
+    nonisolated static func retryAfter(from response: HTTPURLResponse, now: Date = Date()) -> TimeInterval? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespaces), !value.isEmpty else {
+            return nil
+        }
+        if let seconds = Int(value) {
+            return seconds >= 0 ? TimeInterval(seconds) : nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: value) else {
+            return nil
+        }
+        return max(0, date.timeIntervalSince(now))
     }
 }
 
@@ -114,9 +129,28 @@ private extension RetryInterceptor {
         statusCode >= 500 || statusCode == 429
     }
 
-    /// Determines if a URLError is retryable.
-    func isRetryableURLError(_ error: URLError) -> Bool {
-        Self.retryableURLErrorCodes.contains(error.code)
+    /// Determines if a failed attempt can be retried.
+    func isRetryable(_ error: any Error) -> Bool {
+        switch error {
+        case let urlError as URLError:
+            Self.retryableURLErrorCodes.contains(urlError.code)
+        case let apiError as APIError:
+            apiError.isRetryable
+        default:
+            false
+        }
+    }
+
+    /// Returns how long to wait before the next attempt, or nil when no retry may start.
+    /// A `Retry-After` value from the server replaces the backoff delay. No retry is scheduled when
+    /// the attempts are used up or the retry would start after the policy's time budget.
+    func delayBeforeRetry(attempt: Int, elapsed: Duration, retryAfter: TimeInterval?) -> TimeInterval? {
+        guard policy.shouldRetry(attempt: attempt) else {
+            return nil
+        }
+        let delay = retryAfter ?? policy.delay(for: attempt)
+        let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return policy.fitsTimeBudget(elapsed: elapsedSeconds, delay: delay) ? delay : nil
     }
 
     func logRetry(attempt: Int, delay: TimeInterval, reason: String) {

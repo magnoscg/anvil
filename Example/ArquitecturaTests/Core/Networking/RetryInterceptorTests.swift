@@ -111,6 +111,95 @@ struct RetryInterceptorTests {
         #expect(callCount == 1)
     }
 
+    // MARK: - Time Budget and Retry-After
+
+    @Test("No retry starts once the policy's time budget is spent")
+    func noRetryAfterTimeBudget() async throws {
+        let counter = CallCounter()
+        let request = try makeRequest(method: "GET")
+        let interceptor = RetryInterceptor(policy: RetryPolicy(maxRetries: 2,
+                                                               baseDelay: 0.001,
+                                                               maxDelay: 0.001,
+                                                               jitterFactor: 0,
+                                                               maxElapsedTime: 0))
+
+        _ = try await interceptor.intercept(request: request) { request in
+            await counter.increment()
+            return try Self.makeResponse(for: request, statusCode: 503)
+        }
+
+        let callCount = await counter.count
+        #expect(callCount == 1)
+    }
+
+    @Test("A Retry-After longer than the time budget returns the response without retrying")
+    func longRetryAfterIsNotRetried() async throws {
+        let counter = CallCounter()
+        let request = try makeRequest(method: "GET")
+
+        let (_, response) = try await interceptor.intercept(request: request) { request in
+            await counter.increment()
+            return try Self.makeResponse(for: request, statusCode: 503, headerFields: ["Retry-After": "120"])
+        }
+
+        #expect(response.statusCode == 503)
+        let callCount = await counter.count
+        #expect(callCount == 1)
+    }
+
+    @Test("A 429 with Retry-After: 0 is retried")
+    func zeroRetryAfterIsRetried() async throws {
+        let counter = CallCounter()
+        let request = try makeRequest(method: "GET")
+
+        _ = try await interceptor.intercept(request: request) { request in
+            await counter.increment()
+            return try Self.makeResponse(for: request, statusCode: 429, headerFields: ["Retry-After": "0"])
+        }
+
+        let callCount = await counter.count
+        #expect(callCount == 3)
+    }
+
+    @Test("Retry-After is read as delay-seconds")
+    func retryAfterSeconds() throws {
+        let (_, response) = try Self.makeResponse(for: makeRequest(method: "GET"),
+                                                  statusCode: 503,
+                                                  headerFields: ["Retry-After": "120"])
+
+        #expect(RetryInterceptor.retryAfter(from: response) == 120)
+    }
+
+    @Test("Retry-After is read as an HTTP date relative to now")
+    func retryAfterHTTPDate() throws {
+        let now = Date(timeIntervalSince1970: 1_445_412_480)
+        let (_, response) = try Self.makeResponse(for: makeRequest(method: "GET"),
+                                                  statusCode: 503,
+                                                  headerFields: ["Retry-After": "Wed, 21 Oct 2015 07:28:30 GMT"])
+
+        #expect(RetryInterceptor.retryAfter(from: response, now: now) == 30)
+    }
+
+    @Test("A Retry-After date in the past means no wait")
+    func retryAfterPastDate() throws {
+        let now = Date(timeIntervalSince1970: 1_445_412_480)
+        let (_, response) = try Self.makeResponse(for: makeRequest(method: "GET"),
+                                                  statusCode: 503,
+                                                  headerFields: ["Retry-After": "Wed, 21 Oct 2015 07:27:00 GMT"])
+
+        #expect(RetryInterceptor.retryAfter(from: response, now: now) == 0)
+    }
+
+    @Test("An invalid or missing Retry-After is ignored", arguments: ["soon", "-5", nil] as [String?])
+    func invalidRetryAfterIsIgnored(value: String?) throws {
+        let headerFields = value.map { ["Retry-After": $0] }
+        let (_, response) = try Self.makeResponse(for: makeRequest(method: "GET"),
+                                                  statusCode: 503,
+                                                  headerFields: headerFields)
+
+        #expect(RetryInterceptor.retryAfter(from: response) == nil)
+    }
+
     // MARK: - Method and Header Matching
 
     @Test("Idempotent methods are retried regardless of case", arguments: ["get", "HEAD", "Delete", "OPTIONS"])
@@ -189,9 +278,14 @@ struct RetryInterceptorTests {
         return request
     }
 
-    private nonisolated static func makeResponse(for request: URLRequest, statusCode: Int) throws -> (Data, HTTPURLResponse) {
+    private nonisolated static func makeResponse(for request: URLRequest,
+                                                 statusCode: Int,
+                                                 headerFields: [String: String]? = nil) throws -> (Data, HTTPURLResponse) {
         let url = try #require(request.url)
-        let response = try #require(HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: nil, headerFields: nil))
+        let response = try #require(HTTPURLResponse(url: url,
+                                                    statusCode: statusCode,
+                                                    httpVersion: nil,
+                                                    headerFields: headerFields))
         return (Data(), response)
     }
 }
