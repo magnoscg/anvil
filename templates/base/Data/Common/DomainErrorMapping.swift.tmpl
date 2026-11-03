@@ -28,6 +28,10 @@ extension DomainError {
             return mapAPIError(apiError)
         }
 
+        if error is DecodingError {
+            return .parsing
+        }
+
         return .unknown
     }
 
