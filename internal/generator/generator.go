@@ -85,6 +85,9 @@ func (g *DefaultProjectGenerator) Generate(ctx context.Context, cfg config.Proje
 	if err := config.ValidateProjectName(cfg.Name); err != nil {
 		return result, err
 	}
+	if err := config.ValidateSchemeNames(cfg.Schemes); err != nil {
+		return result, err
+	}
 
 	projectDir := filepath.Join(cfg.OutputDir, cfg.Name)
 	result.ProjectDir = projectDir

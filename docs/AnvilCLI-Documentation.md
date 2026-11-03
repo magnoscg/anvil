@@ -247,7 +247,7 @@ Two radio options:
 | Bundle ID | Auto-generated from name | Free text |
 | iOS Version | `18.0` | Free text |
 | Swift Version | `6.0` | Free text |
-| Schemes | `Dev, Stg, Production` | Comma-separated |
+| Schemes | `Dev, Stg, Production` | Comma-separated; each `^[A-Za-z][A-Za-z0-9_]*$`, unique ignoring case |
 
 **Hierarchical Features Section:**
 

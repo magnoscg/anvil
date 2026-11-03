@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestValidateProjectName(t *testing.T) {
 	tests := []struct {
@@ -23,6 +26,46 @@ func TestValidateProjectName(t *testing.T) {
 			err := ValidateProjectName(test.name)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("ValidateProjectName(%q) error = %v, wantErr %v", test.name, err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateSchemeNames(t *testing.T) {
+	tests := []struct {
+		label     string
+		schemes   []string
+		wantErr   bool
+		duplicate bool
+	}{
+		{label: "defaults", schemes: []string{"Dev", "Stg", "Production"}},
+		{label: "underscore and digits", schemes: []string{"QA_2", "Release"}},
+		{label: "none", schemes: nil},
+		{label: "parent traversal", schemes: []string{"Dev", "../../escaped"}, wantErr: true},
+		{label: "path separator", schemes: []string{"Dev/Child"}, wantErr: true},
+		{label: "backslash", schemes: []string{`Dev\Child`}, wantErr: true},
+		{label: "absolute path", schemes: []string{"/tmp/Dev"}, wantErr: true},
+		{label: "hyphen breaks the Swift case", schemes: []string{"Pre-Prod"}, wantErr: true},
+		{label: "leading digit", schemes: []string{"2Dev"}, wantErr: true},
+		{label: "empty", schemes: []string{""}, wantErr: true},
+		{label: "case-insensitive duplicate", schemes: []string{"Dev", "dev"}, wantErr: true, duplicate: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.label, func(t *testing.T) {
+			err := ValidateSchemeNames(test.schemes)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("ValidateSchemeNames(%q) error = %v, wantErr %v", test.schemes, err, test.wantErr)
+			}
+			if !test.wantErr {
+				return
+			}
+			var invalid InvalidSchemeNameError
+			if !errors.As(err, &invalid) {
+				t.Fatalf("error = %T, want InvalidSchemeNameError", err)
+			}
+			if invalid.Duplicate != test.duplicate {
+				t.Fatalf("Duplicate = %v, want %v", invalid.Duplicate, test.duplicate)
 			}
 		})
 	}

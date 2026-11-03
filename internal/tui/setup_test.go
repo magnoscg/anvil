@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -15,6 +16,25 @@ func TestSetup_InitialState(t *testing.T) {
 	}
 	if len(m.features) == 0 {
 		t.Error("features should not be empty")
+	}
+}
+
+func TestSetup_ConfirmFocusesInvalidSchemes(t *testing.T) {
+	m := newSetupModel(DefaultTheme())
+	m.fields[fieldProjectName].value = "TestApp"
+	m.fields[fieldSchemes].value = "Dev, ../../escaped"
+	m.depsChecked = true
+
+	m, cmd := m.tryConfirm()
+
+	if cmd != nil {
+		t.Fatal("confirm should not proceed with an invalid scheme")
+	}
+	if m.focused != fieldSchemes {
+		t.Fatalf("focused = %d, want the schemes field (%d)", m.focused, fieldSchemes)
+	}
+	if !strings.Contains(m.view(), "Each scheme must start with a letter") {
+		t.Fatal("view should explain the scheme rule")
 	}
 }
 
