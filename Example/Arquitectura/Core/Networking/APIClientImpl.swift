@@ -98,6 +98,8 @@ private extension APIClientImpl {
             throw APIError.networkError(error)
         } catch let error as APIError {
             throw error
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw APIError.unknown(SendableError(error))
         }
