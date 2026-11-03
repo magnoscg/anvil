@@ -4,30 +4,35 @@ import Security
 
 // MARK: - SSLPinningDelegate
 
-/// URLSessionDelegate that implements SSL Public Key Pinning.
-/// Validates server certificates against a list of known public key hashes.
+/// URLSessionDelegate that implements SSL public key pinning.
+/// The system first validates the certificate chain; the connection is then accepted only if the
+/// SHA-256 hash of the SubjectPublicKeyInfo of a certificate in the chain matches a pinned hash.
+/// Pins use the `sha256/<base64>` format produced by
+/// `openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64`.
+/// Pinning the current leaf key plus a backup key lets the certificate rotate without an app update.
+/// Challenges other than server trust get the system's default handling.
 ///
 /// Thread Safety: Conforms to `Sendable` via `@unchecked` because:
 /// - All stored properties are immutable (`let` constants)
 /// - URLSessionDelegate methods are called from arbitrary URLSession threads
-/// - `extractPublicKeyHash(_:)` is a pure function with no shared mutable state
+/// - The pin helpers are pure functions with no shared mutable state
 ///
 /// - Warning: DO NOT add mutable (`var`) properties to this class without re-analyzing
 ///   thread safety. Any shared mutable state requires proper synchronization.
 final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     // MARK: - Properties
 
-    private let pinnedPublicKeyHashes: [String]
+    private let pinnedPublicKeyHashes: Set<String>
     private let isEnabled: Bool
 
     // MARK: - Init
 
     /// Creates an SSL Pinning delegate.
     /// - Parameters:
-    ///   - publicKeyHashes: Array of base64-encoded SHA256 hashes of public keys (format: "sha256/...")
+    ///   - publicKeyHashes: Base64-encoded SHA-256 hashes of SubjectPublicKeyInfo, formatted as "sha256/..."
     ///   - isEnabled: Whether pinning validation is enabled. When false, default handling is used.
     init(publicKeyHashes: [String], isEnabled: Bool = true) {
-        self.pinnedPublicKeyHashes = publicKeyHashes
+        self.pinnedPublicKeyHashes = Set(publicKeyHashes)
         self.isEnabled = isEnabled
         super.init()
     }
@@ -37,64 +42,93 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
     nonisolated func urlSession(_ session: URLSession,
                                 didReceive challenge: URLAuthenticationChallenge) async
         -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        // If pinning is disabled, use default handling
-        guard isEnabled else {
+        guard isEnabled,
+              challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let serverTrust = challenge.protectionSpace.serverTrust else {
             return (.performDefaultHandling, nil)
         }
 
-        // Only handle server trust challenges
-        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let serverTrust = challenge.protectionSpace.serverTrust else {
-            return (.cancelAuthenticationChallenge, nil)
-        }
-
-        // Validate certificate chain
         let policies = [SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString)]
         SecTrustSetPolicies(serverTrust, policies as CFArray)
 
-        var error: CFError?
-        guard SecTrustEvaluateWithError(serverTrust, &error) else {
+        guard SecTrustEvaluateWithError(serverTrust, nil),
+              Self.publicKeyPins(in: serverTrust).contains(where: pinnedPublicKeyHashes.contains) else {
             return (.cancelAuthenticationChallenge, nil)
         }
 
-        // Extract and validate public key hash
-        guard let publicKeyHash = extractPublicKeyHash(from: serverTrust) else {
-            return (.cancelAuthenticationChallenge, nil)
-        }
+        return (.useCredential, URLCredential(trust: serverTrust))
+    }
+}
 
-        // Check if the hash matches any of the pinned hashes
-        if pinnedPublicKeyHashes.contains(publicKeyHash) {
-            let credential = URLCredential(trust: serverTrust)
-            return (.useCredential, credential)
-        }
+// MARK: - Public Key Pins
 
-        // Hash doesn't match - reject the connection
-        return (.cancelAuthenticationChallenge, nil)
+extension SSLPinningDelegate {
+    /// Returns the pin of every certificate in the trust's chain, leaf first.
+    /// - Parameter trust: The server trust object from the authentication challenge.
+    /// - Returns: The `sha256/` pins of the chain's supported public keys.
+    nonisolated static func publicKeyPins(in trust: SecTrust) -> [String] {
+        guard let certificates = SecTrustCopyCertificateChain(trust) as? [SecCertificate] else {
+            return []
+        }
+        return certificates.compactMap { SecCertificateCopyKey($0).flatMap(publicKeyPin(for:)) }
     }
 
-    // MARK: - Private Methods
-
-    /// Extracts the SHA256 hash of the server's public key.
-    /// - Parameter trust: The server trust object from the authentication challenge.
-    /// - Returns: Base64-encoded SHA256 hash prefixed with "sha256/", or nil if extraction fails.
-    private func extractPublicKeyHash(from trust: SecTrust) -> String? {
-        // Get certificate chain
-        guard let certificates = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
-              let certificate = certificates.first else {
+    /// Returns the pin of a public key: SHA-256 of its DER SubjectPublicKeyInfo, base64-encoded.
+    /// `SecKeyCopyExternalRepresentation` omits the SubjectPublicKeyInfo header, so it is added back
+    /// to match the hash that `openssl` computes.
+    /// - Parameter key: The public key to pin.
+    /// - Returns: The `sha256/` pin, or nil for an unsupported key type or size.
+    nonisolated static func publicKeyPin(for key: SecKey) -> String? {
+        guard let attributes = SecKeyCopyAttributes(key) as? [CFString: Any],
+              let keyType = attributes[kSecAttrKeyType] as? String,
+              let keySize = attributes[kSecAttrKeySizeInBits] as? Int,
+              let header = SubjectPublicKeyInfoHeader.header(keyType: keyType, keySizeInBits: keySize),
+              let keyData = SecKeyCopyExternalRepresentation(key, nil) as Data? else {
             return nil
         }
+        let digest = SHA256.hash(data: header + keyData)
+        return "sha256/" + Data(digest).base64EncodedString()
+    }
+}
 
-        // Extract public key from certificate
-        guard let publicKey = SecCertificateCopyKey(certificate),
-              let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
-            return nil
+// MARK: - SubjectPublicKeyInfoHeader
+
+/// DER SubjectPublicKeyInfo prefixes for the key types and sizes that pinning supports.
+private nonisolated enum SubjectPublicKeyInfoHeader {
+    // MARK: - Headers
+
+    private static let rsaKeyType = kSecAttrKeyTypeRSA as String
+    private static let ellipticCurveKeyType = kSecAttrKeyTypeECSECPrimeRandom as String
+
+    private static let rsaHeaders: [Int: Data] = [
+        2048: Data([0x30, 0x82, 0x01, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
+                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0F, 0x00]),
+        3072: Data([0x30, 0x82, 0x01, 0xA2, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
+                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x8F, 0x00]),
+        4096: Data([0x30, 0x82, 0x02, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
+                    0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x02, 0x0F, 0x00])
+    ]
+
+    private static let ellipticCurveHeaders: [Int: Data] = [
+        256: Data([0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02, 0x01,
+                   0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00]),
+        384: Data([0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02,
+                   0x01, 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22, 0x03, 0x62, 0x00]),
+        521: Data([0x30, 0x81, 0x9B, 0x30, 0x10, 0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x02,
+                   0x01, 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23, 0x03, 0x81, 0x86, 0x00])
+    ]
+
+    // MARK: - Lookup
+
+    static func header(keyType: String, keySizeInBits: Int) -> Data? {
+        switch keyType {
+        case rsaKeyType:
+            rsaHeaders[keySizeInBits]
+        case ellipticCurveKeyType:
+            ellipticCurveHeaders[keySizeInBits]
+        default:
+            nil
         }
-
-        // Compute SHA256 hash of the public key
-        let hash = SHA256.hash(data: publicKeyData)
-        let hashData = Data(hash)
-
-        return "sha256/" + hashData.base64EncodedString()
     }
 }
 
