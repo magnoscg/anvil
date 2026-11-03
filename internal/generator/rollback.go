@@ -30,6 +30,20 @@ func Rollback(dir string) error {
 	return nil
 }
 
+// EnsureTrackedDir creates path and any missing parents, appending each
+// directory it creates to createdDirs (parents first) so that a rollback can
+// remove exactly those. It refuses symlinked or non-directory components.
+func EnsureTrackedDir(path string, createdDirs *[]string, createdSet map[string]struct{}) error {
+	return ensureTrackedDirectory(path, createdDirs, createdSet)
+}
+
+// RollbackCreated removes the given files and then the given directories,
+// newest first. Directories are removed only when empty, so anything another
+// process wrote into them is kept and reported.
+func RollbackCreated(files, dirs []string) error {
+	return rollbackInstall(files, dirs)
+}
+
 // RollbackFiles removes individual files from the filesystem. This is used
 // for partial rollback after a failed feature forge (`anvil feature`).
 // Files that do not exist are skipped without error. Empty parent directories
