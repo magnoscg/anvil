@@ -26,7 +26,9 @@ struct {{ .FeatureName }}RepositoryImpl: {{ .FeatureName }}Repository {
     // MARK: - Public Methods
 
     func fetch() async throws -> [{{ .FeatureName }}Model] {
-        let dtos = try await remoteDataSource.fetch()
-        return mapper.map(dtos)
+        try await DomainError.catching {
+            let dtos = try await remoteDataSource.fetch()
+            return mapper.map(dtos)
+        }
     }
 }

@@ -50,11 +50,11 @@ func TestIntegrationAnvilFeature(t *testing.T) {
 		filepath.Join(projectDir, "Domain", "TestFeature", "Models", "TestFeatureModel.swift"),
 		filepath.Join(projectDir, "Domain", "TestFeature", "UseCases", "TestFeatureUseCase.swift"),
 		filepath.Join(projectDir, "Domain", "TestFeature", "UseCases", "TestFeatureUseCaseImpl.swift"),
+		filepath.Join(projectDir, "Domain", "TestFeature", "Repositories", "TestFeatureRepository.swift"),
 		// Data
 		filepath.Join(projectDir, "Data", "TestFeature", "DTO", "TestFeatureDTO.swift"),
 		filepath.Join(projectDir, "Data", "TestFeature", "Mappers", "TestFeatureDTOMapper.swift"),
 		filepath.Join(projectDir, "Data", "TestFeature", "DataSources", "TestFeatureRemoteDataSource.swift"),
-		filepath.Join(projectDir, "Data", "TestFeature", "Repositories", "TestFeatureRepository.swift"),
 		filepath.Join(projectDir, "Data", "TestFeature", "Repositories", "TestFeatureRepositoryImpl.swift"),
 		// Features
 		filepath.Join(projectDir, "Features", "TestFeature", "DI", "TestFeatureFactory.swift"),

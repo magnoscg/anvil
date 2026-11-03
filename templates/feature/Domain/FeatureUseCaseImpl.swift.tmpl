@@ -17,12 +17,6 @@ struct {{ .FeatureName }}UseCaseImpl: {{ .FeatureName }}UseCase, Sendable {
     // MARK: - Public Methods
 
     func execute() async throws -> [{{ .FeatureName }}Model] {
-        do {
-            return try await repository.fetch()
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw DomainError.map(error)
-        }
+        try await repository.fetch()
     }
 }

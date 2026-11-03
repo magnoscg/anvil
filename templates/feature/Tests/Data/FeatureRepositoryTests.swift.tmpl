@@ -44,10 +44,10 @@ struct {{ .FeatureName }}RepositoryImplTests {
 
     // MARK: - Error
 
-    @Test("Given data source throws error, when fetch, then propagates error")
-    func fetch_dataSourceThrows_propagatesError() async {
+    @Test("Given data source throws APIError, when fetch, then throws the mapped DomainError")
+    func fetch_dataSourceThrows_throwsDomainError() async {
         // Given
-        let expectedError = NSError(domain: "test", code: 42)
+        let expectedError = APIError.httpError(statusCode: 404, data: nil)
         mockRemoteDataSource.fetchResult = .failure(expectedError)
 
         // When / Then
@@ -55,6 +55,7 @@ struct {{ .FeatureName }}RepositoryImplTests {
             _ = try await sut.fetch()
             Issue.record("Expected error to be thrown")
         } catch {
+            #expect(error as? DomainError == .notFound)
             #expect(mockRemoteDataSource.fetchCallCount == 1)
             #expect(mockDTOMapper.mapMultipleCallCount == 0)
         }
