@@ -132,9 +132,9 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 - ViewModels are `@MainActor @Observable final class` with `private(set) var state` and an `async` API for loading/updating.
 - UseCases, Repositories, DataSources and mappers are **NOT** `@MainActor`: they are `struct`s conforming to `Sendable` protocols.
 - Propagate cancellation:
-  - `DomainError.catching` rethrows `CancellationError` unchanged; repositories that catch errors themselves rethrow it first.
+  - `DomainError.catching` runs in the caller's isolation (`#isolation`). It rethrows `CancellationError`, treats any failure that arrives after the task was cancelled as cancellation, and maps everything else to `DomainError`. Repositories that catch errors themselves rethrow `CancellationError` first.
   - ViewModels restore the previous state on cancellation instead of showing an error.
-  - A cancelled `URLSession` request surfaces as `URLError.cancelled`. Treat it as cancellation, not as a network error.
+  - `APIClientImpl` turns `URLError.cancelled` into `CancellationError` only when `Task.isCancelled`; any other `.cancelled` (e.g., a rejected pinning challenge) stays `APIError.networkError`.
 
 ### Errors
 

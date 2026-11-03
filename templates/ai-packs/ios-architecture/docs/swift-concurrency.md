@@ -304,13 +304,11 @@ actor ArticleRepositoryImpl: ArticleRepository, ModelActor {
     // MARK: - ArticleRepository
 
     func fetchArticle(id: UUID) async throws -> ArticleModel? {
-        do {
+        try await DomainError.catching {
             let descriptor = FetchDescriptor<ArticleSDModel>(
                 predicate: #Predicate { $0.id == id }
             )
             return try modelContext.fetch(descriptor).first?.toDomain()
-        } catch {
-            throw DomainError.map(error)
         }
     }
 }
@@ -350,7 +348,7 @@ Cancellation reaches the ViewModel as `CancellationError` through every layer:
 
 - `APIClientImpl` turns `URLError.cancelled` into `CancellationError` only when `Task.isCancelled` is true. Any other `URLError.cancelled` (for example a rejected authentication challenge or an invalidated session) stays `APIError.networkError`, so it is not silently hidden.
 - `RetryInterceptor` checks `Task.checkCancellation()` before each attempt and never retries a `CancellationError`.
-- `DomainError.catching` rethrows `CancellationError` unchanged; repositories that catch errors themselves must rethrow it first.
+- `DomainError.catching` runs in the caller's isolation (`#isolation`), rethrows `CancellationError`, and treats any failure after cancellation as cancellation; repositories that catch errors themselves must rethrow it first.
 
 ### Structured Concurrency in Views
 

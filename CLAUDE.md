@@ -229,8 +229,8 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 - Use structured concurrency for parallel work: `withThrowingTaskGroup` (see `PokemonListRepositoryImpl`) or `async let` (see `PokemonDetailRepositoryImpl`).
 - With approachable concurrency, a plain `nonisolated async` function runs on the caller's actor. Work that must leave the main actor (heavy decoding, disk I/O) has to be marked `@concurrent` explicitly.
 - Propagate cancellation:
-  - `APIClientImpl` turns `URLError.cancelled` into `CancellationError`.
-  - `DomainError.catching` rethrows `CancellationError` unchanged; repositories that catch errors themselves (e.g., optional sub-requests) rethrow it first.
+  - `APIClientImpl` turns `URLError.cancelled` into `CancellationError` only when `Task.isCancelled` (a rejected pinning challenge also reports `.cancelled` and must stay an error), and rethrows the `CancellationError` of the retry backoff unchanged.
+  - `DomainError.catching` runs in the caller's isolation (`#isolation`). It rethrows `CancellationError`, treats any failure that arrives after the task was cancelled as cancellation, and maps everything else to `DomainError`. Repositories that catch errors themselves (e.g., optional sub-requests) rethrow `CancellationError` first.
   - ViewModels restore the previous state on cancellation instead of showing an error.
 
 ### Errors

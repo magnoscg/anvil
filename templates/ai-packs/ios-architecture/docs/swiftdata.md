@@ -203,18 +203,16 @@ actor ArticleRepositoryImpl: ArticleRepository, ModelActor {
     // MARK: - ArticleRepository
 
     func fetchArticle(id: UUID) async throws -> ArticleModel? {
-        do {
+        try await DomainError.catching {
             let descriptor = FetchDescriptor<ArticleSDModel>(
                 predicate: #Predicate { $0.id == id }
             )
             return try modelContext.fetch(descriptor).first?.toDomain()
-        } catch {
-            throw DomainError.map(error)
         }
     }
 
     func save(_ model: ArticleModel) async throws {
-        do {
+        try await DomainError.catching {
             let articleId = model.id
             let descriptor = FetchDescriptor<ArticleSDModel>(
                 predicate: #Predicate { $0.id == articleId }
@@ -227,8 +225,6 @@ actor ArticleRepositoryImpl: ArticleRepository, ModelActor {
             }
 
             try modelContext.save()
-        } catch {
-            throw DomainError.map(error)
         }
     }
 }
@@ -237,7 +233,7 @@ actor ArticleRepositoryImpl: ArticleRepository, ModelActor {
 - This is what the `@ModelActor` macro generates (`nonisolated let modelExecutor`, `nonisolated let modelContainer`), except that the macro's `init(modelContainer:)` creates its own `DefaultSerialModelExecutor`. Here the executor is **injected** instead, so the Factory decides where it comes from and each repository gets its own from `dependencies.swiftDataStack.makeBackgroundExecutor()`.
 - `@Model` objects never leave the actor: every method maps to Domain models (`toDomain()`) before returning.
 - The repository protocol (`ArticleRepository`) lives in `Domain/Article/Repositories/` and knows nothing about SwiftData; the actor satisfies its `async` requirements.
-- Errors: only `DomainError` leaves the repository. The work is synchronous inside the actor, so each method catches and rethrows `DomainError.map(error)` (SwiftData errors map to `DomainError.unknown`). Passing an actor-isolated closure to the nonisolated `DomainError.catching` would send it out of the actor.
+- Errors: only `DomainError` leaves the repository. Each method wraps its work in `DomainError.catching`, which runs in the caller's isolation (`#isolation`), so the closure can use the actor's `modelContext` directly (SwiftData errors map to `DomainError.unknown`).
 
 ---
 
