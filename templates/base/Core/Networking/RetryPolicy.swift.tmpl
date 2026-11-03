@@ -10,14 +10,23 @@ nonisolated struct RetryPolicy: Sendable, Equatable {
     let baseDelay: TimeInterval
     let maxDelay: TimeInterval
     let jitterFactor: Double
+    /// Time budget in seconds, from the first attempt, within which a retry may start.
+    let maxElapsedTime: TimeInterval
 
     // MARK: - Init
 
-    init(maxRetries: Int, baseDelay: TimeInterval, maxDelay: TimeInterval, jitterFactor: Double) {
+    init(
+        maxRetries: Int,
+        baseDelay: TimeInterval,
+        maxDelay: TimeInterval,
+        jitterFactor: Double,
+        maxElapsedTime: TimeInterval = 30.0
+    ) {
         self.maxRetries = maxRetries
         self.baseDelay = baseDelay
         self.maxDelay = maxDelay
         self.jitterFactor = jitterFactor
+        self.maxElapsedTime = max(0, maxElapsedTime)
     }
 
     // MARK: - Delay Calculation
@@ -32,13 +41,26 @@ nonisolated struct RetryPolicy: Sendable, Equatable {
     func shouldRetry(attempt: Int) -> Bool {
         attempt < maxRetries
     }
+
+    /// Checks if a retry that waits `delay` seconds would still start within the time budget.
+    func fitsTimeBudget(elapsed: TimeInterval, delay: TimeInterval) -> Bool {
+        elapsed + delay <= maxElapsedTime
+    }
 }
 
 // MARK: - Preset Policies
 
 extension RetryPolicy {
-    static let `default` = RetryPolicy(maxRetries: 3, baseDelay: 1.0, maxDelay: 30.0, jitterFactor: 0.3)
-    static let none = RetryPolicy(maxRetries: 0, baseDelay: 0, maxDelay: 0, jitterFactor: 0)
-    static let aggressive = RetryPolicy(maxRetries: 5, baseDelay: 2.0, maxDelay: 60.0, jitterFactor: 0.25)
-    static let quick = RetryPolicy(maxRetries: 2, baseDelay: 0.5, maxDelay: 5.0, jitterFactor: 0.2)
+    static let `default` = RetryPolicy(
+        maxRetries: 3, baseDelay: 1.0, maxDelay: 30.0, jitterFactor: 0.3, maxElapsedTime: 30.0
+    )
+    static let none = RetryPolicy(
+        maxRetries: 0, baseDelay: 0, maxDelay: 0, jitterFactor: 0, maxElapsedTime: 0
+    )
+    static let aggressive = RetryPolicy(
+        maxRetries: 5, baseDelay: 2.0, maxDelay: 60.0, jitterFactor: 0.25, maxElapsedTime: 120.0
+    )
+    static let quick = RetryPolicy(
+        maxRetries: 2, baseDelay: 0.5, maxDelay: 5.0, jitterFactor: 0.2, maxElapsedTime: 10.0
+    )
 }
