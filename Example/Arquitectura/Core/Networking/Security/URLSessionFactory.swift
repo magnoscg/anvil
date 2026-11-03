@@ -23,10 +23,6 @@ enum URLSessionFactory {
         // Wait for connectivity instead of failing immediately
         sessionConfig.waitsForConnectivity = true
 
-        // Respect Low Data Mode — non-essential requests will fail with
-        // URLError.networkUnavailableReason == .constrained instead of silently using data
-        sessionConfig.allowsConstrainedNetworkAccess = false
-
         // Apply additional configuration if provided
         additionalConfiguration?(sessionConfig)
 
@@ -59,7 +55,6 @@ enum URLSessionFactory {
         config.timeoutIntervalForRequest = timeout
         config.timeoutIntervalForResource = timeout * 2
         config.waitsForConnectivity = true
-        config.allowsConstrainedNetworkAccess = false
         return URLSession(configuration: config)
     }
 
@@ -72,7 +67,6 @@ enum URLSessionFactory {
         sessionConfig.timeoutIntervalForRequest = configuration.requestTimeout
         sessionConfig.timeoutIntervalForResource = configuration.requestTimeout * 2
         sessionConfig.waitsForConnectivity = true
-        sessionConfig.allowsConstrainedNetworkAccess = false
 
         if configuration.sslPinningEnabled, !configuration.sslPublicKeyHashes.isEmpty {
             let delegate = SSLPinningDelegate(publicKeyHashes: configuration.sslPublicKeyHashes,
