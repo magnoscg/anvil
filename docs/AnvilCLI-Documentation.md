@@ -819,12 +819,12 @@ release:
 ### Release Process
 
 ```bash
-git tag 0.6.0
-git push origin 0.6.0
+git tag 0.7.0
+git push origin 0.7.0
 # GitHub Actions triggers goreleaser automatically
 # Creates a release with:
-#   - anvil_0.6.0_darwin_arm64.tar.gz
-#   - anvil_0.6.0_darwin_amd64.tar.gz
+#   - anvil_0.7.0_darwin_arm64.tar.gz
+#   - anvil_0.7.0_darwin_amd64.tar.gz
 #   - checksums.txt
 ```
 

@@ -310,6 +310,7 @@ Las contribuciones siguen Gitflow: crea una rama `feature/*` desde `develop` y a
 | **Marzo de 2026** | Nace Anvil para generar esa arquitectura, con la app de referencia como su `Example/` |
 | **Julio de 2026** | Se publica aquí como edición pública, release `0.5.1` |
 | **Agosto de 2026** | Generación e instalación de packs transaccionales, procedencia de recursos y skills, release `0.6.0` |
+| **Noviembre de 2026** | Los proyectos generados siguen la arquitectura de referencia: Domain y Data por concepto, navegación por ventana y red reforzada, release `0.7.0` |
 
 El historial privado no se trajo, por eso el primer commit de este repositorio es la edición pública `0.5.1`.
 
