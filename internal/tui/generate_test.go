@@ -32,3 +32,27 @@ func TestGenerateViewShowsEveryInstallConflict(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateViewListsKeptGlobalSkills(t *testing.T) {
+	model := generateModel{
+		theme:     DefaultTheme(),
+		width:     120,
+		done:      true,
+		toolsMode: true,
+		steps:     toolsSteps,
+		result: config.GenerationResult{
+			KeptSkills: []string{"~/.claude/skills/swift-concurrency"},
+		},
+	}
+
+	view := model.view()
+	for _, expected := range []string{
+		"Kept existing global skills",
+		"~/.claude/skills/swift-concurrency",
+		"Delete a skill folder and run anvil again",
+	} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("view does not contain %q:\n%s", expected, view)
+		}
+	}
+}

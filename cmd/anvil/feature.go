@@ -35,6 +35,9 @@ ViewModel, View, State, Decorator, Router, Factory, UseCase, Repository, and mor
 		if err != nil {
 			return fmt.Errorf("reading .anvil.yml: %w", err)
 		}
+		if err := config.ValidateProjectName(anvilMarker.ProjectName); err != nil {
+			return fmt.Errorf("reading .anvil.yml: project_name: %w", err)
+		}
 
 		var includeLocal bool
 		var includeKeychain bool

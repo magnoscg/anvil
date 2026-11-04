@@ -28,28 +28,34 @@ func testProjectConfig(outputDir string) config.ProjectConfig {
 }
 
 // newRealGenerator creates a ProjectGenerator using the real embedded templates,
-// but with a fake TuistRunner and GitRunner (we do not run Tuist/git in these tests).
-func newRealGenerator() (*generator.DefaultProjectGenerator, *fakeTuistRunner) {
+// but with fake Xcode project and git runners (no xcodebuild or git in these tests).
+func newRealGenerator() (*generator.DefaultProjectGenerator, *fakeXcodeProjGenerator) {
 	writer := generator.NewDiskWriter()
 	renderer := generator.NewRenderer(generator.TemplateFS, writer)
-	tuist := &fakeTuistRunner{output: "Project generated successfully"}
+	xcodeproj := &fakeXcodeProjGenerator{output: "Project generated successfully"}
 	git := &fakeGitRunner{}
 	marker := config.FileMarkerReadWriter{}
 	forge := feature.NewFeatureForge(renderer)
 	merger := generator.NewSettingsMerger(writer, generator.TemplateFS)
 	packRenderer := generator.NewPackRenderer(generator.TemplateFS, renderer, writer, merger)
 
-	gen := generator.NewProjectGenerator(renderer, writer, tuist, git, marker, generator.TemplateFS, forge, packRenderer)
-	return gen, tuist
+	gen := generator.NewProjectGenerator(renderer, writer, xcodeproj, git, marker, generator.TemplateFS, forge, packRenderer)
+	return gen, xcodeproj
 }
 
-// fakeTuistRunner stubs the TuistRunner to avoid requiring Tuist in CI.
-type fakeTuistRunner struct {
+// projectPath maps a layout-relative path (Domain/..., Tests/...) to where the
+// generator places it: sources under TestApp/ and tests under TestAppTests/.
+func projectPath(projectDir string, elem ...string) string {
+	return filepath.Join(projectDir, generator.MapToProjectPath(filepath.Join(elem...), "TestApp"))
+}
+
+// fakeXcodeProjGenerator records the call instead of rendering the Xcode project.
+type fakeXcodeProjGenerator struct {
 	output string
 	called bool
 }
 
-func (f *fakeTuistRunner) Generate(_ context.Context, _ string) (string, error) {
+func (f *fakeXcodeProjGenerator) Generate(_ context.Context, _ string, _ config.ProjectConfig) (string, error) {
 	f.called = true
 	return f.output, nil
 }
@@ -63,7 +69,7 @@ func (f *fakeGitRunner) Commit(_, _ string) error { return nil }
 
 func TestIntegrationAnvilInit(t *testing.T) {
 	dir := t.TempDir()
-	gen, tuist := newRealGenerator()
+	gen, xcodeproj := newRealGenerator()
 	cfg := testProjectConfig(dir)
 
 	// Step 1-2: Generate project with real templates
@@ -141,9 +147,9 @@ func TestIntegrationAnvilInit(t *testing.T) {
 		t.Errorf("marker SwiftVersion = %q, want '6.0'", anvilMarker.SwiftVersion)
 	}
 
-	// Verify Tuist runner was called
-	if !tuist.called {
-		t.Error("TuistRunner.Generate should have been called")
+	// Verify the Xcode project generator was called
+	if !xcodeproj.called {
+		t.Error("XcodeProjGenerator.Generate should have been called")
 	}
 
 	// Verify files were created
@@ -169,9 +175,7 @@ func TestIntegrationAnvilInit(t *testing.T) {
 		}
 	}
 
-	// Step 6: Skipped (xcodebuild requires real Xcode + Tuist generated project)
-	// The real xcodebuild test is in TestIntegrationAnvilInitXcodeBuild which
-	// requires the "xcodebuild" build tag.
+	// Step 6: Building the generated project with xcodebuild is not covered here.
 
 	// Step 7: Cleanup is automatic via t.TempDir()
 }

@@ -2,15 +2,16 @@ import Foundation
 
 // MARK: - ArchitectureDetailResponseDTO
 
-/// Root DTO for the architecture details JSON response
-struct ArchitectureDetailResponseDTO: Codable {
+/// Root DTO for the architecture details JSON response.
+/// DTOs are `nonisolated` and `Sendable` so the bundled file can be decoded off the main actor.
+nonisolated struct ArchitectureDetailResponseDTO: Codable, Sendable {
     let features: [ArchitectureDetailDTO]
 }
 
 // MARK: - ArchitectureDetailDTO
 
 /// Data Transfer Object for architecture feature details from JSON
-struct ArchitectureDetailDTO: Codable {
+nonisolated struct ArchitectureDetailDTO: Codable, Sendable {
     // MARK: - Properties
 
     let id: String
@@ -24,41 +25,25 @@ struct ArchitectureDetailDTO: Codable {
     let implementationDetails: String
     let codeExample: CodeExampleDTO?
     let bestPractices: [BestPracticeDTO]
-
-    // MARK: - CodingKeys
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case icon
-        case version
-        case category
-        case subtitle
-        case isImplemented
-        case filesInvolved
-        case implementationDetails
-        case codeExample
-        case bestPractices
-    }
 }
 
 // MARK: - FileInfoDTO
 
-struct FileInfoDTO: Codable {
+nonisolated struct FileInfoDTO: Codable, Sendable {
     let name: String
     let icon: String
 }
 
 // MARK: - CodeExampleDTO
 
-struct CodeExampleDTO: Codable {
+nonisolated struct CodeExampleDTO: Codable, Sendable {
     let language: String
     let code: String
 }
 
 // MARK: - BestPracticeDTO
 
-struct BestPracticeDTO: Codable {
+nonisolated struct BestPracticeDTO: Codable, Sendable {
     let id: String
     let title: String
     let description: String

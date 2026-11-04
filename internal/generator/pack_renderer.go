@@ -29,6 +29,8 @@ type plannedFile struct {
 	displayPath string
 	sourcePath  string
 	content     []byte
+	// ownerDir is the planned skill directory this file belongs to, if any.
+	ownerDir string
 }
 
 type plannedDirectory struct {
@@ -36,6 +38,19 @@ type plannedDirectory struct {
 	destination string
 	displayPath string
 	sourcePath  string
+	// reuseExisting lets an existing directory stand in for this one instead
+	// of conflicting. It is set for global skills, which earlier runs may
+	// already have installed.
+	reuseExisting bool
+}
+
+// KeptSkill is a global skill that already existed and was left untouched.
+type KeptSkill struct {
+	// Path is the display path, such as ~/.claude/skills/swift-concurrency.
+	Path string
+	// Identical reports whether the existing skill matches what this version
+	// of anvil would install.
+	Identical bool
 }
 
 type plannedSettings struct {
@@ -55,7 +70,22 @@ type PackInstallPlan struct {
 	files         []plannedFile
 	exclusiveDirs []plannedDirectory
 	settings      *plannedSettings
+	keptDirs      map[string]KeptSkill
 	preflighted   bool
+}
+
+// KeptSkills lists the global skills that Preflight found already installed
+// and that Apply will leave untouched, sorted by path.
+func (plan PackInstallPlan) KeptSkills() []KeptSkill {
+	if len(plan.keptDirs) == 0 {
+		return nil
+	}
+	kept := make([]KeptSkill, 0, len(plan.keptDirs))
+	for _, skill := range plan.keptDirs {
+		kept = append(kept, skill)
+	}
+	sort.Slice(kept, func(i, j int) bool { return kept[i].Path < kept[j].Path })
+	return kept
 }
 
 // DefaultPackRenderer is the production pack planner and installer.
@@ -202,6 +232,7 @@ func (p *DefaultPackRenderer) Preflight(plan *PackInstallPlan) error {
 		return fmt.Errorf("pack install plan is nil")
 	}
 	plan.preflighted = false
+	plan.keptDirs = nil
 
 	conflicts := make(map[string]struct{})
 	seenTargets := make(map[string]string)
@@ -243,11 +274,27 @@ func (p *DefaultPackRenderer) Preflight(plan *PackInstallPlan) error {
 	}
 
 	for _, directory := range plan.exclusiveDirs {
+		if directory.reuseExisting {
+			kept, identical, err := existingSkill(*plan, directory)
+			if err != nil {
+				return err
+			}
+			if kept {
+				if plan.keptDirs == nil {
+					plan.keptDirs = make(map[string]KeptSkill)
+				}
+				plan.keptDirs[directory.destination] = KeptSkill{Path: directory.displayPath, Identical: identical}
+				continue
+			}
+		}
 		if _, err := checkTarget(directory.root, directory.destination, directory.displayPath, false); err != nil {
 			return err
 		}
 	}
 	for _, file := range plan.files {
+		if _, kept := plan.keptDirs[file.ownerDir]; kept && file.ownerDir != "" {
+			continue
+		}
 		if _, err := checkTarget(file.root, file.destination, file.displayPath, false); err != nil {
 			return err
 		}
@@ -326,6 +373,9 @@ func (p *DefaultPackRenderer) Apply(plan PackInstallPlan) ([]string, error) {
 	}
 
 	for _, directory := range directories {
+		if _, kept := plan.keptDirs[directory.destination]; kept {
+			continue
+		}
 		if err := ensureTrackedDirectory(filepath.Dir(directory.destination), &createdDirs, createdDirSet); err != nil {
 			return fail(fmt.Errorf("creating parent for %s: %w", directory.displayPath, err))
 		}
@@ -337,6 +387,9 @@ func (p *DefaultPackRenderer) Apply(plan PackInstallPlan) ([]string, error) {
 	}
 
 	for _, file := range files {
+		if _, kept := plan.keptDirs[file.ownerDir]; kept && file.ownerDir != "" {
+			continue
+		}
 		if err := ensureTrackedDirectory(filepath.Dir(file.destination), &createdDirs, createdDirSet); err != nil {
 			return fail(fmt.Errorf("creating parent for %s: %w", file.displayPath, err))
 		}
@@ -485,17 +538,81 @@ func (p *DefaultPackRenderer) planSkills(plan *PackInstallPlan, sourceDir, skill
 			return err
 		}
 		plan.exclusiveDirs = append(plan.exclusiveDirs, plannedDirectory{
-			root:        root,
-			destination: destination,
-			displayPath: filepath.ToSlash(displayRelative),
-			sourcePath:  pathpkg.Join(sourceDir, skillName),
+			root:          root,
+			destination:   destination,
+			displayPath:   filepath.ToSlash(displayRelative),
+			sourcePath:    pathpkg.Join(sourceDir, skillName),
+			reuseExisting: skillsScope == "global",
 		})
 
+		firstFile := len(plan.files)
 		if err := p.planDirectory(plan, pathpkg.Join(sourceDir, skillName), root, destinationRelative, displayRelative, ctx, false); err != nil {
 			return fmt.Errorf("planning skill %s: %w", skillName, err)
 		}
+		for i := firstFile; i < len(plan.files); i++ {
+			plan.files[i].ownerDir = destination
+		}
 	}
 	return nil
+}
+
+// existingSkill reports whether a reusable skill directory is already present
+// and, if so, whether it holds exactly the files the plan would install there.
+// An unsafe ancestor is not reused, so the regular conflict check reports it.
+func existingSkill(plan PackInstallPlan, directory plannedDirectory) (kept, identical bool, err error) {
+	unsafe, err := firstUnsafeAncestor(directory.root, directory.destination)
+	if err != nil {
+		return false, false, err
+	}
+	if unsafe != "" {
+		return false, false, nil
+	}
+	info, err := os.Lstat(directory.destination)
+	if os.IsNotExist(err) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, fmt.Errorf("checking destination %s: %w", directory.destination, err)
+	}
+	if !info.IsDir() {
+		return true, false, nil
+	}
+
+	planned := make(map[string][]byte)
+	for _, file := range plan.files {
+		if file.ownerDir == directory.destination {
+			planned[file.destination] = file.content
+		}
+	}
+	identical = true
+	matched := 0
+	walkErr := filepath.WalkDir(directory.destination, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || entry.Name() == ".DS_Store" || entry.Name() == ".gitkeep" {
+			return nil
+		}
+		want, isPlanned := planned[path]
+		if !isPlanned || !entry.Type().IsRegular() {
+			identical = false
+			return filepath.SkipAll
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(data, want) {
+			identical = false
+			return filepath.SkipAll
+		}
+		matched++
+		return nil
+	})
+	if walkErr != nil {
+		return false, false, fmt.Errorf("comparing existing skill %s: %w", directory.displayPath, walkErr)
+	}
+	return true, identical && matched == len(planned), nil
 }
 
 func (p *DefaultPackRenderer) planTutorials(plan *PackInstallPlan, sourceDir string, ctx any) error {

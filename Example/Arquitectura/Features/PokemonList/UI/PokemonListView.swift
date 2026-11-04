@@ -142,19 +142,19 @@ private extension PokemonListView {
 
 private struct PreviewPokemonListUseCase: PokemonListUseCase {
     func execute(page: Int, pageSize: Int) async throws -> PokemonListResult {
-        PokemonListResult(pokemon: [PokemonListModel(id: 1,
+        PokemonListResult(pokemon: [PokemonSummaryModel(id: 1,
                                                      name: "bulbasaur",
                                                      imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png"),
                                                      types: [.grass, .poison]),
-                                    PokemonListModel(id: 4,
+                                    PokemonSummaryModel(id: 4,
                                                      name: "charmander",
                                                      imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png"),
                                                      types: [.fire]),
-                                    PokemonListModel(id: 7,
+                                    PokemonSummaryModel(id: 7,
                                                      name: "squirtle",
                                                      imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png"),
                                                      types: [.water]),
-                                    PokemonListModel(id: 25,
+                                    PokemonSummaryModel(id: 25,
                                                      name: "pikachu",
                                                      imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"),
                                                      types: [.electric])],

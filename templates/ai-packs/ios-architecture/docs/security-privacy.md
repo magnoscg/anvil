@@ -80,17 +80,26 @@ APIs that require justification in Privacy Manifest:
 
 ### Keychain Wrapper Pattern
 
+The generator creates this wrapper in every project. It also adds Codable conveniences (`save(_ item: some Encodable, for:)` and `read(for:) -> T`), which throw `KeychainError.encodingFailed` / `.decodingFailed`.
+
 ```swift
 // Core/Security/KeychainHelper.swift
+import Foundation
 import Security
 
-enum KeychainError: Error {
+// MARK: - KeychainError
+
+enum KeychainError: Error, Sendable {
     case itemNotFound
     case duplicateItem
+    case encodingFailed
+    case decodingFailed
     case unexpectedStatus(OSStatus)
 }
 
-struct KeychainHelper {
+// MARK: - KeychainHelper
+
+struct KeychainHelper: Sendable {
 
     // MARK: - Save
 
@@ -193,25 +202,50 @@ extension KeychainHelper {
 
 ### DO: Use Keychain for Sensitive Data
 
+Keychain access belongs to the **Data** layer, never to a ViewModel. `anvil feature` can generate a `<Feature>KeychainDataSource` (protocol + Impl in `Data/<Feature>/DataSources/`) that wraps `KeychainHelper`; the repository uses it inside `DomainError.catching`, and the ViewModel only talks to its UseCase.
+
 ```swift
-@MainActor
-@Observable
-final class AuthViewModel {
-    private let keychain = KeychainHelper()
+// Data/Auth/DataSources/AuthKeychainDataSource.swift
 
-    var isAuthenticated: Bool {
-        (try? keychain.getToken()) != nil
+// MARK: - AuthKeychainDataSource
+
+protocol AuthKeychainDataSource: Sendable {
+    func saveToken(_ token: String) throws
+    func readToken() throws -> String
+    func deleteToken() throws
+}
+
+// MARK: - AuthKeychainDataSourceImpl
+
+struct AuthKeychainDataSourceImpl: AuthKeychainDataSource {
+    // MARK: - Properties
+
+    private let keychainHelper: KeychainHelper
+    private let tokenKey = "auth_token"
+
+    // MARK: - Init
+
+    init(keychainHelper: KeychainHelper) {
+        self.keychainHelper = keychainHelper
     }
 
-    func login(token: String) throws {
-        try keychain.saveToken(token)
+    // MARK: - Public Methods
+
+    func saveToken(_ token: String) throws {
+        try keychainHelper.save(token, for: tokenKey)
     }
 
-    func logout() throws {
-        try keychain.deleteToken()
+    func readToken() throws -> String {
+        try keychainHelper.read(for: tokenKey)
+    }
+
+    func deleteToken() throws {
+        try keychainHelper.delete(for: tokenKey)
     }
 }
 ```
+
+Treat `KeychainError.itemNotFound` as "no token" explicitly in the repository instead of hiding every Keychain failure behind `try?`.
 
 ---
 

@@ -29,14 +29,16 @@ func minimalBaseFS() fstest.MapFS {
 	}
 }
 
+// minimalBaseWithGlobalPackFS adds a pack under a registered slug, because
+// Generate resolves packs through the registry and drops unknown slugs.
 func minimalBaseWithGlobalPackFS() fstest.MapFS {
 	filesystem := minimalBaseFS()
-	filesystem["ai-packs/test-pack"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
-	filesystem["ai-packs/test-pack/skills"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
-	filesystem["ai-packs/test-pack/skills/global-skill"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
-	filesystem["ai-packs/test-pack/skills/global-skill/SKILL.md"] = &fstest.MapFile{Data: []byte("# Global Skill\n")}
-	filesystem["ai-packs/test-pack/tutorials"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
-	filesystem["ai-packs/test-pack/tutorials/catalog.md"] = &fstest.MapFile{Data: []byte("# Tutorial\n")}
+	filesystem["ai-packs/gitflow"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/gitflow/skills"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/gitflow/skills/global-skill"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/gitflow/skills/global-skill/SKILL.md"] = &fstest.MapFile{Data: []byte("# Global Skill\n")}
+	filesystem["ai-packs/gitflow/tutorials"] = &fstest.MapFile{Mode: fs.ModeDir | 0755}
+	filesystem["ai-packs/gitflow/tutorials/catalog.md"] = &fstest.MapFile{Data: []byte("# Tutorial\n")}
 	return filesystem
 }
 
@@ -322,6 +324,47 @@ func TestGenerateRejectsInvalidProjectNamesBeforeWriting(t *testing.T) {
 			}
 			if len(entries) != 0 {
 				t.Fatalf("invalid name created output: %v", entries)
+			}
+		})
+	}
+}
+
+func TestGenerateRejectsInvalidSchemeNamesBeforeWriting(t *testing.T) {
+	for _, schemes := range [][]string{
+		{"Dev", "../../../../../escaped", "Production"},
+		{"Dev/Child"},
+		{"/tmp/Dev"},
+		{"Dev", "dev"},
+	} {
+		t.Run(strings.Join(schemes, ","), func(t *testing.T) {
+			dir := t.TempDir()
+			outputDir := filepath.Join(dir, "output")
+			writer := NewDiskWriter()
+			gen := NewProjectGenerator(
+				NewRenderer(minimalBaseFS(), writer),
+				writer,
+				&mockXcodeProjGenerator{},
+				&mockGitRunner{},
+				&mockMarkerReadWriter{},
+				minimalBaseFS(),
+				nil,
+				&mockPackRenderer{},
+			)
+			cfg := baseCfg(outputDir)
+			cfg.Schemes = schemes
+
+			_, err := gen.Generate(context.Background(), cfg)
+			var invalidScheme config.InvalidSchemeNameError
+			if !errors.As(err, &invalidScheme) {
+				t.Fatalf("error = %v, want InvalidSchemeNameError", err)
+			}
+
+			entries, readErr := os.ReadDir(dir)
+			if readErr != nil {
+				t.Fatalf("read temp directory: %v", readErr)
+			}
+			if len(entries) != 0 {
+				t.Fatalf("invalid scheme created output: %v", entries)
 			}
 		})
 	}
@@ -658,7 +701,7 @@ func TestGenerateDoesNotPublishGlobalPacksBeforeFatalStepsComplete(t *testing.T)
 				packRenderer,
 			)
 			cfg := baseCfg(outputDir)
-			cfg.AIPacks = []string{"test-pack"}
+			cfg.AIPacks = []string{"gitflow"}
 			cfg.SkillsScope = "global"
 
 			if _, err := gen.Generate(context.Background(), cfg); err == nil {
@@ -1223,5 +1266,60 @@ func TestGenerateAnvilMarkerHasCorrectMetadata(t *testing.T) {
 	}
 	if m.CreatedAt.Before(before) {
 		t.Error("marker CreatedAt should be after test start time")
+	}
+}
+
+func TestGenerateTwiceWithGlobalSkillsReusesThem(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	memFS := minimalBaseWithGlobalPackFS()
+	delete(memFS, "ai-packs/gitflow/tutorials")
+	delete(memFS, "ai-packs/gitflow/tutorials/catalog.md")
+	writer := NewDiskWriter()
+	renderer := NewRenderer(memFS, writer)
+	gen := NewProjectGenerator(
+		renderer,
+		writer,
+		&mockXcodeProjGenerator{output: "ok"},
+		&mockGitRunner{},
+		&mockMarkerReadWriter{},
+		memFS,
+		nil,
+		NewPackRenderer(memFS, renderer, writer, NewSettingsMerger(writer, memFS)),
+	)
+	generate := func() config.GenerationResult {
+		t.Helper()
+		cfg := baseCfg(t.TempDir())
+		cfg.AIPacks = []string{"gitflow"}
+		cfg.SkillsScope = "global"
+		result, err := gen.Generate(context.Background(), cfg)
+		if err != nil {
+			t.Fatalf("Generate: %v", err)
+		}
+		return result
+	}
+
+	generate()
+	second := generate()
+	if second.KeptSkills != nil {
+		t.Fatalf("an identical global skill should be reused silently, got KeptSkills %v", second.KeptSkills)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("home: %v", err)
+	}
+	skillFile := filepath.Join(home, ".claude", "skills", "global-skill", "SKILL.md")
+	if err := os.WriteFile(skillFile, []byte("# Customised\n"), 0644); err != nil {
+		t.Fatalf("customising the skill: %v", err)
+	}
+
+	third := generate()
+	want := []string{"~/.claude/skills/global-skill"}
+	if len(third.KeptSkills) != 1 || third.KeptSkills[0] != want[0] {
+		t.Fatalf("KeptSkills = %v, want %v", third.KeptSkills, want)
+	}
+	data, err := os.ReadFile(skillFile)
+	if err != nil || string(data) != "# Customised\n" {
+		t.Fatalf("customised skill changed: %q, %v", data, err)
 	}
 }

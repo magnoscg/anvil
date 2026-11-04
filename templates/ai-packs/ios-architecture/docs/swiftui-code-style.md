@@ -25,19 +25,24 @@ struct ArticleDetailView: View {
     // MARK: - Properties
 
     @Environment(\.dismiss) private var dismiss
-    private let viewModel: ArticleViewModel
+
+    @State
+    private var viewModel: ArticleDetailViewModel
+
+    @State
+    private var retryTrigger = false
 
     // MARK: - Init
 
-    init(viewModel: ArticleViewModel) {
-        self.viewModel = viewModel
+    init(viewModel: ArticleDetailViewModel) {
+        self._viewModel = State(initialValue: viewModel)
     }
 
     // MARK: - Body
 
     var body: some View {
         content
-            .task { await viewModel.loadArticles() }
+            .task(id: retryTrigger) { await viewModel.load() }
     }
 
     // MARK: - Private Views
@@ -50,7 +55,7 @@ struct ArticleDetailView: View {
     // MARK: - Private Methods
 
     private func handleRetry() {
-        Task { await viewModel.loadArticles() }
+        retryTrigger.toggle()
     }
 }
 
@@ -105,7 +110,8 @@ private struct HeaderSection: View {
 |-----------|----------|
 | Feature main View | `Features/<Feature>/UI/` |
 | Reusable feature component | `Features/<Feature>/UI/Components/` |
-| Design System component | `Core/DesignSystem/Components/` |
+| Shared component (all features) | `Core/Common/SwiftUI/Components/` (e.g. generated `ErrorView`, `LoadingStateView`) |
+| Design tokens | `Core/DesignSystem/Tokens/` (`AppColors`, `AppTypography`, `Spacing`, `AppIcons`, `IconSize`) |
 
 ### Custom ViewModifiers
 
@@ -116,11 +122,9 @@ Core/
 +- Common/
    +- SwiftUI/
       +- Modifiers/
-         +- ShimmerModifier.swift
-         +- LoadingOverlayModifier.swift
-         +- CardStyleModifier.swift
-         +- PrimaryButtonStyleModifier.swift
-         +- ConditionalModifier.swift
+         +- CustomListRow.swift         # generated
+         +- PrimaryButtonStyle.swift    # generated (.primaryButtonStyle())
+         +- ShimmerModifier.swift       # example of one you add
 ```
 
 File structure:
@@ -194,31 +198,37 @@ struct ArticleDetailView: View {
 
     // MARK: - Properties
 
-    @State var viewModel: ArticleDetailViewModel
+    @State
+    private var viewModel: ArticleDetailViewModel
+
+    // MARK: - Init
+
+    init(viewModel: ArticleDetailViewModel) {
+        self._viewModel = State(initialValue: viewModel)
+    }
 
     // MARK: - Body
 
     var body: some View {
         content
-            .task { await viewModel.load() }
+            .task(id: viewModel.articleId) { await viewModel.load() }
     }
 }
 
 // Factory stays the same - creates ViewModel and returns View
-static func makeView(articleId: String, ...) -> ArticleDetailView {
-    let viewModel = ArticleDetailViewModel(...)
+static func makeView(articleId: String, appRouter: AppRouter, dependencies: AppDependencies) -> some View {
+    let viewModel = makeViewModel(articleId: articleId, appRouter: appRouter, apiClient: dependencies.apiClient)
     return ArticleDetailView(viewModel: viewModel)
 }
 ```
 
-**Note**: Don't write explicit init with `_viewModel = State(initialValue:)`.
-Swift's memberwise initializer handles @State correctly.
+**Note**: Generated Views declare `@State private var viewModel` and set it once in an explicit `init` with `self._viewModel = State(initialValue: viewModel)`. SwiftUI keeps only the first value, so the extra ViewModels a Factory builds when the destination closure runs again are discarded: keep Factories and initializers cheap (no I/O or decoding).
 
 ### When to Use Each Wrapper
 
 | Wrapper | When to Use | Example |
 |---------|-------------|---------|
-| `@State var viewModel` | View receives from Factory | Main feature views |
+| `@State private var viewModel` + `State(initialValue:)` in `init` | View receives from Factory | Main feature views |
 | `@Bindable var viewModel` | Need `$viewModel.property` bindings | Forms with TextField/Toggle |
 | `var viewModel` | Parent owns @State, passes down | Child components |
 | `@State private var localState` | UI-only state (not ViewModel) | `isShowingSheet`, `selectedTab` |
@@ -307,25 +317,25 @@ final class ArticleViewModel {
     private(set) var state: ArticleState = .idle
 
     private let useCase: ArticleUseCase
-    private let router: ArticleRouter
     private let decoratorMapper: ArticleDecoratorMapper
+    private let router: ArticleRouter
 
     // MARK: - Init
 
-    init(
-        useCase: ArticleUseCase,
-        router: ArticleRouter,
-        decoratorMapper: ArticleDecoratorMapper
-    ) {
+    init(useCase: ArticleUseCase,
+         decoratorMapper: ArticleDecoratorMapper,
+         router: ArticleRouter) {
         self.useCase = useCase
-        self.router = router
         self.decoratorMapper = decoratorMapper
+        self.router = router
     }
 
     // MARK: - Public Methods
 
     func loadArticles() async {
         guard state != .loading else { return }
+
+        let previousState = state
         state = .loading
 
         do {
@@ -333,9 +343,11 @@ final class ArticleViewModel {
             let sections = decoratorMapper.mapToSections(models)
             state = .loaded(sections)
         } catch is CancellationError {
-            return
+            state = previousState
+        } catch let error as DomainError {
+            state = .error(ErrorDecorator.from(error))
         } catch {
-            state = .error(ErrorDecorator.generic)
+            state = .error(.generic)
         }
     }
 
@@ -347,7 +359,7 @@ final class ArticleViewModel {
 
 ### View with ViewModel Injection
 
-> **Important**: Use `@State var viewModel` when the View receives the ViewModel from a Factory.
+> **Important**: Use `@State private var viewModel`, set in `init` with `State(initialValue:)`, when the View receives the ViewModel from a Factory.
 > This preserves the ViewModel identity across navigation events.
 
 ```swift
@@ -360,13 +372,23 @@ struct ArticleView: View {
 
     // MARK: - Properties
 
-    @State var viewModel: ArticleViewModel
+    @State
+    private var viewModel: ArticleViewModel
+
+    @State
+    private var retryTrigger = false
+
+    // MARK: - Init
+
+    init(viewModel: ArticleViewModel) {
+        self._viewModel = State(initialValue: viewModel)
+    }
 
     // MARK: - Body
 
     var body: some View {
         content
-            .task {
+            .task(id: retryTrigger) {
                 await viewModel.loadArticles()
             }
     }
@@ -376,17 +398,19 @@ struct ArticleView: View {
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
-        case .idle, .loading:
-            ProgressView()
+        case .idle:
+            Color.clear
+        case .loading:
+            LoadingStateView()
         case .loaded(let sections):
             ArticleListContent(
                 sections: sections,
                 onSelectArticle: viewModel.navigateToDetail
             )
         case .error(let error):
-            ErrorView(error: error, onRetry: {
-                Task { await viewModel.loadArticles() }
-            })
+            ErrorView(error: ErrorDecorator(title: error.title,
+                                            message: error.message,
+                                            retryAction: { retryTrigger.toggle() }))
         }
     }
 }
@@ -407,8 +431,11 @@ struct ArticleView: View {
 
     // MARK: - Properties
 
-    @State var viewModel: ArticleViewModel
-    @State private var isShowingFilter = false
+    @State
+    private var viewModel: ArticleViewModel
+
+    @State
+    private var isShowingFilter = false
 
     // MARK: - Body
 
@@ -434,8 +461,8 @@ struct ArticleView: View {
 // Avoid
 @Environment(\.articleRepository) private var repository
 
-// Inject via ViewModel
-let viewModel = ArticleViewModel(useCase: useCase)
+// Inject through the Factory into the ViewModel
+ArticleFactory.makeView(appRouter: appRouter, dependencies: dependencies)
 ```
 
 ### Avoid
@@ -483,14 +510,21 @@ Button("Load") {
     }
 }
 
-// Better to move logic to ViewModel
+// Better: change the id that drives .task(id:)
+Button("Reload") {
+    retryTrigger.toggle()
+}
 ```
 
 ### Cancellation Handling in ViewModel
 
+Cancellation is not an error: restore the previous state.
+
 ```swift
 func loadArticles() async {
     guard state != .loading else { return }
+
+    let previousState = state
     state = .loading
 
     do {
@@ -498,9 +532,11 @@ func loadArticles() async {
         let sections = decoratorMapper.mapToSections(data)
         state = .loaded(sections)
     } catch is CancellationError {
-        return
+        state = previousState
+    } catch let error as DomainError {
+        state = .error(ErrorDecorator.from(error))
     } catch {
-        state = .error(ErrorDecorator.generic)
+        state = .error(.generic)
     }
 }
 ```

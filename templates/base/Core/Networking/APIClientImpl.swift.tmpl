@@ -3,12 +3,14 @@ import Foundation
 // MARK: - APIClientImpl
 
 /// Default implementation of `APIClient`.
-/// Holds a `URLSession` reference and manages its lifecycle.
+/// Holds a `URLSession` reference and manages its lifecycle: it invalidates only a session it
+/// created itself, never an injected one, which belongs to the caller and may be shared.
 /// Uses an interceptor chain for cross-cutting concerns (logging, retry, auth).
 final class APIClientImpl: APIClient, @unchecked Sendable {
     // MARK: - Properties
 
     private let session: URLSession
+    private let ownsSession: Bool
     private let decoder: JSONDecoder
     private let interceptorChain: InterceptorChain
     private let configuration: EnvironmentConfiguration
@@ -22,15 +24,13 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
         interceptors: [any RequestInterceptor]? = nil
     ) {
         self.configuration = configuration
-        // TODO: In a real project, use URLSessionFactory.makeSession(configuration:) here
         let resolvedSession: URLSession
         if let session {
             resolvedSession = session
+            ownsSession = false
         } else {
-            let sessionConfig = URLSessionConfiguration.default
-            sessionConfig.timeoutIntervalForRequest = configuration.requestTimeout
-            sessionConfig.timeoutIntervalForResource = configuration.resourceTimeout
-            resolvedSession = URLSession(configuration: sessionConfig)
+            resolvedSession = URLSessionFactory.makeSession(configuration: configuration)
+            ownsSession = true
         }
         self.session = resolvedSession
         self.decoder = decoder
@@ -47,7 +47,9 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
     }
 
     deinit {
-        session.invalidateAndCancel()
+        if ownsSession {
+            session.finishTasksAndInvalidate()
+        }
     }
 
     // MARK: - APIClient (Internal Endpoints)
@@ -89,6 +91,8 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
             return try await interceptorChain.execute(request)
         } catch let apiError as APIError {
             throw apiError
+        } catch let urlError as URLError where urlError.code == .cancelled && Task.isCancelled {
+            throw CancellationError()
         } catch let urlError as URLError {
             throw APIError.networkError(urlError)
         } catch is CancellationError {

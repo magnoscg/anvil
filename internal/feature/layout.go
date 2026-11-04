@@ -63,6 +63,10 @@ func domainJobs(name string) []FileJob {
 			TemplatePath: "feature/Domain/FeatureUseCaseImpl.swift.tmpl",
 			DestPath:     filepath.Join("Domain", name, "UseCases", name+"UseCaseImpl.swift"),
 		},
+		{
+			TemplatePath: "feature/Domain/FeatureRepository.swift.tmpl",
+			DestPath:     filepath.Join("Domain", name, "Repositories", name+"Repository.swift"),
+		},
 	}
 }
 
@@ -79,10 +83,6 @@ func dataJobs(name string, cfg config.FeatureConfig) []FileJob {
 		{
 			TemplatePath: "feature/Data/FeatureRemoteDataSource.swift.tmpl",
 			DestPath:     filepath.Join("Data", name, "DataSources", name+"RemoteDataSource.swift"),
-		},
-		{
-			TemplatePath: "feature/Data/FeatureRepository.swift.tmpl",
-			DestPath:     filepath.Join("Data", name, "Repositories", name+"Repository.swift"),
 		},
 		{
 			TemplatePath: "feature/Data/FeatureRepositoryImpl.swift.tmpl",

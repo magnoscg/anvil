@@ -47,23 +47,23 @@ func TestIntegrationAnvilFeature(t *testing.T) {
 	// Step 3: Verify all source feature files exist in correct directories
 	expectedSourceFiles := []string{
 		// Domain
-		filepath.Join(projectDir, "Domain", "TestFeature", "Models", "TestFeatureModel.swift"),
-		filepath.Join(projectDir, "Domain", "TestFeature", "UseCases", "TestFeatureUseCase.swift"),
-		filepath.Join(projectDir, "Domain", "TestFeature", "UseCases", "TestFeatureUseCaseImpl.swift"),
+		projectPath(projectDir, "Domain", "TestFeature", "Models", "TestFeatureModel.swift"),
+		projectPath(projectDir, "Domain", "TestFeature", "UseCases", "TestFeatureUseCase.swift"),
+		projectPath(projectDir, "Domain", "TestFeature", "UseCases", "TestFeatureUseCaseImpl.swift"),
+		projectPath(projectDir, "Domain", "TestFeature", "Repositories", "TestFeatureRepository.swift"),
 		// Data
-		filepath.Join(projectDir, "Data", "TestFeature", "DTO", "TestFeatureDTO.swift"),
-		filepath.Join(projectDir, "Data", "TestFeature", "Mappers", "TestFeatureDTOMapper.swift"),
-		filepath.Join(projectDir, "Data", "TestFeature", "DataSources", "TestFeatureRemoteDataSource.swift"),
-		filepath.Join(projectDir, "Data", "TestFeature", "Repositories", "TestFeatureRepository.swift"),
-		filepath.Join(projectDir, "Data", "TestFeature", "Repositories", "TestFeatureRepositoryImpl.swift"),
+		projectPath(projectDir, "Data", "TestFeature", "DTO", "TestFeatureDTO.swift"),
+		projectPath(projectDir, "Data", "TestFeature", "Mappers", "TestFeatureDTOMapper.swift"),
+		projectPath(projectDir, "Data", "TestFeature", "DataSources", "TestFeatureRemoteDataSource.swift"),
+		projectPath(projectDir, "Data", "TestFeature", "Repositories", "TestFeatureRepositoryImpl.swift"),
 		// Features
-		filepath.Join(projectDir, "Features", "TestFeature", "DI", "TestFeatureFactory.swift"),
-		filepath.Join(projectDir, "Features", "TestFeature", "UI", "TestFeatureView.swift"),
-		filepath.Join(projectDir, "Features", "TestFeature", "UI", "TestFeatureState.swift"),
-		filepath.Join(projectDir, "Features", "TestFeature", "UI", "TestFeatureDecorator.swift"),
-		filepath.Join(projectDir, "Features", "TestFeature", "Presentation", "ViewModels", "TestFeatureViewModel.swift"),
-		filepath.Join(projectDir, "Features", "TestFeature", "Presentation", "Mappers", "TestFeatureDecoratorMapper.swift"),
-		filepath.Join(projectDir, "Features", "TestFeature", "Navigation", "TestFeatureRouter.swift"),
+		projectPath(projectDir, "Features", "TestFeature", "DI", "TestFeatureFactory.swift"),
+		projectPath(projectDir, "Features", "TestFeature", "UI", "TestFeatureView.swift"),
+		projectPath(projectDir, "Features", "TestFeature", "UI", "TestFeatureState.swift"),
+		projectPath(projectDir, "Features", "TestFeature", "UI", "TestFeatureDecorator.swift"),
+		projectPath(projectDir, "Features", "TestFeature", "Presentation", "ViewModels", "TestFeatureViewModel.swift"),
+		projectPath(projectDir, "Features", "TestFeature", "Presentation", "Mappers", "TestFeatureDecoratorMapper.swift"),
+		projectPath(projectDir, "Features", "TestFeature", "Navigation", "TestFeatureRouter.swift"),
 	}
 
 	for _, f := range expectedSourceFiles {
@@ -74,11 +74,11 @@ func TestIntegrationAnvilFeature(t *testing.T) {
 
 	// Step 4: Verify all test files exist with correct mock types
 	expectedTestFiles := []string{
-		filepath.Join(projectDir, "Tests", "Domain", "TestFeature", "UseCases", "TestFeatureUseCaseTests.swift"),
-		filepath.Join(projectDir, "Tests", "Data", "TestFeature", "Repositories", "TestFeatureRepositoryTests.swift"),
-		filepath.Join(projectDir, "Tests", "Data", "TestFeature", "Mappers", "TestFeatureDTOMapperTests.swift"),
-		filepath.Join(projectDir, "Tests", "Features", "TestFeature", "Presentation", "ViewModels", "TestFeatureViewModelTests.swift"),
-		filepath.Join(projectDir, "Tests", "Features", "TestFeature", "Presentation", "Mappers", "TestFeatureDecoratorMapperTests.swift"),
+		projectPath(projectDir, "Tests", "Domain", "TestFeature", "UseCases", "TestFeatureUseCaseTests.swift"),
+		projectPath(projectDir, "Tests", "Data", "TestFeature", "Repositories", "TestFeatureRepositoryTests.swift"),
+		projectPath(projectDir, "Tests", "Data", "TestFeature", "Mappers", "TestFeatureDTOMapperTests.swift"),
+		projectPath(projectDir, "Tests", "Features", "TestFeature", "Presentation", "ViewModels", "TestFeatureViewModelTests.swift"),
+		projectPath(projectDir, "Tests", "Features", "TestFeature", "Presentation", "Mappers", "TestFeatureDecoratorMapperTests.swift"),
 	}
 
 	for _, f := range expectedTestFiles {
@@ -88,12 +88,12 @@ func TestIntegrationAnvilFeature(t *testing.T) {
 	}
 
 	expectedMockFiles := []string{
-		filepath.Join(projectDir, "Tests", "Mocks", "TestFeatureUseCaseMock.swift"),
-		filepath.Join(projectDir, "Tests", "Mocks", "TestFeatureRepositoryMock.swift"),
-		filepath.Join(projectDir, "Tests", "Mocks", "TestFeatureRouterMock.swift"),
-		filepath.Join(projectDir, "Tests", "Mocks", "TestFeatureRemoteDataSourceMock.swift"),
-		filepath.Join(projectDir, "Tests", "Mocks", "TestFeatureDTOMapperMock.swift"),
-		filepath.Join(projectDir, "Tests", "Mocks", "TestFeatureDecoratorMapperMock.swift"),
+		projectPath(projectDir, "Tests", "Mocks", "TestFeatureUseCaseMock.swift"),
+		projectPath(projectDir, "Tests", "Mocks", "TestFeatureRepositoryMock.swift"),
+		projectPath(projectDir, "Tests", "Mocks", "TestFeatureRouterMock.swift"),
+		projectPath(projectDir, "Tests", "Mocks", "TestFeatureRemoteDataSourceMock.swift"),
+		projectPath(projectDir, "Tests", "Mocks", "TestFeatureDTOMapperMock.swift"),
+		projectPath(projectDir, "Tests", "Mocks", "TestFeatureDecoratorMapperMock.swift"),
 	}
 
 	for _, f := range expectedMockFiles {
@@ -102,8 +102,8 @@ func TestIntegrationAnvilFeature(t *testing.T) {
 		}
 	}
 
-	// Verify total file count
-	wantFiles := 27
+	// Verify that nothing beyond the expected files was created
+	wantFiles := len(expectedSourceFiles) + len(expectedTestFiles) + len(expectedMockFiles)
 	if len(forgeResult.FilesCreated) != wantFiles {
 		t.Errorf("FilesCreated count = %d, want %d", len(forgeResult.FilesCreated), wantFiles)
 	}
@@ -124,8 +124,7 @@ func TestIntegrationAnvilFeature(t *testing.T) {
 		t.Errorf("expected FeatureExistsError, got %T: %v", dupErr, dupErr)
 	}
 
-	// Step 6-7: xcodebuild compilation tests are skipped here (require Tuist-generated
-	// Xcode project). Steps 6-7 need a real Tuist + Xcode environment.
+	// Step 6-7: Building the feature with xcodebuild is not covered here.
 }
 
 func TestIntegrationFeatureRenderedContent(t *testing.T) {
@@ -158,7 +157,7 @@ func TestIntegrationFeatureRenderedContent(t *testing.T) {
 	}
 
 	// Verify ViewModel content
-	vmFile := filepath.Join(projectDir, "Features", "Article", "Presentation", "ViewModels", "ArticleViewModel.swift")
+	vmFile := projectPath(projectDir, "Features", "Article", "Presentation", "ViewModels", "ArticleViewModel.swift")
 	vmData, err := os.ReadFile(vmFile)
 	if err != nil {
 		t.Fatalf("reading ViewModel: %v", err)
@@ -186,7 +185,7 @@ func TestIntegrationFeatureRenderedContent(t *testing.T) {
 	}
 
 	// Verify Router content
-	routerFile := filepath.Join(projectDir, "Features", "Article", "Navigation", "ArticleRouter.swift")
+	routerFile := projectPath(projectDir, "Features", "Article", "Navigation", "ArticleRouter.swift")
 	routerData, err := os.ReadFile(routerFile)
 	if err != nil {
 		t.Fatalf("reading Router: %v", err)
@@ -211,7 +210,7 @@ func TestIntegrationFeatureRenderedContent(t *testing.T) {
 	}
 
 	// Verify no hardcoded references leaked
-	err = filepath.Walk(filepath.Join(projectDir, "Features", "Article"), func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(projectPath(projectDir, "Features", "Article"), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err
 		}

@@ -9,15 +9,15 @@ struct MockPokemonListDTOMapper: PokemonListDTOMapper {
     // MARK: - Properties
 
     /// The fixed model to return from all map calls.
-    let mapResult: PokemonListModel
+    let mapResult: PokemonSummaryModel
 
     // MARK: - PokemonListDTOMapper
 
-    nonisolated func mapToDomain(_: PokemonListDTO) -> PokemonListModel {
+    nonisolated func mapToDomain(_: PokemonListDTO) -> PokemonSummaryModel {
         mapResult
     }
 
-    nonisolated func mapToDomain(_ dtos: [PokemonListDTO]) -> [PokemonListModel] {
+    nonisolated func mapToDomain(_ dtos: [PokemonListDTO]) -> [PokemonSummaryModel] {
         dtos.map { mapToDomain($0) }
     }
 }

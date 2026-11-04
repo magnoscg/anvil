@@ -17,12 +17,6 @@ struct ArchitectureDetailUseCaseImpl: ArchitectureDetailUseCase {
     // MARK: - Public Methods
 
     func execute(id: String) async throws -> ArchitectureDetailModel? {
-        do {
-            return try await repository.getFeatureDetail(id: id)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw DomainError.map(error)
-        }
+        try await repository.getFeatureDetail(id: id)
     }
 }

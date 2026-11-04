@@ -184,6 +184,17 @@ func (m generateModel) view() string {
 			box.WriteString(m.theme.Body.Render("$ xcodebuild build -scheme " + scheme))
 		}
 
+		if len(r.KeptSkills) > 0 {
+			box.WriteString("\n\n")
+			box.WriteString(m.theme.WarningText.Render("Kept existing global skills that differ from this version:"))
+			for _, skill := range r.KeptSkills {
+				box.WriteString("\n")
+				box.WriteString(m.theme.Body.Render("  " + skill))
+			}
+			box.WriteString("\n")
+			box.WriteString(m.theme.MutedText.Render("Delete a skill folder and run anvil again to install this version."))
+		}
+
 		b.WriteString(m.theme.SuccessBox.Width(w - 4).Render(box.String()))
 		b.WriteString("\n\n")
 		b.WriteString(renderFooter(m.theme, "enter exit • q quit"))

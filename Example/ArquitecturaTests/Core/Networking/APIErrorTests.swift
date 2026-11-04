@@ -20,10 +20,10 @@ struct APIErrorTests {
         #expect(error.isRetryable == true)
     }
 
-    @Test("Not connected to internet is retryable")
-    func notConnectedIsRetryable() {
+    @Test("Not connected to internet is not retryable")
+    func notConnectedIsNotRetryable() {
         let error = APIError.networkError(URLError(.notConnectedToInternet))
-        #expect(error.isRetryable == true)
+        #expect(error.isRetryable == false)
     }
 
     @Test("Server error 500 is retryable")

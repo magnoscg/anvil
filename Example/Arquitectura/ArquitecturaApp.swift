@@ -10,15 +10,14 @@ enum AppLaunchState: Equatable {
 
 // MARK: - ArquitecturaApp
 
+/// Composition root: creates app-lifetime dependencies and the app-wide launch state.
+/// Each window gets its own `AppRootView`, which owns that window's navigation.
 @main
 struct ArquitecturaApp: App {
     // MARK: - Properties
 
     @State
     private var launchState: AppLaunchState = .splash
-
-    @State
-    private var appRouter = AppRouterImpl()
 
     /// App-level dependencies created at the composition root
     private let dependencies: AppDependencies
@@ -33,19 +32,8 @@ struct ArquitecturaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                switch launchState {
-                case .splash:
-                    SplashScreenFactory.makeView {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            launchState = .ready
-                        }
-                    }
-                case .ready:
-                    RootNavigationView(appRouter: appRouter,
-                                       dependencies: dependencies)
-                }
-            }
+            AppRootView(launchState: $launchState,
+                        dependencies: dependencies)
         }
     }
 }

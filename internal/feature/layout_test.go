@@ -128,11 +128,11 @@ func TestFeatureLayoutDirectoryStructure(t *testing.T) {
 		"Domain/Auth/Models/AuthModel.swift",
 		"Domain/Auth/UseCases/AuthUseCase.swift",
 		"Domain/Auth/UseCases/AuthUseCaseImpl.swift",
+		"Domain/Auth/Repositories/AuthRepository.swift",
 		// Data
 		"Data/Auth/DTO/AuthDTO.swift",
 		"Data/Auth/Mappers/AuthDTOMapper.swift",
 		"Data/Auth/DataSources/AuthRemoteDataSource.swift",
-		"Data/Auth/Repositories/AuthRepository.swift",
 		"Data/Auth/Repositories/AuthRepositoryImpl.swift",
 		// Features
 		"Features/Auth/DI/AuthFactory.swift",
