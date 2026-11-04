@@ -16,7 +16,7 @@ struct PokemonListDecoratorMapperTests {
     @Test("Map single model correctly maps id, name, imageURL, and types")
     func mapSingleModel() {
         // Given
-        let model = PokemonListModel(id: 25,
+        let model = PokemonSummaryModel(id: 25,
                                      name: "pikachu",
                                      imageURL: URL(string: "https://example.com/25.png"),
                                      types: [.electric])
@@ -37,9 +37,9 @@ struct PokemonListDecoratorMapperTests {
     @Test("Map array of models returns correct count")
     func mapArrayOfModels() {
         // Given
-        let models = [PokemonListModel(id: 1, name: "bulbasaur", imageURL: nil, types: [.grass, .poison]),
-                      PokemonListModel(id: 4, name: "charmander", imageURL: nil, types: [.fire]),
-                      PokemonListModel(id: 7, name: "squirtle", imageURL: nil, types: [.water])]
+        let models = [PokemonSummaryModel(id: 1, name: "bulbasaur", imageURL: nil, types: [.grass, .poison]),
+                      PokemonSummaryModel(id: 4, name: "charmander", imageURL: nil, types: [.fire]),
+                      PokemonSummaryModel(id: 7, name: "squirtle", imageURL: nil, types: [.water])]
 
         // When
         let items = mapper.mapToItems(models)
@@ -85,7 +85,7 @@ struct PokemonListDecoratorMapperTests {
 
         for (pokemonType, expectedColor) in typeMapping {
             // When
-            let model = PokemonListModel(id: 1, name: "test", imageURL: nil, types: [pokemonType])
+            let model = PokemonSummaryModel(id: 1, name: "test", imageURL: nil, types: [pokemonType])
             let decorator = mapper.map(model)
 
             // Then
@@ -97,7 +97,7 @@ struct PokemonListDecoratorMapperTests {
     @Test("Model with multiple types maps all types correctly")
     func modelWithMultipleTypes() {
         // Given
-        let model = PokemonListModel(id: 6,
+        let model = PokemonSummaryModel(id: 6,
                                      name: "charizard",
                                      imageURL: nil,
                                      types: [.fire, .flying])

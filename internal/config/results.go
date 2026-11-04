@@ -16,6 +16,10 @@ type GenerationResult struct {
 	// GitOutput captures stdout/stderr from git initialization.
 	GitOutput string
 
+	// KeptSkills lists global skills that already existed with different
+	// content and were left untouched (for example ~/.claude/skills/x).
+	KeptSkills []string
+
 	// Duration is how long the entire generation took.
 	Duration time.Duration
 }

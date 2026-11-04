@@ -20,10 +20,15 @@ func NewFeatureForge(renderer generator.TemplateRenderer) *DefaultFeatureForge {
 }
 
 // Forge validates the config, renders all feature templates, and returns a
-// ForgeResult. If any step fails, previously created files are rolled back.
+// ForgeResult. Every destination is checked before anything is written, and if
+// a step fails, the files and directories created so far are rolled back, so
+// a failed run can be retried.
 func (s *DefaultFeatureForge) Forge(cfg config.FeatureConfig) (config.ForgeResult, error) {
-	// 1. Validate feature name
+	// 1. Validate the feature and project names
 	if err := ValidateFeatureName(cfg.FeatureName); err != nil {
+		return config.ForgeResult{}, err
+	}
+	if err := config.ValidateProjectName(cfg.ProjectName); err != nil {
 		return config.ForgeResult{}, err
 	}
 
@@ -45,21 +50,41 @@ func (s *DefaultFeatureForge) Forge(cfg config.FeatureConfig) (config.ForgeResul
 	// 3. Build template context
 	ctx := generator.NewFeatureContext(cfg)
 
-	// 4. Build layout (all file mappings)
+	// 4. Build layout (all file mappings). MapToProjectPath places source
+	// files in <ProjectName>/ and test files in <ProjectName>Tests/, matching
+	// the Xcode target structure.
 	jobs := FeatureLayout(cfg)
+	destPaths := make([]string, len(jobs))
+	for i, job := range jobs {
+		destPaths[i] = filepath.Join(cfg.ProjectRoot, generator.MapToProjectPath(job.DestPath, cfg.ProjectName))
+	}
 
-	// 5. Render each file, tracking created paths for potential rollback.
-	// Use mapToProjectPath to place source files in <ProjectName>/ and
-	// test files in <ProjectName>Tests/, matching the Xcode target structure.
+	// 5. Refuse to start when any destination already exists, so a collision
+	// cannot leave a half-written feature behind.
+	for _, destPath := range destPaths {
+		if _, err := os.Lstat(destPath); err == nil {
+			return config.ForgeResult{}, config.FeatureExistsError{
+				FeatureName: cfg.FeatureName,
+				ExistingDir: destPath,
+			}
+		} else if !os.IsNotExist(err) {
+			return config.ForgeResult{}, fmt.Errorf("checking %s: %w", destPath, err)
+		}
+	}
+
+	// 6. Render each file, tracking the files and directories it creates.
 	var created []string
-	for _, job := range jobs {
-		mappedPath := generator.MapToProjectPath(job.DestPath, cfg.ProjectName)
-		destPath := filepath.Join(cfg.ProjectRoot, mappedPath)
+	var createdDirs []string
+	createdDirSet := make(map[string]struct{})
+	for i, job := range jobs {
+		destPath := destPaths[i]
 
-		if err := s.renderer.Render(job.TemplatePath, ctx, destPath); err != nil {
-			// Rollback files created so far
-			rollbackErr := s.Rollback(created)
-			if rollbackErr != nil {
+		err := generator.EnsureTrackedDir(filepath.Dir(destPath), &createdDirs, createdDirSet)
+		if err == nil {
+			err = s.renderer.Render(job.TemplatePath, ctx, destPath)
+		}
+		if err != nil {
+			if rollbackErr := generator.RollbackCreated(created, createdDirs); rollbackErr != nil {
 				return config.ForgeResult{}, config.RollbackError{
 					OriginalError: err,
 					RollbackCause: rollbackErr,
@@ -70,10 +95,10 @@ func (s *DefaultFeatureForge) Forge(cfg config.FeatureConfig) (config.ForgeResul
 		created = append(created, destPath)
 	}
 
-	// 6. Build wiring instructions
+	// 7. Build wiring instructions
 	instructions := WiringInstructions(cfg)
 
-	// 7. Return result
+	// 8. Return result
 	featureDir := filepath.Join("Features", cfg.FeatureName)
 	result := config.ForgeResult{
 		FeatureDir:         featureDir,

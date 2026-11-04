@@ -20,9 +20,9 @@ Si no se proporciona, continua con el flujo clasico (Paso 1).
 
 ## Paso 1 — Leer reglas base
 
-Lee SIEMPRE estos 2 docs:
-1. `~/.claude/dev-verify-docs/project-rules.md` — reglas maestras, anti-patterns, naming
-2. `~/.claude/dev-verify-docs/project-structure.md` — estructura de carpetas
+Lee SIEMPRE estos 2 docs del proyecto (los instala el pack ios-architecture):
+1. `CLAUDE.md` — reglas maestras, anti-patterns, naming
+2. `.claude/docs/PROJECT-STRUCTURE.md` — estructura de carpetas
 
 ## Paso 2 — Determinar nivel de verificacion
 
@@ -33,11 +33,11 @@ Lee el CLAUDE.md del proyecto actual (directorio de trabajo) si existe:
 
 ## Paso 3 — Leer docs adicionales segun scope
 
-Segun los ficheros que vas a verificar, lee docs adicionales de `~/.claude/dev-verify-docs/`:
+Segun los ficheros que vas a verificar, lee docs adicionales de `.claude/docs/`:
 
 | Si hay ficheros en... | Lee |
 |----------------------|-----|
-| Domain/, Data/, Features/ | architecture.md |
+| Domain/, Data/, Features/ | ARCHITECTURE.md |
 | Ficheros nuevos (Factory, Router, UseCase) | new-feature.md |
 | Features/*/UI/ o */Presentation/ | swiftui-code-style.md |
 | Codigo con async/Task/actor/Sendable | swift-concurrency.md |

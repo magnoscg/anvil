@@ -53,12 +53,26 @@ Domain, Data, Features, Navigation, DI, and SwiftData persistence.`,
 			return err
 		}
 
-		if wizard, ok := finalModel.(tui.WizardModel); ok {
-			warnMissingAxiom(os.Stdout, wizard.InstalledPacks())
+		if err := finishInit(os.Stdout, finalModel); err != nil {
+			cmd.SilenceUsage = true
+			return err
 		}
-
 		return nil
 	},
+}
+
+// finishInit turns the wizard's outcome into the command result, so a failed
+// generation makes anvil init exit non-zero instead of reporting success.
+func finishInit(w io.Writer, finalModel tea.Model) error {
+	wizard, ok := finalModel.(tui.WizardModel)
+	if !ok {
+		return nil
+	}
+	if err := wizard.Err(); err != nil {
+		return fmt.Errorf("generation failed: %w", err)
+	}
+	warnMissingAxiom(w, wizard.InstalledPacks())
+	return nil
 }
 
 // warnMissingAxiom points the user at Axiom's install commands when they

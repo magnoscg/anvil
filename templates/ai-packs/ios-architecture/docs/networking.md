@@ -4,7 +4,7 @@
 
 ## Overview
 
-This guide covers the async networking layer: dual-endpoint system, interceptor chain, error handling, retry policies, and connectivity monitoring.
+This guide covers the async networking layer: dual-endpoint system, interceptor chain, error handling, retry policies, SSL pinning, and connectivity monitoring.
 
 ---
 
@@ -42,32 +42,51 @@ The default implementation (`APIClientImpl`) is a `final class` (not struct) bec
 ```swift
 // Core/Networking/APIClientImpl.swift
 
-final class APIClientImpl: APIClient, @unchecked Sendable {
-    private let session: URLSession
-    private let configuration: EnvironmentConfiguration
-    private let decoder: JSONDecoder
-    private let interceptors: [any RequestInterceptor]
+// MARK: - APIClientImpl
 
-    init(configuration: EnvironmentConfiguration = EnvironmentConfigurationImpl(),
+final class APIClientImpl: APIClient, @unchecked Sendable {
+    // MARK: - Properties
+
+    private let session: URLSession
+    private let ownsSession: Bool
+    private let decoder: JSONDecoder
+    private let interceptorChain: InterceptorChain
+    private let configuration: EnvironmentConfiguration
+
+    // MARK: - Init
+
+    init(configuration: EnvironmentConfiguration,
          session: URLSession? = nil,
          decoder: JSONDecoder = JSONDecoder(),
-         interceptors: [any RequestInterceptor]? = nil) {
-        self.configuration = configuration
-        self.session = session ?? URLSessionFactory.makeSession(configuration: configuration)
-        self.decoder = decoder
-        self.interceptors = interceptors ?? Self.defaultInterceptors()
-    }
+         interceptors: [any RequestInterceptor]? = nil)
 
     deinit {
-        session.invalidateAndCancel()
+        if ownsSession {
+            session.finishTasksAndInvalidate()
+        }
     }
 }
 ```
 
 **Key design decisions:**
+- Created once in `AppDependencies` (`APIClientImpl(configuration: EnvironmentConfigurationImpl())`) and shared through `dependencies.apiClient`. Factories never create their own client.
 - `@unchecked Sendable` — safe because all properties are `let` and `URLSession` is thread-safe
-- Session created via `URLSessionFactory` which configures SSL pinning based on environment
-- `deinit` invalidates the session to prevent resource leaks
+- Without an injected `session`, it builds one with `URLSessionFactory.makeSession(configuration:)` (see Security below), which waits for connectivity and applies SSL pinning when the environment enables it
+- Requests go through an `InterceptorChain` (default: `[RetryInterceptor()]`)
+- It invalidates only a session it created (`finishTasksAndInvalidate()` in `deinit`, which also releases the pinning delegate). An injected session belongs to the caller and may be shared, so the client never invalidates it
+
+### Error Translation in APIClientImpl
+
+| Failure | Thrown as |
+|---------|-----------|
+| Non-2xx status | `APIError.httpError(statusCode:data:)` |
+| `DecodingError` while decoding `T` | `APIError.decodingError` |
+| `URLError.cancelled` **and** `Task.isCancelled` | `CancellationError` |
+| Any other `URLError` (including `.cancelled` without task cancellation, e.g. a rejected authentication challenge) | `APIError.networkError` |
+| `CancellationError` | rethrown unchanged |
+| Anything else | `APIError.unknown(SendableError)` |
+
+Requiring `Task.isCancelled` keeps real failures that URLSession reports as `.cancelled` visible instead of silently restoring the previous screen state.
 
 ---
 
@@ -81,7 +100,7 @@ final class APIClientImpl: APIClient, @unchecked Sendable {
 struct Endpoint: Sendable {
     let path: String
     let method: HTTPMethod
-    let queryParameters: [String: any CustomStringConvertible & Sendable]?
+    let queryParameters: [String: String]?
     let headers: [String: String]?
     let body: Data?
     let contentType: ContentType
@@ -99,7 +118,7 @@ struct Endpoint: Sendable {
 let endpoint = Endpoint.get(path: "/articles")
 
 // GET with query parameters
-let endpoint = Endpoint.get(path: "/articles", queryParameters: ["page": 1, "limit": 20])
+let endpoint = Endpoint.get(path: "/articles", queryParameters: ["page": "1", "limit": "20"])
 
 // POST with Encodable body
 let endpoint = try Endpoint.post(path: "/articles", body: articleDTO)
@@ -233,7 +252,7 @@ extension APIError {
         switch self {
         case let .networkError(urlError):
             let retryableCodes: [URLError.Code] = [
-                .timedOut, .networkConnectionLost, .notConnectedToInternet,
+                .timedOut, .networkConnectionLost,
                 .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed
             ]
             return retryableCodes.contains(urlError.code)
@@ -270,27 +289,34 @@ extension APIError {
 
 ### Error Mapping to Domain
 
-```swift
-enum ArticleError: Error {
-    case notFound
-    case serverError(String?)
-    case networkUnavailable
-    case unknown
+`APIError` never leaves the Data layer. Every `RepositoryImpl` wraps its work in `try await DomainError.catching { ... }` (`Data/Common/DomainErrorMapping.swift`), which rethrows `CancellationError` unchanged and maps everything else with `DomainError.map(_:)`:
 
-    init(from apiError: APIError) {
-        switch apiError {
-        case .networkError:
-            self = .networkUnavailable
-        case let .httpError(statusCode, _) where statusCode == 404:
-            self = .notFound
-        case .httpError:
-            self = .serverError(apiError.serverError?.message)
-        case .decodingError, .invalidURL, .unknown:
-            self = .unknown
+| Error | `DomainError` |
+|-------|---------------|
+| `APIError.networkError`, `APIError.invalidURL` | `.network` |
+| `APIError.httpError` 401 | `.unauthorized` |
+| `APIError.httpError` 404 | `.notFound` |
+| `APIError.httpError` (other status) | `.server` |
+| `APIError.decodingError` or a raw `DecodingError` | `.parsing` |
+| `APIError.unknown` or any other error | `.unknown` |
+| An existing `DomainError` | unchanged |
+
+```swift
+// MARK: - ArticleRepositoryImpl
+
+struct ArticleRepositoryImpl: ArticleRepository {
+    // MARK: - Public Methods
+
+    func fetchArticles() async throws -> [ArticleModel] {
+        try await DomainError.catching {
+            let dtos = try await remoteDataSource.fetchArticles()
+            return mapper.map(dtos)
         }
     }
 }
 ```
+
+UseCases don't catch or map; the ViewModel turns the `DomainError` into an `ErrorDecorator` with `ErrorDecorator.from(_:)`. Need the server's message (`apiError.serverError?.message`) in the UI? Add a case to `DomainError` and map it in `DomainErrorMapping`, rather than exposing `APIError`.
 
 ### DON'T: Pre-flight Connectivity Checks
 
@@ -333,18 +359,24 @@ protocol RequestInterceptor: Sendable {
 
 #### RetryInterceptor
 
-Implements retry logic with exponential backoff. Only retries transient errors.
+Implements retry logic with exponential backoff. Only retries transient errors, and only on requests that are
+safe to resend: an idempotent method (GET, HEAD, PUT, DELETE, OPTIONS, TRACE) or any request carrying a
+non-empty `Idempotency-Key` header. POST and PATCH without that header are sent once, because a lost response
+or a 5xx after the server applied them would otherwise duplicate the side effect. Cancellation is checked first.
 
 ```swift
-nonisolated struct RetryInterceptor: RequestInterceptor {
+struct RetryInterceptor: RequestInterceptor {
     init(policy: RetryPolicy = .default)
 }
 ```
 
 Features:
 - Retries on 5xx HTTP errors and 429 (rate limiting)
-- Retries on transient URLError codes (timeout, connection lost, DNS failure, etc.)
-- Respects `CancellationError` — never retries cancellation
+- Retries on transient URLError codes (timeout, connection lost, DNS failure, etc.) while the retry still starts within the time budget. With the default 30 s budget and 30 s request timeout, a timed-out request is reported, not retried
+- Does not retry `notConnectedToInternet`: the session already waits for connectivity, and a retry seconds later fails the same way
+- Honors `Retry-After` on a 429 or 5xx, as delay-seconds or as an HTTP date, in place of its backoff. A wait longer than `maxDelay`, or one that would end after `maxElapsedTime`, returns the response as is
+- Starts no retry after the policy's `maxElapsedTime`
+- Respects cancellation — checks it before the first attempt and never retries a `CancellationError`
 - Uses `RetryPolicy` for backoff configuration
 
 ### Custom Interceptor Example (Auth)
@@ -378,20 +410,24 @@ nonisolated struct RetryPolicy: Sendable, Equatable {
     let baseDelay: TimeInterval
     let maxDelay: TimeInterval
     let jitterFactor: Double
+    let maxElapsedTime: TimeInterval
 
     func delay(for attempt: Int) -> TimeInterval
     func shouldRetry(attempt: Int) -> Bool
+    func fitsTimeBudget(elapsed: TimeInterval, delay: TimeInterval) -> Bool
 }
 ```
 
+`maxElapsedTime` is a time budget measured from the first attempt: no retry starts after it. It bounds when the last attempt can start, not how long that attempt runs, so the worst case is the budget plus one resource timeout (about 90 s with the defaults).
+
 ### Preset Policies
 
-| Policy | Max Retries | Base Delay | Max Delay | Use Case |
-|--------|-------------|------------|-----------|----------|
-| `.default` | 3 | 1.0s | 30.0s | Standard requests |
-| `.none` | 0 | 0 | 0 | No retries |
-| `.aggressive` | 5 | 2.0s | 60.0s | Critical operations |
-| `.quick` | 2 | 0.5s | 5.0s | Fast operations |
+| Policy | Max Retries | Base Delay | Max Delay | Time Budget | Use Case |
+|--------|-------------|------------|-----------|-------------|----------|
+| `.default` | 3 | 1.0s | 30.0s | 30s | Standard requests |
+| `.none` | 0 | 0 | 0 | 0 | No retries |
+| `.aggressive` | 5 | 2.0s | 60.0s | 120s | Critical operations |
+| `.quick` | 2 | 0.5s | 5.0s | 10s | Fast operations |
 
 ---
 
@@ -402,7 +438,8 @@ nonisolated struct RetryPolicy: Sendable, Equatable {
 ```swift
 // Core/Networking/NetworkMonitor.swift
 
-protocol NetworkMonitor: Sendable {
+@MainActor
+protocol NetworkMonitor {
     var isConnected: Bool { get }
     var isExpensive: Bool { get }
     var isConstrained: Bool { get }
@@ -414,7 +451,40 @@ nonisolated enum ConnectionType: String, Sendable {
 }
 ```
 
-`NetworkMonitorImpl` uses `NWPathMonitor` and is `@Observable` for SwiftUI integration.
+`NetworkMonitorImpl` is a `@MainActor @Observable final class` that uses `NWPathMonitor` and publishes updates on the main actor for SwiftUI. It reports no connection until the first path update arrives. It is not part of `AppDependencies` by default; inject it where you need it.
+
+Use it to show connectivity in the UI, never to decide whether to send a request (see "DON'T: Pre-flight Connectivity Checks").
+
+---
+
+## Security: SSL Pinning
+
+### URLSessionFactory
+
+```swift
+// Core/Networking/Security/URLSessionFactory.swift
+
+enum URLSessionFactory {
+    static func makeSession(configuration: EnvironmentConfiguration) -> URLSession
+}
+```
+
+- `waitsForConnectivity = true`: an offline request waits for a connection instead of failing at once. `resourceTimeout` (60 s by default) bounds the wait.
+- Low Data Mode is allowed. Mark only non-essential requests with `request.allowsConstrainedNetworkAccess = false`.
+- `SSL_PINNING_ENABLED = YES` installs `SSLPinningDelegate` for the `baseURL` host. Without valid hashes (none, the generated placeholder, or a pin cut short by an xcconfig `//` comment) connections to the API host are rejected (fail closed), a fault is logged, and debug builds assert.
+
+### SSLPinningDelegate
+
+Only the API host (`baseURL`) is pinned. After the system validates the certificate chain, the connection is accepted only if the SHA-256 of the SubjectPublicKeyInfo of a certificate in the chain matches a pin. Other hosts reached through the same session (any external `APIEndpoint`) and challenges other than server trust get the system's default handling. To pin an external host too, pass its host and pins to `SSLPinningDelegate` in `URLSessionFactory`. Supported keys: RSA of any size or exponent, and EC P-256/P-384/P-521.
+
+Compute a pin (the scheme xcconfig shows the full command):
+
+```bash
+openssl s_client -connect api.example.com:443 -servername api.example.com 2>/dev/null | \
+  openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
+```
+
+Set `SSL_PUBLIC_KEY_HASHES` to comma-separated `sha256/<base64>` values, writing any `//` inside a pin as `/$()/` because an xcconfig reads `//` as a comment. Pin the current key and a backup key (or an intermediate) so the certificate can rotate without an app update. The generated Production scheme enables pinning with a placeholder hash, so it rejects every connection until you replace it.
 
 ---
 
@@ -429,8 +499,9 @@ nonisolated enum ConnectionType: String, Sendable {
 
 ### Error Handling
 
-- [ ] All `APIError` cases handled in domain error mapping
-- [ ] `CancellationError` propagated (not swallowed)
+- [ ] All `APIError` cases handled in `DomainError.map` (`Data/Common/DomainErrorMapping.swift`)
+- [ ] Repositories wrap their work in `DomainError.catching`; UseCases don't catch or map
+- [ ] `CancellationError` propagated (not swallowed); only a cancelled `Task` turns `URLError.cancelled` into it
 - [ ] Server error responses parsed via `APIErrorResponse`
 
 ### Interceptors
@@ -441,11 +512,12 @@ nonisolated enum ConnectionType: String, Sendable {
 
 ### Security
 
-- [ ] SSL pinning configured in production xcconfig
+- [ ] Real pins, plus a backup pin, in the production xcconfig (`SSL_PINNING_ENABLED`, `SSL_PUBLIC_KEY_HASHES`)
 - [ ] Sensitive headers redacted in logs
 
 ### Performance
 
-- [ ] Using `URLSessionFactory` (not `URLSession.shared`) for proper lifecycle
-- [ ] `waitsForConnectivity` enabled for resilience
-- [ ] Retry policy tuned per request type
+- [ ] A dedicated `URLSession` (not `URLSession.shared`) owned by `APIClientImpl`
+- [ ] `waitsForConnectivity` kept on the session (set by `URLSessionFactory`)
+- [ ] Retry policy tuned per request type, including its time budget
+- [ ] No connectivity check before sending a request

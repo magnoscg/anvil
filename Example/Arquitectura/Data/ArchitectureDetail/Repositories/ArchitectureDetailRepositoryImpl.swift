@@ -20,9 +20,11 @@ struct ArchitectureDetailRepositoryImpl: ArchitectureDetailRepository {
     // MARK: - ArchitectureDetailRepository
 
     func getFeatureDetail(id: String) async throws -> ArchitectureDetailModel? {
-        guard let dto = try dataSource.loadFeatureDetail(id: id) else {
-            return nil
+        try await DomainError.catching {
+            guard let dto = try await dataSource.loadFeatureDetail(id: id) else {
+                return nil
+            }
+            return mapper.mapToDomain(dto)
         }
-        return mapper.mapToDomain(dto)
     }
 }

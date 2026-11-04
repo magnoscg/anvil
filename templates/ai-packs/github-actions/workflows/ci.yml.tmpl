@@ -6,31 +6,68 @@ on:
   push:
     branches: [develop]
 
+permissions:
+  contents: read
+
 concurrency:
-  group: {{ "{{" }} github.workflow {{ "}}" }}-{{ "{{" }} github.ref {{ "}}" }}
+  group: ${{ "{{" }} github.workflow {{ "}}" }}-${{ "{{" }} github.ref {{ "}}" }}
   cancel-in-progress: true
+
+env:
+{{- if and (not .IsToolsMode) .Schemes }}
+  SCHEME: {{ .ProjectName }}-{{ index .Schemes 0 }}
+{{- else }}
+  # Set this to the scheme CI should build and test.
+  SCHEME: YourApp
+{{- end }}
 
 jobs:
   build-and-test:
     name: Build & Test
-    runs-on: macos-15
+    runs-on: macos-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      # The runner's default Xcode is used. A hardcoded Xcode path or device
+      # name breaks when the runner image moves on, so pick the newest iOS
+      # runtime that ships an iPhone, comparing versions as numbers.
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          udid="$(xcrun simctl list devices available --json | jq -r '
+            .devices
+            | to_entries
+            | map(select(.key | test("SimRuntime\\.iOS-[0-9]+(-[0-9]+)*$")))
+            | map({
+                version: (.key | capture("iOS-(?<v>[0-9-]+)$").v | split("-") | map(tonumber)),
+                iphones: (.value | map(select(.name | startswith("iPhone"))))
+              })
+            | map(select(.iphones | length > 0))
+            | sort_by(.version)
+            | last
+            | .iphones[0].udid // empty
+          ')"
+          if [ -z "$udid" ]; then
+            echo "No available iPhone simulator on this runner" >&2
+            exit 1
+          fi
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: |
           xcodebuild build \
-            -scheme {{ .ProjectName }}-Dev \
-            -destination "platform=iOS Simulator,name=iPhone 16 Pro" \
+            -scheme "$SCHEME" \
+            -destination "id=${{ "{{" }} steps.simulator.outputs.udid {{ "}}" }}" \
             -skipPackagePluginValidation
 
       - name: Test
         run: |
           xcodebuild test \
-            -scheme {{ .ProjectName }}-Dev \
-            -destination "platform=iOS Simulator,name=iPhone 16 Pro" \
+            -scheme "$SCHEME" \
+            -destination "id=${{ "{{" }} steps.simulator.outputs.udid {{ "}}" }}" \
             -skipPackagePluginValidation \
             -resultBundlePath TestResults.xcresult

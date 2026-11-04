@@ -8,10 +8,30 @@ import (
 
 var validProjectName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 
+var validSchemeName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
+
 // ValidateProjectName verifies that name is one safe directory component.
 func ValidateProjectName(name string) error {
 	if !validProjectName.MatchString(name) {
 		return InvalidProjectNameError{Name: name}
+	}
+	return nil
+}
+
+// ValidateSchemeNames verifies that every scheme is one safe file name
+// component that also works as a Swift enum case once lowercased, and that no
+// two schemes collide after lowercasing.
+func ValidateSchemeNames(schemes []string) error {
+	seen := make(map[string]bool, len(schemes))
+	for _, scheme := range schemes {
+		if !validSchemeName.MatchString(scheme) {
+			return InvalidSchemeNameError{Name: scheme}
+		}
+		key := strings.ToLower(scheme)
+		if seen[key] {
+			return InvalidSchemeNameError{Name: scheme, Duplicate: true}
+		}
+		seen[key] = true
 	}
 	return nil
 }

@@ -247,7 +247,7 @@ Two radio options:
 | Bundle ID | Auto-generated from name | Free text |
 | iOS Version | `18.0` | Free text |
 | Swift Version | `6.0` | Free text |
-| Schemes | `Dev, Stg, Production` | Comma-separated |
+| Schemes | `Dev, Stg, Production` | Comma-separated; each `^[A-Za-z][A-Za-z0-9_]*$`, unique ignoring case |
 
 **Hierarchical Features Section:**
 
@@ -280,7 +280,7 @@ Two radio options:
 
 **Scope Prompt** (overlay, shown if any selected pack has `HasSkills=true`):
 - Project scope → `.claude/skills/`
-- Global scope → `~/.claude/skills/`
+- Global scope → `~/.claude/skills/` (a skill that already exists there is reused; one that differs is kept as is and listed when generation finishes)
 
 **Controls:** up/down navigate, tab cycle, space toggle, left/right expand/collapse, enter confirm, esc back
 
@@ -429,15 +429,13 @@ For each selected pack, the PackRenderer executes up to 10 steps:
   - `swift-concurrency.md`, `performance.md`
   - `swiftdata.md`, `networking.md`
   - `security-privacy.md`, `diagnostics.md`
-  - `testing.md`, `create-tests.md`, `workflow-qa.md`
+  - `testing.md`, `create-tests.md`
 
 **prd-planner:**
 - `CLAUDE-section.md.tmpl` — Appends workflow section to CLAUDE.md
 - `commands/` — Dev workflow commands (`dev-prd`, `dev-plan`, `dev-build`, `dev-status`, etc.)
-- `agents/` — Specialized agents (DEV-SPEC-WRITER, DEV-TASK-PLANNER, DEV-IMPLEMENTER, etc.)
+- `agents/` — Specialized agents (DEV-ARCHITECT, DEV-TASK-PLANNER, DEV-IMPLEMENTER, DEV-VERIFIER, etc.)
 - `dev/` — `arch-index.md`, `skill-registry.md`, `ast-patterns.yml`
-- `plan/` — `INDEX.md` template
-- `settings-merge.json` — Merges agent/command config into settings
 - `skills/ios-tutorials/` — search skill over your own local tutorial library (corpus not bundled)
 
 **axiom-ios:**
@@ -452,7 +450,7 @@ For each selected pack, the PackRenderer executes up to 10 steps:
 - `CLAUDE-section.md.tmpl` — Git conventions
 
 **github-actions:**
-- `workflows/` — `ci.yml.tmpl`, `release.yml.tmpl`
+- `workflows/` — `ci.yml.tmpl` builds and tests the first scheme on the newest available iPhone simulator; `release.yml.tmpl` creates a GitHub release with `gh` for `v*` tags. Actions are pinned by commit SHA and jobs default to `contents: read`.
 
 ---
 
@@ -821,12 +819,12 @@ release:
 ### Release Process
 
 ```bash
-git tag 0.6.0
-git push origin 0.6.0
+git tag 0.7.0
+git push origin 0.7.0
 # GitHub Actions triggers goreleaser automatically
 # Creates a release with:
-#   - anvil_0.6.0_darwin_arm64.tar.gz
-#   - anvil_0.6.0_darwin_amd64.tar.gz
+#   - anvil_0.7.0_darwin_arm64.tar.gz
+#   - anvil_0.7.0_darwin_amd64.tar.gz
 #   - checksums.txt
 ```
 

@@ -6,38 +6,41 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Generate release notes
-        id: notes
+      - name: Collect commit messages since the previous tag
         run: |
-          # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            NOTES=$(git log --pretty=format:"- %s" HEAD)
-          else
-            NOTES=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
-          fi
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$NOTES" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          prev_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+          {
+            echo "## Changes"
+            echo
+            if [ -z "$prev_tag" ]; then
+              git log --pretty=format:"- %s" HEAD
+            else
+              git log --pretty=format:"- %s" "${prev_tag}..HEAD"
+            fi
+            echo
+          } > release-notes.md
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          body: |
-            ## Changes
-
-            {{ "{{" }} steps.notes.outputs.notes {{ "}}" }}
+      # gh ships on GitHub-hosted runners, so no third-party action is needed.
+      # The commit list is prepended to GitHub's generated notes.
+      - name: Create GitHub release
         env:
-          GITHUB_TOKEN: {{ "{{" }} secrets.GITHUB_TOKEN {{ "}}" }}
+          GH_TOKEN: ${{ "{{" }} github.token {{ "}}" }}
+          GH_REPO: ${{ "{{" }} github.repository {{ "}}" }}
+          TAG: ${{ "{{" }} github.ref_name {{ "}}" }}
+        run: gh release create "$TAG" --verify-tag --generate-notes --notes-file release-notes.md

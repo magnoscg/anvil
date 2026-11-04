@@ -1,0 +1,9 @@
+import Foundation
+
+// MARK: - {{ .FeatureName }}Repository
+
+/// Repository contract for {{ .FeatureNameLower }} data access, owned by Domain.
+/// The implementation lives in Data and throws only `DomainError` or `CancellationError`.
+protocol {{ .FeatureName }}Repository: Sendable {
+    func fetch() async throws -> [{{ .FeatureName }}Model]
+}

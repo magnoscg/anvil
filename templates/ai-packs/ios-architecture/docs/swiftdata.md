@@ -6,6 +6,23 @@
 
 SwiftData provides a declarative approach to data persistence. This guide covers how to integrate it correctly with Clean Architecture while maintaining thread safety.
 
+> **SwiftData is optional.** It is generated only when the project is created with SwiftData enabled. Without it, none of the files below exist and the project has no persistence stack; add them by hand following this guide if you need SwiftData later.
+
+### What the Generator Creates (SwiftData enabled)
+
+| File | Purpose |
+|------|---------|
+| `Core/Persistence/SwiftDataStack.swift` | `@MainActor final class SwiftDataStack`: owns the `ModelContainer` and vends one `ModelExecutor` per repository |
+| `Core/Persistence/ModelContainerShared.swift` | `ModelContainer.shared` (on disk) and `ModelContainer.preview` (in memory) |
+| `App/DI/PersistenceAssembly.swift` | Helpers to build production / preview stacks and executors |
+
+And it wires the stack at the composition root:
+
+- `@main` (`App/Application/AppMain.swift`) creates the `SwiftDataStack`, attaches `.modelContainer(swiftDataStack.container)` to the `WindowGroup` and passes the stack to `AppDependencies(swiftDataStack:)`.
+- `AppDependencies.swiftDataStack` is how Factories reach it. Each Factory calls `dependencies.swiftDataStack.makeBackgroundExecutor()` once per repository.
+
+The generated schema is empty: add your `@Model` types to both containers.
+
 ---
 
 ## SwiftData Stack Setup
@@ -13,17 +30,21 @@ SwiftData provides a declarative approach to data persistence. This guide covers
 ### ModelContainer Configuration
 
 ```swift
-// Core/Persistence/ModelContainer+Shared.swift
+// Core/Persistence/ModelContainerShared.swift
 import SwiftData
 
+// MARK: - ModelContainer + Shared
+
 extension ModelContainer {
+    // MARK: - Production
+
     static let shared: ModelContainer = {
         let schema = Schema([
             ArticleSDModel.self,
             UserSDModel.self
         ])
 
-        let modelConfiguration = ModelConfiguration(
+        let configuration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
             allowsSave: true
@@ -32,26 +53,34 @@ extension ModelContainer {
         do {
             return try ModelContainer(
                 for: schema,
-                configurations: [modelConfiguration]
+                configurations: [configuration]
             )
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            fatalError("Failed to create ModelContainer: \(error)")
         }
     }()
 
-    /// In-memory container for previews and tests
+    // MARK: - Preview
+
     static let preview: ModelContainer = {
         let schema = Schema([
             ArticleSDModel.self,
             UserSDModel.self
         ])
 
-        let config = ModelConfiguration(
+        let configuration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: true
         )
 
-        return try! ModelContainer(for: schema, configurations: [config])
+        do {
+            return try ModelContainer(
+                for: schema,
+                configurations: [configuration]
+            )
+        } catch {
+            fatalError("Failed to create preview ModelContainer: \(error)")
+        }
     }()
 }
 ```
@@ -62,27 +91,61 @@ extension ModelContainer {
 // Core/Persistence/SwiftDataStack.swift
 import SwiftData
 
+// MARK: - SwiftDataStack
+
 @MainActor
 final class SwiftDataStack {
+    // MARK: - Properties
+
     let container: ModelContainer
+
+    // MARK: - Init
 
     init(container: ModelContainer = .shared) {
         self.container = container
     }
 
-    /// Creates an isolated ModelExecutor for background operations
+    // MARK: - Executor Factory
+
     func makeBackgroundExecutor() -> ModelExecutor {
         DefaultSerialModelExecutor(
             modelContext: ModelContext(container)
         )
     }
+}
+```
 
-    /// Main context for UI operations (use sparingly)
-    var mainContext: ModelContext {
-        container.mainContext
+There is intentionally no `mainContext` accessor: repositories never use the main `ModelContext`.
+
+### PersistenceAssembly
+
+```swift
+// App/DI/PersistenceAssembly.swift
+import SwiftData
+
+// MARK: - PersistenceAssembly
+
+@MainActor
+enum PersistenceAssembly {
+    // MARK: - Registration
+
+    static func makeSwiftDataStack() -> SwiftDataStack {
+        SwiftDataStack(container: .shared)
+    }
+
+    static func makePreviewSwiftDataStack() -> SwiftDataStack {
+        SwiftDataStack(container: .preview)
+    }
+
+    // MARK: - Executor Factory
+
+    static func makeExecutor(from stack: SwiftDataStack) -> ModelExecutor {
+        stack.makeBackgroundExecutor()
     }
 }
 ```
+
+Use `makePreviewSwiftDataStack()` for SwiftUI previews and tests.
 
 ---
 
@@ -116,45 +179,61 @@ class ArticleViewModel {
 
 ### Repository Pattern with IDs
 
+A SwiftData repository is an `actor` conforming to `ModelActor`. `ModelExecutor` only exposes `modelContext`; it has no API to run a closure. Running the work on the executor is the actor's job: `ModelActor` uses `modelExecutor` as the actor's executor and provides `modelContext`, so every method body runs on the repository's own executor and context.
+
 ```swift
 // Data/Article/Repositories/ArticleRepositoryImpl.swift
-struct ArticleRepositoryImpl: ArticleRepository {
-    private let modelExecutor: ModelExecutor
+import SwiftData
 
-    init(modelExecutor: ModelExecutor) {
+// MARK: - ArticleRepositoryImpl
+
+actor ArticleRepositoryImpl: ArticleRepository, ModelActor {
+    // MARK: - Properties
+
+    nonisolated let modelExecutor: any ModelExecutor
+    nonisolated let modelContainer: ModelContainer
+
+    // MARK: - Init
+
+    init(modelExecutor: any ModelExecutor, modelContainer: ModelContainer) {
         self.modelExecutor = modelExecutor
+        self.modelContainer = modelContainer
     }
 
+    // MARK: - ArticleRepository
+
     func fetchArticle(id: UUID) async throws -> ArticleModel? {
-        try await modelExecutor.perform {
+        try await DomainError.catching {
             let descriptor = FetchDescriptor<ArticleSDModel>(
                 predicate: #Predicate { $0.id == id }
             )
-            guard let sdModel = try modelExecutor.modelContext.fetch(descriptor).first else {
-                return nil
-            }
-            return ArticleModel(from: sdModel)
+            return try modelContext.fetch(descriptor).first?.toDomain()
         }
     }
 
     func save(_ model: ArticleModel) async throws {
-        try await modelExecutor.perform {
+        try await DomainError.catching {
+            let articleId = model.id
             let descriptor = FetchDescriptor<ArticleSDModel>(
-                predicate: #Predicate { $0.id == model.id }
+                predicate: #Predicate { $0.id == articleId }
             )
 
-            if let existing = try modelExecutor.modelContext.fetch(descriptor).first {
+            if let existing = try modelContext.fetch(descriptor).first {
                 existing.update(from: model)
             } else {
-                let sdModel = ArticleSDModel(from: model)
-                modelExecutor.modelContext.insert(sdModel)
+                modelContext.insert(ArticleSDModel(from: model))
             }
 
-            try modelExecutor.modelContext.save()
+            try modelContext.save()
         }
     }
 }
 ```
+
+- This is what the `@ModelActor` macro generates (`nonisolated let modelExecutor`, `nonisolated let modelContainer`), except that the macro's `init(modelContainer:)` creates its own `DefaultSerialModelExecutor`. Here the executor is **injected** instead, so the Factory decides where it comes from and each repository gets its own from `dependencies.swiftDataStack.makeBackgroundExecutor()`.
+- `@Model` objects never leave the actor: every method maps to Domain models (`toDomain()`) before returning.
+- The repository protocol (`ArticleRepository`) lives in `Domain/Article/Repositories/` and knows nothing about SwiftData; the actor satisfies its `async` requirements.
+- Errors: only `DomainError` leaves the repository. Each method wraps its work in `DomainError.catching`, which runs in the caller's isolation (`#isolation`), so the closure can use the actor's `modelContext` directly (SwiftData errors map to `DomainError.unknown`).
 
 ---
 
@@ -169,16 +248,34 @@ struct ArticleRepositoryImpl: ArticleRepository {
 ### DefaultSerialModelExecutor
 
 ```swift
-// In Factory
+// Features/Article/DI/ArticleFactory.swift
+
+// MARK: - ArticleFactory
+
 @MainActor
 enum ArticleFactory {
-    static func makeRepository(stack: SwiftDataStack) -> ArticleRepository {
-        ArticleRepositoryImpl(
-            modelExecutor: stack.makeBackgroundExecutor()
-        )
+    // MARK: - Public Methods
+
+    static func makeView(appRouter: AppRouter, dependencies: AppDependencies) -> some View {
+        let viewModel = makeViewModel(appRouter: appRouter, dependencies: dependencies)
+        return ArticleView(viewModel: viewModel)
+    }
+}
+
+// MARK: - Private Factory Methods
+
+private extension ArticleFactory {
+    // MARK: - Repositories
+
+    static func makeRepository(dependencies: AppDependencies) -> ArticleRepository {
+        let stack = dependencies.swiftDataStack
+        return ArticleRepositoryImpl(modelExecutor: stack.makeBackgroundExecutor(),
+                                     modelContainer: stack.container)
     }
 }
 ```
+
+Call `makeBackgroundExecutor()` once per repository; never share an executor between repositories. Each call wraps a fresh `ModelContext(container)` in a `DefaultSerialModelExecutor`.
 
 ### Custom ModelActor (Advanced)
 
@@ -194,7 +291,7 @@ actor ArticlePersistenceActor {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         let sdModels = try modelContext.fetch(descriptor)
-        return sdModels.map { ArticleModel(from: $0) }
+        return sdModels.map { $0.toDomain() }
     }
 
     func save(_ model: ArticleModel) throws {
@@ -260,31 +357,42 @@ final class ArticleSDModel {
         self.body = model.body
         self.updatedAt = Date()
     }
+
+    // MARK: - Domain Mapping
+
+    func toDomain() -> ArticleModel {
+        ArticleModel(id: id, title: title, body: body)
+    }
 }
 ```
+
+Mapping between `ArticleSDModel` and `ArticleModel` lives in **Data** (here, in the SD model file or a mapper in `Data/<Feature>/Mappers/`), because Data depends on Domain and never the other way around.
 
 ### Domain Model (Clean - No SwiftData)
 
 ```swift
 // Domain/Article/Models/ArticleModel.swift
+
+// MARK: - ArticleModel
+
 struct ArticleModel: Sendable, Equatable, Identifiable {
+    // MARK: - Properties
+
     let id: UUID
     var title: String
     var body: String
+
+    // MARK: - Init
 
     init(id: UUID = UUID(), title: String, body: String) {
         self.id = id
         self.title = title
         self.body = body
     }
-
-    init(from sdModel: ArticleSDModel) {
-        self.id = sdModel.id
-        self.title = sdModel.title
-        self.body = sdModel.body
-    }
 }
 ```
+
+The Domain model has no initializer that takes `ArticleSDModel`: Domain must not know Data types.
 
 ---
 
@@ -392,8 +500,8 @@ struct ArticleListView: View {
     @Query var articles: [ArticleSDModel]
 }
 
-// Create dedicated executor for background
-let executor = DefaultSerialModelExecutor(modelContext: ModelContext(container))
+// Create one dedicated executor per repository, in its Factory
+let executor = dependencies.swiftDataStack.makeBackgroundExecutor()
 
 // Pass IDs between actors
 await repository.save(articleId: article.id)
@@ -440,16 +548,16 @@ import Foundation
 ### In-Memory Container for Tests
 
 ```swift
-@Suite("ArticleRepository Tests")
-struct ArticleRepositoryTests {
+@MainActor
+@Suite("ArticleRepositoryImpl Tests")
+struct ArticleRepositoryImplTests {
+    // MARK: - Tests
 
     @Test func saveAndFetch() async throws {
         // Given
-        let container = ModelContainer.preview
-        let executor = DefaultSerialModelExecutor(
-            modelContext: ModelContext(container)
-        )
-        let repository = ArticleRepositoryImpl(modelExecutor: executor)
+        let stack = PersistenceAssembly.makePreviewSwiftDataStack()
+        let repository = ArticleRepositoryImpl(modelExecutor: stack.makeBackgroundExecutor(),
+                                               modelContainer: stack.container)
 
         let article = ArticleModel(title: "Test", body: "Content")
 
@@ -463,19 +571,33 @@ struct ArticleRepositoryTests {
 }
 ```
 
+`SwiftDataStack` is `@MainActor`, so the suite is `@MainActor`; the repository still works on its own executor. `ModelContainer.preview` is a single in-memory container shared by every test, so use unique IDs (or build a fresh in-memory `ModelContainer` per test) to keep tests independent.
+
 ### Mock Repository (No SwiftData in Tests)
 
+Follow the generated mock style: `[Project]Tests/Mocks/<Feature><Type>Mock.swift`, a `final class ... @unchecked Sendable` with `Result` properties and recorded calls.
+
 ```swift
-// Tests/Mocks/MockArticleRepository.swift
-actor MockArticleRepository: ArticleRepository {
-    var articles: [ArticleModel] = []
+// [Project]Tests/Mocks/ArticleRepositoryMock.swift
+import Foundation
+@testable import MyApp
+
+// MARK: - ArticleRepositoryMock
+
+final class ArticleRepositoryMock: ArticleRepository, @unchecked Sendable {
+    // MARK: - Properties
+
+    var fetchArticleResult: Result<ArticleModel?, Error> = .success(nil)
+    var savedModels: [ArticleModel] = []
+
+    // MARK: - ArticleRepository
 
     func fetchArticle(id: UUID) async throws -> ArticleModel? {
-        articles.first { $0.id == id }
+        try fetchArticleResult.get()
     }
 
     func save(_ model: ArticleModel) async throws {
-        articles.append(model)
+        savedModels.append(model)
     }
 }
 ```

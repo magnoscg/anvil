@@ -57,7 +57,6 @@ extension APIError {
             // Retry on transient network issues
             let retryableCodes: [URLError.Code] = [.timedOut,
                                                    .networkConnectionLost,
-                                                   .notConnectedToInternet,
                                                    .cannotFindHost,
                                                    .cannotConnectToHost,
                                                    .dnsLookupFailed]

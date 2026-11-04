@@ -7,7 +7,7 @@ import Foundation
 struct PokemonListDecoratorMapperImpl: PokemonListDecoratorMapper {
     // MARK: - Public Methods
 
-    func map(_ model: PokemonListModel) -> PokemonListItemDecorator {
+    func map(_ model: PokemonSummaryModel) -> PokemonListItemDecorator {
         PokemonListItemDecorator(id: String(model.id),
                                  numericId: model.id,
                                  name: model.name.capitalized,
@@ -15,7 +15,7 @@ struct PokemonListDecoratorMapperImpl: PokemonListDecoratorMapper {
                                  types: model.types.map { mapType($0) })
     }
 
-    func mapToItems(_ models: [PokemonListModel]) -> [PokemonListItemDecorator] {
+    func mapToItems(_ models: [PokemonSummaryModel]) -> [PokemonListItemDecorator] {
         models.map { map($0) }
     }
 }

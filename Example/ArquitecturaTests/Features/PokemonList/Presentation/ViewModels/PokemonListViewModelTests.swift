@@ -26,7 +26,7 @@ struct PokemonListViewModelTests {
                                    hasMore: Bool = true,
                                    totalCount: Int = 1302) -> PokemonListResult {
         let pokemon = (1 ... count).map { index in
-            PokemonListModel(id: index,
+            PokemonSummaryModel(id: index,
                              name: "pokemon-\(index)",
                              imageURL: URL(string: "https://example.com/\(index).png"),
                              types: [.fire])
@@ -140,7 +140,7 @@ struct PokemonListViewModelTests {
 
         await viewModel.loadPokemon()
 
-        let nextPageResult = PokemonListResult(pokemon: [PokemonListModel(id: 10,
+        let nextPageResult = PokemonListResult(pokemon: [PokemonSummaryModel(id: 10,
                                                                           name: "caterpie",
                                                                           imageURL: URL(string: "https://example.com/10.png"),
                                                                           types: [.bug])],
@@ -187,7 +187,7 @@ struct PokemonListViewModelTests {
         await viewModel.loadPokemon()
         let callCountAfterLoad = await mockUseCase.executeCallCount
 
-        let nextResult = PokemonListResult(pokemon: [PokemonListModel(id: 10,
+        let nextResult = PokemonListResult(pokemon: [PokemonSummaryModel(id: 10,
                                                                       name: "caterpie",
                                                                       imageURL: nil,
                                                                       types: [.bug])],
