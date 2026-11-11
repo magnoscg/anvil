@@ -31,10 +31,10 @@ Data/Article/
   DataSources/ArticleLocalDataSource.swift, ArticleKeychainDataSource.swift   # optional, protocol + Impl
   DTO/ArticleDTO.swift
   Mappers/ArticleDTOMapper.swift                            # protocol + Impl
+  DataStubs/StubArticleRemoteDataSource.swift, FixtureArticleRemoteDataSource.swift   # optional (UI tests), Debug only
 Features/Article/
   DI/ArticleFactory.swift
   UI/ArticleView.swift, ArticleState.swift, ArticleDecorator.swift
-  UI/ArticleAccessibilityID.swift                           # optional (UI tests)
   UI/Components/                                            # feature-only subviews, add when needed
   Presentation/ViewModels/ArticleViewModel.swift
   Presentation/Mappers/ArticleDecoratorMapper.swift         # protocol + Impl
@@ -235,7 +235,7 @@ The complete View, with `body`, the retry in `errorView(error:)` and the reason 
 
 ### Accessibility Identifiers and UI-Test Stubs
 
-With "Include UI tests" the scaffold adds `UI/ArticleAccessibilityID.swift` (ids named `article_<element>`, such as `article_retry_button`), a Page Object and stub and fixture DataSources. Set each id in the View with `.accessibilityIdentifier(ArticleAccessibilityID.screen)`; never repeat the string literal. The naming convention, the launch argument and the stubs are in `ui-testing.md`.
+With "Include UI tests" the scaffold adds `Shared/AccessibilityIDs/ArticleAccessibilityID.swift` (ids named `article_<element>`, such as `article_retry_button`), stub and fixture DataSources, a Page Object and Screen tests that pass as generated. It applies the ids in `ArticleView`, adds the stub branch to `ArticleFactory` and registers the screen in `UITestScreenRegistry`. A new id goes into the enum and the View reads it from there, as in `.accessibilityIdentifier(ArticleAccessibilityID.retryButton)`; never repeat the string literal. The naming convention, the launch contract and the stubs are in `ui-testing.md`.
 
 ## 5) Navigation
 

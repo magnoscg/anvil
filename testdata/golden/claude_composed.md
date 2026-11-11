@@ -11,7 +11,7 @@
 - **Concurrency**: `SWIFT_STRICT_CONCURRENCY = complete`, **no** default actor isolation (types are nonisolated unless annotated)
 - **Dependency Injection**: manual constructor injection through `AppDependencies` + per-feature Factories (no DI container)
 - **Persistence**: **none** — the SwiftData stack was not generated for this project
-- **Testing**: **Swift Testing** (`import Testing`) in `MyAppTests/`, mirroring `Domain/`, `Data/` and `Features/`, plus shared `Mocks/`
+- **Testing**: **Swift Testing** (`import Testing`) in `MyAppTests/`, mirroring `Domain/`, `Data/` and `Features/`, plus shared `Mocks/`; UI tests (XCTest) in `MyAppUITests/` (`ui-testing.md`)
 
 ## Build & Test
 
@@ -28,7 +28,7 @@
 | Action | Command |
 |--------|---------|
 | **Build** | `axbuild xcodebuild -scheme MyApp-Dev -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' build` |
-| **Unit Tests** | `axbuild xcodebuild -scheme MyApp-Dev -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' test` |
+| **Tests** (unit + UI) | `axbuild xcodebuild -scheme MyApp-Dev -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' test` |
 | **Launch app** | `xcrun simctl launch <SIMULATOR_UDID> com.testorg.MyApp` |
 
 `axbuild` ships with the Axiom plugin. Without it, and for simulator checks, crash logs and profiling, see `.claude/docs/tooling.md`. Always pass an explicit simulator UDID, never `booted`.

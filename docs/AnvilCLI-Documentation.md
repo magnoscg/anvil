@@ -557,6 +557,7 @@ Tests/Mocks/
 | `IncludeLocalDataSource` | `<Feature>LocalDataSource.swift` |
 | `IncludeKeychain` | `<Feature>KeychainDataSource.swift` |
 | `IncludeRouteResolver` | `<Feature>RouteResolver.swift` |
+| `IncludeUITests` | `Shared/AccessibilityIDs/<Feature>AccessibilityID.swift`, `Data/<Feature>/DataStubs/` (Stub and Fixture), `<ProjectName>UITests/` Page Object and Screen tests, and an entry in `App/Navigation/UITestScreenRegistry.swift` |
 
 ### Wiring Instructions
 
@@ -597,6 +598,8 @@ All UUIDs in the pbxproj are deterministic using FNV1a hashing:
 | `RootGroup` | Top-level PBXGroup |
 | `AppTarget` | Application target |
 | `TestTarget` | Unit test target |
+| `UITestTarget` | UI test target |
+| `SharedGroup` | `Shared/` group, in the app and UI test targets |
 | `AppBuildConfigDebug/Release` | Build configurations |
 | `SwiftDataFramework` | SwiftData framework reference (conditional) |
 | `SwiftDataBuildFile` | SwiftData build file (conditional) |

@@ -36,10 +36,9 @@ Unit-test rules for the generated architecture: Swift Testing conventions, what 
 +- Features/Article/Presentation/ViewModels/ArticleViewModelTests.swift
 +- Features/Article/Presentation/Mappers/ArticleDecoratorMapperTests.swift
 +- Mocks/Article{UseCase,Repository,RemoteDataSource,DTOMapper,DecoratorMapper,Router}Mock.swift
-+- DataStubs/, UITests/             only with UI tests: see ui-testing.md
 ```
 
-The generator covers `fetch()` / `execute()` / `load()`. When a feature grows, extend these suites and mocks instead of starting new files. Nothing is generated for `Core/`: add `[Project]Tests/Core/` by hand.
+UI tests live in `[Project]UITests/` and their stubs in the app, Debug only (`ui-testing.md`). The generator covers `fetch()` / `execute()` / `load()`. When a feature grows, extend these suites and mocks instead of starting new files. Nothing is generated for `Core/`: add `[Project]Tests/Core/` by hand.
 
 ## Mocks
 

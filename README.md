@@ -25,7 +25,7 @@
 
 **🏗️ A project that builds on day one**
 
-`anvil init` writes a native `.xcodeproj` with App, Core, Domain, Data and Features layers, schemes per environment and a test target. No Tuist or XcodeGen needed.
+`anvil init` writes a native `.xcodeproj` with App, Core, Domain, Data and Features layers, schemes per environment, and unit and UI test targets. No Tuist or XcodeGen needed.
 
 </td>
 <td width="33%" valign="top">
@@ -182,6 +182,8 @@ flowchart TB
 │   ├── Features/       screens: UI, ViewModels, routers and factories
 │   └── Resources/      assets and String Catalog
 ├── <ProjectName>Tests/ unit tests mirroring the source tree
+├── <ProjectName>UITests/ UI tests: Page Objects and Screen tests
+├── Shared/             compiled into the app and the UI tests: accessibility ids, launch keys
 ├── <ProjectName>.xcodeproj
 └── .anvil.yml          marker that anvil feature reads
 ```
