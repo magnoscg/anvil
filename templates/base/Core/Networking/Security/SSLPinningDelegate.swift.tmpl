@@ -181,23 +181,3 @@ private enum SubjectPublicKeyInfo {
         return Data([0x80 | UInt8(bytes.count)] + bytes)
     }
 }
-
-// MARK: - SSLPinningError
-
-/// Errors that can occur during SSL pinning validation.
-enum SSLPinningError: Error, LocalizedError {
-    case invalidCertificate
-    case publicKeyExtractionFailed
-    case hashMismatch
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidCertificate:
-            "Server certificate is invalid"
-        case .publicKeyExtractionFailed:
-            "Failed to extract public key from certificate"
-        case .hashMismatch:
-            "Server public key does not match pinned keys"
-        }
-    }
-}

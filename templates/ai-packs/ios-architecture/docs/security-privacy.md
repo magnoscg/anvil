@@ -1,94 +1,24 @@
-# Security & Privacy Guide
+# Security & Privacy
 
-> Security best practices and Privacy Manifest requirements for iOS apps.
+Where secrets live, how the generated Keychain wrapper is used, and what an app must declare before it ships: Privacy Manifest, ATS, Data Protection and logging.
 
-## Overview
+## What goes where
 
-This guide covers security patterns, Privacy Manifests (required iOS 17+), and secure storage for iOS applications.
+| Data | Store | Why |
+|------|-------|-----|
+| Tokens, passwords, any credential | Keychain, behind a Data-layer DataSource | Encrypted and tied to the device lock |
+| Sensitive files | A file written with an explicit Data Protection level | Encrypted at rest |
+| Non-sensitive preferences and caches | `UserDefaults`, from a Data-layer DataSource | Plain plist, readable from a backup |
+| View-only UI state | `@AppStorage` | Same store as `UserDefaults` |
+| Non-secret build configuration | xcconfig, read through `Info.plist` | Ships readable inside the bundle |
 
----
+Never put a token, password or key in `UserDefaults` or `@AppStorage`.
 
-## Privacy Manifests (iOS 17+)
+## Keychain
 
-### What is a Privacy Manifest?
-
-A `PrivacyInfo.xcprivacy` file that declares:
-- Required Reason APIs your app uses
-- Data types your app collects
-- Tracking domains
-
-**Required** for App Store submission starting Spring 2024.
-
-### Creating Privacy Manifest
-
-1. File -> New -> File -> App Privacy
-2. Name: `PrivacyInfo.xcprivacy`
-3. Add to your app target
-
-### Required Reason APIs
-
-APIs that require justification in Privacy Manifest:
-
-| API Category | Examples | Common Reasons |
-|--------------|----------|----------------|
-| **File timestamp** | `NSFileCreationDate`, `NSFileModificationDate` | `DDA9.1` - Display to user |
-| **System boot time** | `systemUptime`, `ProcessInfo.systemUptime` | `35F9.1` - Measure time intervals |
-| **Disk space** | `volumeAvailableCapacity` | `E174.1` - Write files to disk |
-| **User defaults** | `UserDefaults` | `CA92.1` - Access info from same app group |
-| **Active keyboard** | `activeInputModes` | `54BD.1` - Customize keyboard UI |
-
-### Privacy Manifest Example
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>NSPrivacyTracking</key>
-    <false/>
-    <key>NSPrivacyTrackingDomains</key>
-    <array/>
-    <key>NSPrivacyCollectedDataTypes</key>
-    <array/>
-    <key>NSPrivacyAccessedAPITypes</key>
-    <array>
-        <dict>
-            <key>NSPrivacyAccessedAPIType</key>
-            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
-            <key>NSPrivacyAccessedAPITypeReasons</key>
-            <array>
-                <string>CA92.1</string>
-            </array>
-        </dict>
-    </array>
-</dict>
-</plist>
-```
-
----
-
-## Secure Storage
-
-### Storage Options Comparison
-
-| Storage | Security | Use Case |
-|---------|----------|----------|
-| **Keychain** | Highest | Passwords, tokens, API keys |
-| **Data Protection** | High | Sensitive files |
-| **UserDefaults** | Low | Non-sensitive preferences |
-| **@AppStorage** | Low | UI state only |
-
-### Keychain Wrapper Pattern
-
-The generator creates this wrapper in every project. It also adds Codable conveniences (`save(_ item: some Encodable, for:)` and `read(for:) -> T`), which throw `KeychainError.encodingFailed` / `.decodingFailed`.
+`Core/Security/KeychainHelper.swift` is generated in every project:
 
 ```swift
-// Core/Security/KeychainHelper.swift
-import Foundation
-import Security
-
-// MARK: - KeychainError
-
 enum KeychainError: Error, Sendable {
     case itemNotFound
     case duplicateItem
@@ -97,260 +27,101 @@ enum KeychainError: Error, Sendable {
     case unexpectedStatus(OSStatus)
 }
 
-// MARK: - KeychainHelper
-
 struct KeychainHelper: Sendable {
+    init(service: String = Bundle.main.bundleIdentifier ?? "<bundle id>")
+    func save(_ data: Data, for key: String, accessibility: KeychainAccessibility = .whenUnlocked) throws
+    func retrieve(for key: String) throws -> Data
+    func delete(for key: String) throws
+    func save<T: Encodable>(_ item: T, for key: String, accessibility: KeychainAccessibility = .whenUnlocked) throws
+    func read<T: Decodable>(for key: String) throws -> T
+}
+```
 
-    // MARK: - Save
+- `save` updates the item with `SecItemUpdate` and adds it only when it does not exist, so the item keeps its metadata; a concurrent add surfaces as `.duplicateItem`. `retrieve` and `read` throw `.itemNotFound` when the key is missing. `delete` treats a missing item as success. Any other failure is `.unexpectedStatus(OSStatus)`.
+- The generic overloads store JSON and throw `.encodingFailed` or `.decodingFailed`. **One format per key**: a `String` passed straight to `save(_:for:)` selects the generic overload and is stored as quoted JSON, which does not round-trip through `retrieve` plus UTF-8 decoding. Read with the call that matches the write.
+- An item is identified by `kSecAttrService` (`service`, the bundle identifier by default) plus `key`, so keys are app-wide within a service. Prefix them with the feature: `"article.session_token"`.
 
-    func save(_ data: Data, for key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        ]
+### Accessibility
 
-        SecItemDelete(query as CFDictionary)
+`save` takes a `KeychainAccessibility`. Both levels are `ThisDeviceOnly`: the item never moves to another device through a backup restore or migration.
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.unexpectedStatus(status)
-        }
-    }
+- `.whenUnlocked` (default, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`): readable only while the device is unlocked. Right for tokens used from the UI.
+- `.afterFirstUnlock` (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`): only for items read by background work (background refresh, push handling). Pass it explicitly at the write.
+- The level is applied on every save, so writing an item again with another level changes it.
+- `kSecAttrAccessibleAlways` and `kSecAttrAccessibleAlwaysThisDeviceOnly` are deprecated: do not use.
+- A read that fails because the device is locked (`errSecInteractionNotAllowed`) does not mean the item is broken. Never delete an item on that error.
+- Biometric gating needs `SecAccessControl`, which the helper does not cover.
 
-    // MARK: - Retrieve
+### Keychain belongs to Data
 
-    func retrieve(for key: String) throws -> Data {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+Keychain access goes through a DataSource in Data. A View, ViewModel or UseCase never touches `KeychainHelper`: storage is an infrastructure detail, and the layers above see only the repository protocol. Answering yes to "Include Keychain storage?" in `anvil feature` generates `Data/Article/DataSources/ArticleKeychainDataSource.swift`:
 
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+```swift
+protocol ArticleKeychainDataSource: Sendable {
+    func save(_ value: String, forKey key: String) throws
+    func read(forKey key: String) throws -> String?
+    func delete(forKey key: String) throws
+}
+```
 
-        guard status == errSecSuccess, let data = result as? Data else {
-            if status == errSecItemNotFound {
-                throw KeychainError.itemNotFound
-            }
-            throw KeychainError.unexpectedStatus(status)
-        }
+- `ArticleFactory` builds `ArticleKeychainDataSourceImpl(keychainHelper: KeychainHelper())` and injects it into `ArticleRepositoryImpl`.
+- It stores strings as UTF-8 through the `Data` overloads of the helper.
+- **Absence is explicit.** `read(forKey:)` returns `nil` only for `KeychainError.itemNotFound`; every other error propagates. Never wrap a Keychain call in `try?`: it turns a locked device or a damaged item into "signed out".
+- The repository calls it inside `DomainError.catching`. A `KeychainError` that escapes maps to `DomainError.unknown`; add a `DomainError` case in `DomainErrorMapping.swift` if the UI must tell it apart.
 
-        return data
-    }
-
-    // MARK: - Delete
-
-    func delete(for key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key
-        ]
-
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.unexpectedStatus(status)
-        }
+```swift
+func sessionToken() async throws -> String? {
+    try await DomainError.catching {
+        try keychainDataSource.read(forKey: "article.session_token")
     }
 }
 ```
 
-### Keychain Accessibility Options
+## Secrets
 
-| Option | Description |
-|--------|-------------|
-| `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` | **Recommended**. Available after first unlock, not backed up. |
-| `kSecAttrAccessibleWhenUnlocked` | Available only when unlocked |
-| `kSecAttrAccessibleAlways` | **AVOID**. Always accessible. |
-
-### Storing Tokens
+- **No secret in source.** A literal ships inside the binary and can be read with `strings`. Marking it `private` or base64-encoding it changes nothing.
 
 ```swift
-extension KeychainHelper {
-    func saveToken(_ token: String) throws {
-        guard let data = token.data(using: .utf8) else { return }
-        try save(data, for: "auth_token")
-    }
-
-    func getToken() throws -> String? {
-        let data = try retrieve(for: "auth_token")
-        return String(data: data, encoding: .utf8)
-    }
-
-    func deleteToken() throws {
-        try delete(for: "auth_token")
-    }
-}
+let partnerKey = "any literal placed here ships in the binary"
 ```
 
----
+- **xcconfig holds non-secret configuration only.** Its values are copied into `Info.plist`, which ships readable in the bundle. Base URL, API version, timeouts, environment name and pin hashes belong there. An API key does not.
+- **User secrets** (session tokens) arrive at runtime and go to the Keychain.
+- **App-level third-party keys** stay on a server you control: the app calls your backend and the backend calls the third party.
+- Never commit a real value to an xcconfig, a fixture or a document.
 
-## Secure @AppStorage Alternative
+## Logging
 
-### DON'T: Store Sensitive Data in @AppStorage
+Logs can be read from Console and travel in sysdiagnoses. Never log a token, password or key. Mark any value that identifies a person as private, and apply the same rule to `print`:
 
 ```swift
-// WRONG: Tokens in UserDefaults
-@AppStorage("authToken") var authToken: String = ""
-
-// WRONG: API keys visible in UserDefaults
-@AppStorage("apiKey") var apiKey: String = ""
+logger.info("Signed in as \(email, privacy: .private)")
 ```
 
-### DO: Use Keychain for Sensitive Data
+## Privacy Manifest
 
-Keychain access belongs to the **Data** layer, never to a ViewModel. `anvil feature` can generate a `<Feature>KeychainDataSource` (protocol + Impl in `Data/<Feature>/DataSources/`) that wraps `KeychainHelper`; the repository uses it inside `DomainError.catching`, and the ViewModel only talks to its UseCase.
+- The generator does not create `PrivacyInfo.xcprivacy`. Add one to the app target (File > New > File > App Privacy File) before the first submission.
+- It declares tracking and tracking domains, collected data types, and every Required Reason API with a reason code. There are five categories: file timestamp, system boot time, disk space, active keyboard and user defaults. A build that uses one without declaring it is rejected automatically.
+- `UserDefaults` always needs a declaration. A feature generated with a local data source (`ArticleLocalDataSourceImpl`) uses it, so declare `NSPrivacyAccessedAPICategoryUserDefaults` with `CA92.1`, the code for information the app itself stored. `1C8F.1` is the code for information shared through an App Group. Declare the code that matches the real use.
+- Each third-party SDK must ship its own manifest, and you answer for the data it collects.
+
+## Transport and files
+
+- **ATS** is on by default: `URLSession` requires HTTPS with TLS 1.2 or later, and the generated base URLs are `https`. Do not set `NSAllowsArbitraryLoads`: it disables ATS for the whole app, and App Review flags it and may reject. If one host cannot comply, add an exception for that domain under `NSExceptionDomains` and be ready to justify it. SSL pinning is in `networking.md`.
+- **Data Protection.** Choose a level when you write a sensitive file. `.completeUntilFirstUserAuthentication` is the baseline for most app data, because the file stays readable in the background after the first unlock. Use `.complete` only for files touched while the device is unlocked: background work on a locked device fails with it. `.noFileProtection` leaves the file unencrypted, so keep it for data that is not sensitive at all.
 
 ```swift
-// Data/Auth/DataSources/AuthKeychainDataSource.swift
-
-// MARK: - AuthKeychainDataSource
-
-protocol AuthKeychainDataSource: Sendable {
-    func saveToken(_ token: String) throws
-    func readToken() throws -> String
-    func deleteToken() throws
-}
-
-// MARK: - AuthKeychainDataSourceImpl
-
-struct AuthKeychainDataSourceImpl: AuthKeychainDataSource {
-    // MARK: - Properties
-
-    private let keychainHelper: KeychainHelper
-    private let tokenKey = "auth_token"
-
-    // MARK: - Init
-
-    init(keychainHelper: KeychainHelper) {
-        self.keychainHelper = keychainHelper
-    }
-
-    // MARK: - Public Methods
-
-    func saveToken(_ token: String) throws {
-        try keychainHelper.save(token, for: tokenKey)
-    }
-
-    func readToken() throws -> String {
-        try keychainHelper.read(for: tokenKey)
-    }
-
-    func deleteToken() throws {
-        try keychainHelper.delete(for: tokenKey)
-    }
-}
+try data.write(to: url, options: .completeFileProtectionUntilFirstUserAuthentication)
 ```
 
-Treat `KeychainError.itemNotFound` as "no token" explicitly in the repository instead of hiding every Keychain failure behind `try?`.
+## Before submitting
 
----
+- [ ] No secret in source, xcconfig or `Info.plist`
+- [ ] Credentials only in the Keychain, behind a Data-layer DataSource
+- [ ] `PrivacyInfo.xcprivacy` covers every Required Reason API used by the app and its SDKs
+- [ ] No `NSAllowsArbitraryLoads`; every ATS exception has a reason
+- [ ] Real pins and a backup pin in the production xcconfig (`networking.md`)
+- [ ] No token, password or personal value in logs
+- [ ] `ITSAppUsesNonExemptEncryption` set in `Info.plist`: the generated one omits it, and the app uses CryptoKit to hash pins
 
-## Hardcoded Secrets
-
-### DON'T: Hardcode API Keys
-
-```swift
-// WRONG: Visible in binary
-let apiKey = "<REDACTED_SECRET>"
-```
-
-### DO: Use Configuration Files or Environment
-
-```swift
-// Option 1: Info.plist (for non-secret configuration)
-let baseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String
-
-// Option 2: xcconfig files (build-time injection)
-// Create Debug.xcconfig and Release.xcconfig
-// API_KEY = $(API_KEY)
-// Access via Info.plist: $(API_KEY)
-
-// Option 3: Keychain (for user-specific secrets)
-let token = try keychain.getToken()
-```
-
----
-
-## App Transport Security (ATS)
-
-### Default: HTTPS Required
-
-ATS is enabled by default. All connections must use HTTPS.
-
-### ATS Best Practices
-
-| Practice | Description |
-|----------|-------------|
-| **Never disable ATS globally** | `NSAllowsArbitraryLoads = true` will be rejected |
-| **Use exceptions sparingly** | Only for specific domains when absolutely necessary |
-| **Document exceptions** | App Store review may ask for justification |
-| **Minimum TLS 1.2** | Always require TLS 1.2 or higher |
-
----
-
-## Data Protection
-
-### File Protection Levels
-
-```swift
-let data = sensitiveData
-let url = documentsURL.appendingPathComponent("sensitive.dat")
-
-try data.write(to: url, options: .completeFileProtection)
-```
-
-| Protection Level | When Available |
-|------------------|----------------|
-| `.complete` | Only when device unlocked |
-| `.completeUnlessOpen` | Open files remain accessible |
-| `.completeUntilFirstUserAuthentication` | After first unlock |
-| `.none` | Always accessible (default) |
-
----
-
-## Logging Best Practices
-
-### DON'T: Log Sensitive Data
-
-```swift
-// WRONG: Logging tokens
-Logger.auth.info("Token: \(token)")
-
-// RIGHT: Log without sensitive data
-Logger.auth.info("Authentication succeeded")
-```
-
----
-
-## Pre-Submission Security Checklist
-
-### Required
-
-- [ ] **Privacy Manifest** created and includes all Required Reason APIs
-- [ ] **No hardcoded secrets** in source code
-- [ ] **Sensitive data in Keychain**, not UserDefaults
-- [ ] **HTTPS only** (no ATS exceptions unless justified)
-
-### Recommended
-
-- [ ] **Certificate pinning** for critical endpoints
-- [ ] **Biometric authentication** for sensitive operations
-- [ ] **Jailbreak detection** for high-security apps
-- [ ] **Code obfuscation** for sensitive logic
-
----
-
-## Quick Reference
-
-| Secret Type | Storage |
-|-------------|---------|
-| Auth tokens | Keychain |
-| API keys | Keychain or xcconfig |
-| User preferences | UserDefaults |
-| UI state | @AppStorage |
-| Sensitive files | Data Protection |
-| Passwords | Keychain with biometric |
+Deeper reference (Axiom plugin, if installed): `axiom-security` (`skills/keychain.md`, `skills/keychain-ref.md`, `skills/file-protection-ref.md`) for the SecItem model, accessibility levels, `SecAccessControl` and protection levels, plus the `security-privacy-scanner` agent; `axiom-integration` (`skills/privacy-ux.md`) for the Privacy Manifest, reason codes and App Tracking Transparency; `axiom-shipping` (`skills/app-store-ref.md`) for submission requirements; `axiom-networking` (`skills/networking-diag.md`) for ATS.

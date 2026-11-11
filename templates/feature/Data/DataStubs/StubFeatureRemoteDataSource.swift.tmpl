@@ -1,10 +1,10 @@
+#if DEBUG
 import Foundation
-@testable import {{ .ProjectName }}
 
 // MARK: - Stub{{ .FeatureName }}RemoteDataSource
 
-/// Stub data source that returns predefined responses for UI tests.
-/// Injected via Factory when `ProcessInfo.isUITestMode` is true.
+/// Data source that answers without network according to its fixture scenario.
+/// {{ .FeatureName }}Factory builds it instead of the Impl when the app runs in UI test mode.
 struct Stub{{ .FeatureName }}RemoteDataSource: {{ .FeatureName }}RemoteDataSource {
     // MARK: - Properties
 
@@ -25,9 +25,8 @@ struct Stub{{ .FeatureName }}RemoteDataSource: {{ .FeatureName }}RemoteDataSourc
         case .empty:
             return []
         case .error:
-            throw NSError(domain: "StubError", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "Simulated error for UI testing"
-            ])
+            throw APIError.httpError(statusCode: 500, data: nil)
         }
     }
 }
+#endif

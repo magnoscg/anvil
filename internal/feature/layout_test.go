@@ -46,12 +46,14 @@ func TestFeatureLayoutWithLocalDataSource(t *testing.T) {
 	}
 
 	jobs := FeatureLayout(cfg)
-	wantCount := 27 // base(26) + 1 local data source
+	wantCount := 29 // base(26) + local data source, its mock and its tests
 	if len(jobs) != wantCount {
 		t.Errorf("FeatureLayout with LocalDataSource: got %d files, want %d", len(jobs), wantCount)
 	}
 
 	assertHasFile(t, jobs, "Data/Pokemon/DataSources/PokemonLocalDataSource.swift")
+	assertHasFile(t, jobs, "Tests/Mocks/PokemonLocalDataSourceMock.swift")
+	assertHasFile(t, jobs, "Tests/Data/Pokemon/DataSources/PokemonLocalDataSourceTests.swift")
 }
 
 func TestFeatureLayoutWithKeychain(t *testing.T) {
@@ -65,12 +67,13 @@ func TestFeatureLayoutWithKeychain(t *testing.T) {
 	}
 
 	jobs := FeatureLayout(cfg)
-	wantCount := 27 // base(26) + 1 keychain
+	wantCount := 28 // base(26) + keychain data source and its mock
 	if len(jobs) != wantCount {
 		t.Errorf("FeatureLayout with Keychain: got %d files, want %d", len(jobs), wantCount)
 	}
 
 	assertHasFile(t, jobs, "Data/Pokemon/DataSources/PokemonKeychainDataSource.swift")
+	assertHasFile(t, jobs, "Tests/Mocks/PokemonKeychainDataSourceMock.swift")
 }
 
 func TestFeatureLayoutWithRouteResolver(t *testing.T) {
@@ -103,7 +106,7 @@ func TestFeatureLayoutAllOptions(t *testing.T) {
 	}
 
 	jobs := FeatureLayout(cfg)
-	wantCount := 29 // base(26) + 3 optional
+	wantCount := 32 // base(26) + local(3) + keychain(2) + route resolver(1)
 	if len(jobs) != wantCount {
 		t.Errorf("FeatureLayout all options: got %d files, want %d", len(jobs), wantCount)
 	}

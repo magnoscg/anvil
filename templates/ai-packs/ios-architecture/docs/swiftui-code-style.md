@@ -1,366 +1,41 @@
-# SwiftUI Code Style Rules
+# SwiftUI Code Style
 
-## File Organization
+Conventions for SwiftUI files in this architecture: file layout, where views live, how a View holds its ViewModel, and how previews are built.
 
-Recommended order within a file:
+## File Layout
 
-1. `import` (alphabetical)
-2. `// MARK: - <TypeName>` (main type)
-3. Type properties
-4. `init` (if applicable)
-5. `body` (if View)
-6. Private methods
-7. `extension` of main type
-8. `// MARK: - Previews` at the end
+Order inside a file, as the generator emits it:
 
-### Required MARK Comments
+1. `import` statements, alphabetical.
+2. `// MARK: - <TypeName>` and the main type, split into `// MARK: - Properties`, `// MARK: - Init` and `// MARK: - Body`.
+3. `// MARK: - Private Views`: a `private extension` of the type with its subviews and helpers.
+4. `// MARK: - Preview` and `// MARK: - Preview Helpers`, always last.
 
-**Always** use `// MARK: - <Section>` to organize code:
+- Every section opens with `// MARK: - <Section>`, and the first one sits directly under the opening brace. The marks are what keeps a long View navigable.
+- Attributes go on the line before the declaration (`@State`, `@Bindable`, `@ViewBuilder`, `@MainActor`, `@Observable`). The generated `.swiftformat` sets `--varattributes`, `--funcattributes` and `--typeattributes` to `prev-line`, so any other spelling only produces a reformat diff.
+- `body` only composes named subviews. Move a branch into the private extension well before the type reaches the limits in `.swiftlint.yml` (`type_body_length` 250, `function_body_length` 40).
+- One View per file, named after the type (`ArticleView.swift` holds `struct ArticleView: View`), so a view is found by name and files stay small. The only exception is a `private` subview of about 15 lines or fewer, which may stay below the view that uses it, under its own `// MARK: -`.
 
-```swift
-// MARK: - ArticleDetailView
+## Where Things Live
 
-struct ArticleDetailView: View {
-
-    // MARK: - Properties
-
-    @Environment(\.dismiss) private var dismiss
-
-    @State
-    private var viewModel: ArticleDetailViewModel
-
-    @State
-    private var retryTrigger = false
-
-    // MARK: - Init
-
-    init(viewModel: ArticleDetailViewModel) {
-        self._viewModel = State(initialValue: viewModel)
-    }
-
-    // MARK: - Body
-
-    var body: some View {
-        content
-            .task(id: retryTrigger) { await viewModel.load() }
-    }
-
-    // MARK: - Private Views
-
-    @ViewBuilder
-    private var content: some View {
-        // ...
-    }
-
-    // MARK: - Private Methods
-
-    private func handleRetry() {
-        retryTrigger.toggle()
-    }
-}
-
-// MARK: - Previews
-
-#Preview("Loaded") {
-    // ...
-}
-```
-
-## View Organization
-
-### One View per File
-
-Each SwiftUI View should be in its own `.swift` file:
-
-```
-ArticleView.swift         -> struct ArticleView: View
-ArticleFeatureRow.swift   -> struct ArticleFeatureRow: View
-ArticleDetailView.swift   -> struct ArticleDetailView: View
-```
-
-**Exception**: Very small private subviews (< 15 lines) can be in the same file:
-
-```swift
-// ArticleView.swift
-
-// MARK: - ArticleView
-
-struct ArticleView: View {
-    var body: some View {
-        VStack {
-            HeaderSection()
-            // ...
-        }
-    }
-}
-
-// MARK: - HeaderSection
-
-private struct HeaderSection: View {
-    var body: some View {
-        Text("Header")
-            .font(.title)
-    }
-}
-```
-
-### View Locations
-
-| View Type | Location |
-|-----------|----------|
-| Feature main View | `Features/<Feature>/UI/` |
-| Reusable feature component | `Features/<Feature>/UI/Components/` |
-| Shared component (all features) | `Core/Common/SwiftUI/Components/` (e.g. generated `ErrorView`, `LoadingStateView`) |
+| What | Location |
+|---|---|
+| Feature screen, its `State` and its `Decorator` | `Features/<Feature>/UI/` (ViewModels, mappers and the rest of the tree: `PROJECT-STRUCTURE.md`) |
+| Component used by a single feature | `Features/<Feature>/UI/Components/` |
+| Component shared by features | `Core/Common/SwiftUI/Components/` (generated: `ErrorView`, `LoadingStateView`) |
+| `ViewModifier` plus its `View` extension | `Core/Common/SwiftUI/Modifiers/` (generated: `CustomListRow.swift`, `PrimaryButtonStyle.swift`) |
+| `@ViewBuilder` helpers | `Core/Common/SwiftUI/Builders/` (generated: `ConditionalContent.swift`) |
 | Design tokens | `Core/DesignSystem/Tokens/` (`AppColors`, `AppTypography`, `Spacing`, `AppIcons`, `IconSize`) |
 
-### Custom ViewModifiers
+## Modifiers and Builders
 
-**Never** write complex modifiers inline. **All** ViewModifiers go in a single location:
+- A modifier chain that is reused, or that carries logic, becomes a `ViewModifier` in `Core/Common/SwiftUI/Modifiers/`; it is never repeated inline. One place to change a style is one place to get it wrong.
+- The file holds the `<Name>Modifier` struct and the `View` extension that exposes it. Call sites use the extension (`.primaryButtonStyle()`, `.customListRow()`), never `.modifier(...)`.
+- Conditional view-building helpers go in `Core/Common/SwiftUI/Builders/` (generated: `.if(_:transform:)`).
 
-```
-Core/
-+- Common/
-   +- SwiftUI/
-      +- Modifiers/
-         +- CustomListRow.swift         # generated
-         +- PrimaryButtonStyle.swift    # generated (.primaryButtonStyle())
-         +- ShimmerModifier.swift       # example of one you add
-```
+## View and ViewModel
 
-File structure:
-
-```swift
-// Core/Common/SwiftUI/Modifiers/ShimmerModifier.swift
-import SwiftUI
-
-// MARK: - ShimmerModifier
-
-struct ShimmerModifier: ViewModifier {
-
-    // MARK: - Properties
-
-    let isActive: Bool
-    @State private var phase: CGFloat = 0
-
-    // MARK: - Body
-
-    func body(content: Content) -> some View {
-        content
-            .overlay {
-                if isActive {
-                    shimmerOverlay
-                }
-            }
-    }
-
-    // MARK: - Private Views
-
-    private var shimmerOverlay: some View {
-        // ...
-    }
-}
-
-// MARK: - View Extension
-
-extension View {
-    func shimmer(isActive: Bool = true) -> some View {
-        modifier(ShimmerModifier(isActive: isActive))
-    }
-}
-```
-
-### @ViewBuilder Helpers
-
-For conditional view building logic, create helpers in:
-
-```
-Core/
-+- Common/
-   +- SwiftUI/
-      +- Builders/
-         +- ConditionalContent.swift
-```
-
-## State and Observation
-
-### @State for ViewModels from Factory (Navigation Preservation)
-
-**CRITICAL**: When a View receives a ViewModel from a Factory via `navigationDestination`,
-you **MUST** use `@State` to preserve the ViewModel identity across navigation.
-
-**Why?** When you navigate back, SwiftUI may recreate the View struct. Without `@State`:
-1. View struct recreated -> Factory called -> NEW ViewModel created
-2. All loaded data and state is LOST
-
-```swift
-// CORRECT: @State preserves ViewModel across navigation
-struct ArticleDetailView: View {
-
-    // MARK: - Properties
-
-    @State
-    private var viewModel: ArticleDetailViewModel
-
-    // MARK: - Init
-
-    init(viewModel: ArticleDetailViewModel) {
-        self._viewModel = State(initialValue: viewModel)
-    }
-
-    // MARK: - Body
-
-    var body: some View {
-        content
-            .task(id: viewModel.articleId) { await viewModel.load() }
-    }
-}
-
-// Factory stays the same - creates ViewModel and returns View
-static func makeView(articleId: String, appRouter: AppRouter, dependencies: AppDependencies) -> some View {
-    let viewModel = makeViewModel(articleId: articleId, appRouter: appRouter, apiClient: dependencies.apiClient)
-    return ArticleDetailView(viewModel: viewModel)
-}
-```
-
-**Note**: Generated Views declare `@State private var viewModel` and set it once in an explicit `init` with `self._viewModel = State(initialValue: viewModel)`. SwiftUI keeps only the first value, so the extra ViewModels a Factory builds when the destination closure runs again are discarded: keep Factories and initializers cheap (no I/O or decoding).
-
-### When to Use Each Wrapper
-
-| Wrapper | When to Use | Example |
-|---------|-------------|---------|
-| `@State private var viewModel` + `State(initialValue:)` in `init` | View receives from Factory | Main feature views |
-| `@Bindable var viewModel` | Need `$viewModel.property` bindings | Forms with TextField/Toggle |
-| `var viewModel` | Parent owns @State, passes down | Child components |
-| `@State private var localState` | UI-only state (not ViewModel) | `isShowingSheet`, `selectedTab` |
-
-### @Bindable for Two-way Bindings
-
-When you need to create bindings (`$`) to properties of an `@Observable` class, use `@Bindable`:
-
-```swift
-// Features/Profile/UI/EditProfileView.swift
-import SwiftUI
-
-// MARK: - EditProfileView
-
-struct EditProfileView: View {
-
-    // MARK: - Properties
-
-    @Bindable var viewModel: EditProfileViewModel
-
-    // MARK: - Body
-
-    var body: some View {
-        Form {
-            TextField("profile.name", text: $viewModel.name)
-            TextField("profile.bio", text: $viewModel.bio)
-            Toggle("profile.notifications", isOn: $viewModel.notificationsEnabled)
-        }
-    }
-}
-```
-
-### Separate State and Decorators
-
-State enum and Decorators in **separate files** in `UI/` folder:
-
-```swift
-// Features/Article/UI/ArticleState.swift
-
-// MARK: - ArticleState
-
-enum ArticleState: Equatable {
-    case idle
-    case loading
-    case loaded([ArticleSectionDecorator])
-    case error(ErrorDecorator)
-}
-```
-
-```swift
-// Features/Article/UI/ArticleDecorator.swift
-
-// MARK: - ArticleSectionDecorator
-
-struct ArticleSectionDecorator: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let items: [ArticleItemDecorator]
-}
-
-// MARK: - ArticleItemDecorator
-
-struct ArticleItemDecorator: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let description: String
-}
-```
-
-### ViewModel with @Observable
-
-**Note**: Actions are direct methods, no Action/Event enums. **No default values** — everything is injected by the Factory.
-
-```swift
-// Features/Article/Presentation/ViewModels/ArticleViewModel.swift
-import Foundation
-
-// MARK: - ArticleViewModel
-
-@MainActor
-@Observable
-final class ArticleViewModel {
-
-    // MARK: - Properties
-
-    private(set) var state: ArticleState = .idle
-
-    private let useCase: ArticleUseCase
-    private let decoratorMapper: ArticleDecoratorMapper
-    private let router: ArticleRouter
-
-    // MARK: - Init
-
-    init(useCase: ArticleUseCase,
-         decoratorMapper: ArticleDecoratorMapper,
-         router: ArticleRouter) {
-        self.useCase = useCase
-        self.decoratorMapper = decoratorMapper
-        self.router = router
-    }
-
-    // MARK: - Public Methods
-
-    func loadArticles() async {
-        guard state != .loading else { return }
-
-        let previousState = state
-        state = .loading
-
-        do {
-            let models = try await useCase.execute()
-            let sections = decoratorMapper.mapToSections(models)
-            state = .loaded(sections)
-        } catch is CancellationError {
-            state = previousState
-        } catch let error as DomainError {
-            state = .error(ErrorDecorator.from(error))
-        } catch {
-            state = .error(.generic)
-        }
-    }
-
-    func navigateToDetail(articleId: String) {
-        router.navigateToDetail(articleId: articleId)
-    }
-}
-```
-
-### View with ViewModel Injection
-
-> **Important**: Use `@State private var viewModel`, set in `init` with `State(initialValue:)`, when the View receives the ViewModel from a Factory.
-> This preserves the ViewModel identity across navigation events.
+The Factory builds the ViewModel and hands it to the View, which keeps it in `@State`. Every feature screen has this shape:
 
 ```swift
 // Features/Article/UI/ArticleView.swift
@@ -369,288 +44,215 @@ import SwiftUI
 // MARK: - ArticleView
 
 struct ArticleView: View {
-
     // MARK: - Properties
 
     @State
     private var viewModel: ArticleViewModel
-
-    @State
-    private var retryTrigger = false
 
     // MARK: - Init
 
     init(viewModel: ArticleViewModel) {
-        self._viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
     }
 
     // MARK: - Body
 
     var body: some View {
-        content
-            .task(id: retryTrigger) {
-                await viewModel.loadArticles()
+        Group {
+            switch viewModel.state {
+            case .idle:
+                Color.clear
+            case .loading:
+                loadingView
+            case .loaded:
+                loadedView
+            case let .error(error):
+                errorView(error: error)
             }
-    }
-
-    // MARK: - Private Views
-
-    @ViewBuilder
-    private var content: some View {
-        switch viewModel.state {
-        case .idle:
-            Color.clear
-        case .loading:
-            LoadingStateView()
-        case .loaded(let sections):
-            ArticleListContent(
-                sections: sections,
-                onSelectArticle: viewModel.navigateToDetail
-            )
-        case .error(let error):
-            ErrorView(error: ErrorDecorator(title: error.title,
-                                            message: error.message,
-                                            retryAction: { retryTrigger.toggle() }))
+        }
+        .navigationTitle(String(localized: "article.title"))
+        .navigationBarTitleDisplayMode(.large)
+        .task {
+            await viewModel.load()
         }
     }
 }
 
-// MARK: - Previews
+// MARK: - Private Views
 
-#Preview("Loaded") {
-    // ...
+private extension ArticleView {
+    var loadingView: some View {
+        LoadingStateView()
+    }
+
+    var loadedView: some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.md) {
+                ForEach(viewModel.items) { item in
+                    Button {
+                        viewModel.navigateToDetail(id: item.id)
+                    } label: {
+                        Text(item.displayName)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, Spacing.md)
+                }
+            }
+            .padding(.vertical, Spacing.md)
+        }
+    }
+
+    func errorView(error: ErrorDecorator) -> some View {
+        let retryError = ErrorDecorator(
+            title: error.title,
+            message: error.message,
+            retryAction: { [viewModel] in Task { await viewModel.load() } }
+        )
+        return ErrorView(error: retryError)
+    }
 }
 ```
 
-### UI-only State
+Why it is written this way:
 
-For state that only affects UI (not business logic), use `@State private`:
+- `@State private var viewModel` keeps the first ViewModel for as long as the view keeps its identity, so loaded data survives navigating back. It is `private` because the View owns it.
+- `init` assigns the property itself (`self.viewModel = viewModel`) as its last statement, after every other stored property. Never write to the underscored storage (`_viewModel = ...`), and never add an inline default to a `@State` that `init` assigns: the inline value wins silently.
+- The Factory runs every time SwiftUI rebuilds the View value, not once per screen; `@State` keeps the first ViewModel and discards the rest. Every `init` reached from the Factory (ViewModel, UseCase, Repository, mappers) must therefore be cheap: no I/O, no decoding, no work started.
+- The first load uses `.task { }`, which SwiftUI cancels when the view goes away. Use `.task(id:)` only when the id drives the work (loading the detail of the selected item); a flag flipped just to restart a task is not an id.
+- Retry launches `Task { await viewModel.load() }` from the action. The ViewModel emits an `ErrorDecorator` without `retryAction`; the View adds it, and `ErrorView` shows the retry button only when it is set. The capture list `[viewModel]` makes the `@Sendable` closure hold the ViewModel itself instead of a copy of the whole View.
+- `.idle` renders `Color.clear`: nothing has been requested yet, so the screen shows nothing rather than a spinner.
+
+The part of the ViewModel the View relies on (the whole file is in `new-feature.md`, layers and error mapping in `ARCHITECTURE.md`, isolation and cancellation rules in `swift-concurrency.md`):
 
 ```swift
-struct ArticleView: View {
-
+// Features/Article/Presentation/ViewModels/ArticleViewModel.swift
+@MainActor
+@Observable
+final class ArticleViewModel {
     // MARK: - Properties
 
-    @State
-    private var viewModel: ArticleViewModel
+    private(set) var state: ArticleState = .idle
+    private(set) var items: [ArticleDecorator] = []
 
-    @State
-    private var isShowingFilter = false
+    // MARK: - Public Methods
 
-    // MARK: - Body
+    func load() async {
+        guard state != .loading else { return }
 
-    var body: some View {
-        // ...
+        let previousState = state
+        state = .loading
+
+        do {
+            let models = try await useCase.execute()
+            let decorators = models.map { decoratorMapper.map($0) }
+            items = decorators
+            state = .loaded
+        } catch is CancellationError {
+            state = previousState
+        } catch let error as DomainError {
+            state = .error(ErrorDecorator.from(error))
+        } catch {
+            state = .error(.generic)
+        }
     }
 }
 ```
 
-## Environment and Dependencies
+- `@MainActor`, `@Observable`, `final class`. Observable state is `private(set)`: the View reads it and calls plain methods (`load()`, `navigateToDetail(id:)`); there are no Action or Event enums.
+- Cancellation is not an error. When `.task` is cancelled the ViewModel restores `previousState`, so coming back to the screen reloads instead of showing a stuck spinner.
 
-### Use @Environment for System APIs
+## Property Wrappers
 
-```swift
-@Environment(\.dismiss) private var dismiss
-@Environment(\.openURL) private var openURL
-@Environment(\.colorScheme) private var colorScheme
-```
+| Declaration | Use it when |
+|---|---|
+| `@State private var viewModel: ArticleViewModel` plus `init` | The View receives its ViewModel from the Factory (every feature screen). |
+| `@Bindable var viewModel: ArticleViewModel` | A child view needs `$viewModel.property` bindings (`TextField`, `Toggle`) to a ViewModel owned elsewhere. |
+| `let viewModel: ArticleViewModel`, `let item: ArticleDecorator` | A child view only reads; the parent owns the state. |
+| `@Binding var isPresented: Bool` | A child view writes a value type owned by its parent. |
+| `@State private var isShowingFilter = false` | UI-only state that no other layer needs. |
+| `@Environment(\.dismiss)`, `\.openURL`, `\.colorScheme` | System-provided values only. |
 
-### Do NOT use @Environment for Custom Dependencies
+App dependencies never travel through `@Environment`: the Factory injects them into the ViewModel. Do not use `@StateObject`, `@ObservedObject`, `@EnvironmentObject` or `ObservableObject`; the project uses Observation.
 
-```swift
-// Avoid
-@Environment(\.articleRepository) private var repository
-
-// Inject through the Factory into the ViewModel
-ArticleFactory.makeView(appRouter: appRouter, dependencies: dependencies)
-```
-
-### Avoid
-
-- `@EnvironmentObject` — prefer Observation with explicit injection
-- `@StateObject` — it's from the Combine paradigm
-- `@ObservedObject` — it's from the Combine paradigm
-
-## Errors and Optionals
-
-- Don't use `try?` or empty `catch {}` without a clear reason
-- Prefer returning `Result` or throwing typed errors
-- Map errors between layers (see `ARCHITECTURE.md`)
-
-## Memory Management (Closures)
-
-### When to Use `[weak self]`
-
-Only in **escaping closures** that capture a **class** and can outlive the scope:
-
-- Network callbacks
-- Timers
-- NotificationCenter observers
-- Combine sinks
-- Retained delegates
-- `Task` stored in properties
-
-## Concurrency
-
-### In Views: Use `.task(id:)`
+## State and Decorator
 
 ```swift
-.task(id: articleId) {
-    await viewModel.loadArticle(articleId: articleId)
-}
-```
+enum ArticleState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case error(ErrorDecorator)
 
-### Do NOT Use Loose `Task { }`
-
-```swift
-// Avoid in onAppear or Button
-Button("Load") {
-    Task {
-        await viewModel.loadArticles()
-    }
-}
-
-// Better: change the id that drives .task(id:)
-Button("Reload") {
-    retryTrigger.toggle()
-}
-```
-
-### Cancellation Handling in ViewModel
-
-Cancellation is not an error: restore the previous state.
-
-```swift
-func loadArticles() async {
-    guard state != .loading else { return }
-
-    let previousState = state
-    state = .loading
-
-    do {
-        let data = try await useCase.execute()
-        let sections = decoratorMapper.mapToSections(data)
-        state = .loaded(sections)
-    } catch is CancellationError {
-        state = previousState
-    } catch let error as DomainError {
-        state = .error(ErrorDecorator.from(error))
-    } catch {
-        state = .error(.generic)
+    static func == (lhs: ArticleState, rhs: ArticleState) -> Bool {
+        switch (lhs, rhs) {
+        case (.idle, .idle), (.loading, .loading), (.loaded, .loaded):
+            true
+        case let (.error(l), .error(r)):
+            l.title == r.title && l.message == r.message
+        default:
+            false
+        }
     }
 }
 ```
 
-## Localization
-
-### In Views: String Catalog
-
-Don't use hardcoded literals:
-
-```swift
-// Avoid
-Text("Welcome back!")
-
-// Use String Catalog
-Text("home.welcome.title")
-```
-
-### In Code: String(localized:)
-
-```swift
-let message = String(localized: "error.network.message")
-```
-
-## Accessibility
-
-### Basic Rules
-
-All interactive Views must be accessible for VoiceOver and other assistive technologies.
-
-### Required Labels
-
-```swift
-// Icons without text need label
-Button(action: deleteItem) {
-    Image(systemName: "trash")
-}
-.accessibilityLabel("article.delete.button")
-
-// Decorative images are hidden
-Image("decorative-banner")
-    .accessibilityHidden(true)
-
-// Informative images need description
-Image("product-photo")
-    .accessibilityLabel("product.image.description")
-```
+- `State` and `Decorator` each get their own file in `UI/`, never inside the View or ViewModel file.
+- `State` says which screen to draw. The data lives in the ViewModel (`items`), so `.loaded` carries no payload.
+- `==` is written by hand because `ErrorDecorator` holds a closure (`retryAction`) and is `Sendable` but not `Equatable`: two errors are equal when title and message match. `guard state != .loading` depends on it.
+- A Decorator (`ArticleDecorator`) is display-ready data: `Sendable`, `Identifiable`, `Equatable`, with strings already formatted by the `DecoratorMapper`. A View never receives a domain `Model`.
 
 ## Previews
 
-### Always Deterministic
-
-- No network
-- No real SwiftData
-- With mocks/stubs
-
-### Cover Main States
-
-At minimum:
-- `loaded` with data
-- `loading`
-- `error`
-- `empty` (if applicable)
-
----
-
-## Performance Patterns
-
-### LazyVStack for Long Lists
+Previews are deterministic: no network, no persistence, fixed data. Test mocks belong to the test target and are not visible to the app target, so each View file declares small `private` stubs at the bottom, under `// MARK: - Preview Helpers`.
 
 ```swift
-// WRONG: VStack loads all items immediately
-ScrollView {
-    VStack {
-        ForEach(items) { item in
-            ItemRow(item: item)
-        }
+// MARK: - Preview
+
+#Preview("Loaded") {
+    NavigationStack {
+        ArticleView(viewModel: ArticleViewModel(useCase: PreviewArticleUseCase(),
+                                                decoratorMapper: ArticleDecoratorMapperImpl(),
+                                                router: PreviewArticleRouter()))
     }
 }
 
-// CORRECT: LazyVStack loads items on demand
-ScrollView {
-    LazyVStack {
-        ForEach(items) { item in
-            ItemRow(item: item)
-        }
+// MARK: - Preview Helpers
+
+private struct PreviewArticleUseCase: ArticleUseCase {
+    var error: DomainError?
+
+    func execute() async throws -> [ArticleModel] {
+        if let error { throw error }
+        return [ArticleModel(id: "1", name: "First article", description: "Preview data")]
     }
+}
+
+@MainActor
+private struct PreviewArticleRouter: ArticleRouter {
+    func navigateToDetail(id: String) {}
+    func goBack() {}
 }
 ```
 
-### Avoid Expensive Computations in Body
+Add one `#Preview` per case of the State enum that draws something different: loaded, error (`PreviewArticleUseCase(error: .network)`), loading (a stub that never returns) and empty when the screen has one. Previews use the real `DecoratorMapperImpl`, so they show what the mapper actually produces.
+
+## Tokens, Accessibility and Localization
 
 ```swift
-// WRONG: Expensive computation on every render
-var body: some View {
-    let sortedItems = items.sorted { $0.date > $1.date }
-    List(sortedItems) { item in
-        ItemRow(item: item)
-    }
-}
-
-// CORRECT: Move computation to ViewModel
-var body: some View {
-    List(viewModel.processedItems) { item in
-        ItemRow(item: item)
-    }
-}
+Text(item.subtitle)
+    .font(AppTypography.footnote.font)
+    .foregroundStyle(AppColors.textSecondary)
+    .padding(.horizontal, Spacing.md)
 ```
 
-### Use drawingGroup() for Complex Graphics
+- Typography, color, spacing and icons come from tokens, never from `.font(.title)`, a literal `Color` or a numeric padding. `AppTypography` maps to Dynamic Type text styles, so there are no fixed font sizes.
+- Localization: user-facing text is a String Catalog key shaped `<feature>.<element>` (`article.title`, `error.button.retry`) read with `String(localized:)`; no hardcoded literals in Views.
+- Accessibility: a control without visible text gets an `accessibilityLabel` (a localized key), decorative images are hidden with `accessibilityHidden(true)`, and identifiers come from the feature's `AccessibilityID` enum (`ui-testing.md`). The token catalog and the full rules are in `design-system.md`.
 
-```swift
-ZStack {
-    // Many overlapping shapes with effects
-}
-.drawingGroup()
-```
+## Performance
+
+- Sorting, filtering and formatting happen in the ViewModel or the `DecoratorMapper`, never in `body`, which runs on every state change.
+- Long or unbounded lists use a lazy container (`List`, or `LazyVStack` inside a `ScrollView`).
+- Format values with `.formatted()` or `Text(value, format:)`; never store a formatter in a View.
+
+Deeper reference (Axiom plugin, if installed): `axiom-swiftui` (`skills/architecture.md`, `skills/swiftui-performance.md`, `skills/previews-ref.md`).

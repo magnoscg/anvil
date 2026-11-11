@@ -1,164 +1,133 @@
-# new-feature.md — Create a Feature (Checklist)
+# new-feature.md — Create a Feature
 
-## 0) Quick Decisions (Before Coding)
-- Feature name: `[Feature]` (one feature = one screen)
-- Domain concept: reuse an existing `Domain/<Concept>/` folder if another screen already models it
-- Required routes (push/sheet/deeplink) and whether the feature owns destinations (RouteResolver)
-- ViewModel states (idle/loading/loaded/error)
-- `DomainError` cases the UI must tell apart (reuse `DomainError`; add a case only when needed)
-- Data sources needed: Remote (API) / Local (UserDefaults) / Keychain / SwiftData
+Checklist for adding one screen (a feature) across Domain, Data and Presentation, with the rule behind each step.
+Examples use the feature `Article` and omit the `// MARK: -` headers and doc comments the generator emits (`swiftui-code-style.md`).
 
-> **Scaffold first**: `anvil feature [Feature]` generates every file below, plus tests and mocks. It asks whether to include a Local (UserDefaults) data source, Keychain storage, a RouteResolver and UI tests. Then adapt the generated code.
+## 0) Scaffold First
 
-## 1) Folder Structure
+Run `anvil feature Article` inside the project. It asks four questions (Local `UserDefaults` data source, Keychain storage, RouteResolver, UI tests), writes every file below plus tests and mocks, and prints the wiring steps. Hand-written files are how names and folders drift.
 
-Create files in **three separate locations**:
+Decide before running it:
+- Feature name: one feature = one screen. If another screen already models the concept, reuse its `Domain/<Concept>/` and `Data/<Concept>/` code instead of keeping a second copy.
+- Data sources (Remote only, or also Local, Keychain or SwiftData) and whether the feature owns destinations (RouteResolver) or only pushes routes that another resolver handles.
+- Which `DomainError` cases the UI must tell apart. Reuse `DomainError`; add a case only when the UI needs it.
 
-### Domain Layer (Global)
+After scaffolding you still have to:
+1. Replace the placeholder fields (`id`, `name`, `description`) in `ArticleModel`, `ArticleDTO`, `ArticleDecorator` and both mappers.
+2. Replace the `fatalError("TODO: ...")` body of `ArticleRemoteDataSourceImpl.fetch()` with a real request (section 3).
+3. Define the route cases and register the feature in the app root (section 5).
+4. Extend the generated tests (section 8).
+
+## 1) Where the Files Go
+
 ```
-Domain/[Feature]/
-  Models/
-    [Feature]Model.swift              # Domain model
-  UseCases/
-    [Feature]UseCase.swift            # Protocol
-    [Feature]UseCaseImpl.swift        # Implementation
-  Repositories/
-    [Feature]Repository.swift         # Protocol (owned by Domain)
+Domain/Article/
+  Models/ArticleModel.swift
+  UseCases/ArticleUseCase.swift, ArticleUseCaseImpl.swift   # protocol and implementation, one file each
+  Repositories/ArticleRepository.swift                      # protocol, owned by Domain
+Data/Article/
+  Repositories/ArticleRepositoryImpl.swift
+  DataSources/ArticleRemoteDataSource.swift                 # protocol + Impl
+  DataSources/ArticleLocalDataSource.swift, ArticleKeychainDataSource.swift   # optional, protocol + Impl
+  DTO/ArticleDTO.swift
+  Mappers/ArticleDTOMapper.swift                            # protocol + Impl
+  DataStubs/StubArticleRemoteDataSource.swift, FixtureArticleRemoteDataSource.swift   # optional (UI tests), Debug only
+Features/Article/
+  DI/ArticleFactory.swift
+  UI/ArticleView.swift, ArticleState.swift, ArticleDecorator.swift
+  UI/Components/                                            # feature-only subviews, add when needed
+  Presentation/ViewModels/ArticleViewModel.swift
+  Presentation/Mappers/ArticleDecoratorMapper.swift         # protocol + Impl
+  Navigation/ArticleRouter.swift                            # Route enum + protocol + Impl
+  Navigation/ArticleRouteResolver.swift                     # optional
 ```
 
-### Data Layer (Global)
-```
-Data/[Feature]/
-  Repositories/
-    [Feature]RepositoryImpl.swift     # Implementation only
-  DataSources/
-    [Feature]RemoteDataSource.swift   # Protocol + Impl (only if API calls)
-    [Feature]LocalDataSource.swift    # Protocol + Impl (optional, UserDefaults)
-    [Feature]KeychainDataSource.swift # Protocol + Impl (optional)
-  DTO/
-    [Feature]DTO.swift                # (only if API calls)
-  Mappers/
-    [Feature]DTOMapper.swift          # Protocol + Impl (only if API calls)
-```
-
-### Features (Presentation Only)
-```
-Features/[Feature]/
-  DI/
-    [Feature]Factory.swift
-
-  UI/
-    [Feature]View.swift               # Main view
-    [Feature]State.swift              # State enum only
-    [Feature]Decorator.swift          # Decorators (section, item)
-    [Feature]AccessibilityID.swift    # Optional (UI tests)
-    Components/                       # Feature-specific subviews (add when needed)
-      [Feature]Row.swift
-
-  Presentation/
-    ViewModels/
-      [Feature]ViewModel.swift
-    Mappers/
-      [Feature]DecoratorMapper.swift  # Protocol + Impl
-
-  Navigation/
-    [Feature]Router.swift             # Route enum + Protocol + Impl (always)
-    [Feature]RouteResolver.swift      # Optional: only if the feature owns destinations
-```
+UseCase and Repository keep protocol and implementation in separate files (the Repository pair lives in two layers). DataSources, mappers and the Router keep protocol and `Impl` in one file. The whole tree is in `PROJECT-STRUCTURE.md`.
 
 ## 2) Domain
 
-- **Model**: `Sendable` (crosses actor boundaries).
-- **Errors**: use the shared `DomainError` (`Domain/Common/DomainError.swift`); no per-feature error enum.
-- **Repository Protocol**: `Sendable` contract in `Domain/[Feature]/Repositories/`.
-- **UseCase Protocol + Impl**: business logic orchestration. The Impl does not catch or map errors.
+- **Model**: a `struct` that is `Sendable`, `Equatable` and `Identifiable`, because it crosses layers and tasks.
+- **Errors**: the shared `DomainError` (`Domain/Common/DomainError.swift`). No per-feature error enum: one type keeps the ViewModel's `catch` and `ErrorDecorator.from(_:)` complete.
+- **Repository protocol**: in `Domain/Article/Repositories/`. Domain owns the contract and Data implements it, so Domain never imports a Data type.
+- **UseCase**: protocol + `Impl`. The `Impl` holds business rules and does not catch or map errors; they arrive typed from the Repository.
 
 ```swift
 // Domain/Article/Models/ArticleModel.swift
 struct ArticleModel: Sendable, Equatable, Identifiable {
     let id: String
-    let title: String
-    let body: String
-    let category: Category
-    let publishedAt: Date
-
-    enum Category: String, Sendable, CaseIterable {
-        case news = "News"
-        case tutorial = "Tutorial"
-    }
+    let name: String
+    let description: String
 }
 
 // Domain/Article/Repositories/ArticleRepository.swift
-
-// MARK: - ArticleRepository
-
-/// Repository contract owned by Domain; the Impl throws only `DomainError` or `CancellationError`.
 protocol ArticleRepository: Sendable {
-    func fetchArticles() async throws -> [ArticleModel]
+    func fetch() async throws -> [ArticleModel]
 }
 
 // Domain/Article/UseCases/ArticleUseCase.swift
-
-// MARK: - ArticleUseCase
-
 protocol ArticleUseCase: Sendable {
     func execute() async throws -> [ArticleModel]
 }
 
 // Domain/Article/UseCases/ArticleUseCaseImpl.swift
-
-// MARK: - ArticleUseCaseImpl
-
-struct ArticleUseCaseImpl: ArticleUseCase {
-    // MARK: - Properties
-
+struct ArticleUseCaseImpl: ArticleUseCase, Sendable {
     private let repository: ArticleRepository
-
-    // MARK: - Init
 
     init(repository: ArticleRepository) {
         self.repository = repository
     }
 
-    // MARK: - Public Methods
-
     func execute() async throws -> [ArticleModel] {
-        try await repository.fetchArticles()
+        try await repository.fetch()
     }
 }
 ```
 
 ## 3) Data
 
-- **Repository Impl**: implements the Domain protocol and wraps its work in `try await DomainError.catching { ... }`.
-- **DataSources**: Remote (API), optional Local (UserDefaults) and Keychain. Protocol + Impl in one file.
-- **DTO**: Data Transfer Object (only for API responses).
-- **DTOMapper Protocol + Impl** (one file): transformations DTO -> Domain Model.
-- **Error mapping**: `APIError` -> `DomainError` happens only in `DomainError.catching` / `DomainError.map` (`Data/Common/DomainErrorMapping.swift`).
+- **RepositoryImpl**: implements the Domain protocol and wraps its work in `try await DomainError.catching { ... }`, so it throws only `DomainError` or `CancellationError`.
+- **Errors are mapped once**, in `Data/Common/DomainErrorMapping.swift` (`DomainError.catching`, `DomainError.map`). DataSources throw `APIError` or their own errors and never map to `DomainError`: two mapping sites hide which layer decided.
+- **A DataSource `init` does no I/O**: it only stores dependencies. A Factory can run many times (section 5), so reading or decoding in `init` repeats that work. Do it inside the `async throws` method.
+- **DTOMapper**: DTO -> Model through two `map(_:)` overloads (one DTO, an array); `ArticleDTOMapperImpl` sits in the same file as the protocol. The Repository property is named `mapper`.
+- **Isolation**: whether this code runs on or off the main actor depends on the project's build settings. Read `swift-concurrency.md` before adding `nonisolated`, `@concurrent` or `@MainActor`.
 
-### DataSource Rules
+| DataSource | Use for | Returns |
+|---|---|---|
+| `ArticleRemoteDataSource` | API calls through the shared `APIClient` | `[ArticleDTO]` |
+| `ArticleLocalDataSource` (optional) | small cache in `UserDefaults` | `[ArticleDTO]` |
+| `ArticleKeychainDataSource` (optional) | secrets through `KeychainHelper` (`security-privacy.md`) | `String?` |
+| SwiftData | persistent models, when the project enables it | see `swiftdata.md` |
 
-| DataSource | When to use | Returns |
-|------------|-------------|---------|
-| RemoteDataSource | Feature makes API calls (`APIClient`) | `[FeatureDTO]` |
-| LocalDataSource (optional) | Small local cache in `UserDefaults` | `[FeatureDTO]` |
-| KeychainDataSource (optional) | Secrets / tokens through `KeychainHelper` | `String?` |
-| SwiftData | Persistent models (only when SwiftData is enabled) | see `swiftdata.md` |
-
-### Repository with DTOMapper
+The optional Local and Keychain data sources are injected into `ArticleRepositoryImpl`, but the generated `fetch()` does not call them yet.
 
 ```swift
+// Data/Article/DataSources/ArticleRemoteDataSource.swift
+protocol ArticleRemoteDataSource: Sendable {
+    func fetch() async throws -> [ArticleDTO]
+}
+
+struct ArticleRemoteDataSourceImpl: ArticleRemoteDataSource {
+    private let apiClient: APIClient
+
+    init(apiClient: APIClient) {
+        self.apiClient = apiClient
+    }
+
+    func fetch() async throws -> [ArticleDTO] {
+        try await apiClient.request(Endpoint.get(path: "/articles"))
+    }
+}
+
+// Data/Article/Mappers/ArticleDTOMapper.swift
+protocol ArticleDTOMapper: Sendable {
+    func map(_ dto: ArticleDTO) -> ArticleModel
+    func map(_ dtos: [ArticleDTO]) -> [ArticleModel]
+}
+
 // Data/Article/Repositories/ArticleRepositoryImpl.swift
-
-// MARK: - ArticleRepositoryImpl
-
 struct ArticleRepositoryImpl: ArticleRepository {
-    // MARK: - Properties
-
     private let remoteDataSource: ArticleRemoteDataSource
     private let mapper: ArticleDTOMapper
-
-    // MARK: - Init
 
     init(remoteDataSource: ArticleRemoteDataSource,
          mapper: ArticleDTOMapper) {
@@ -166,182 +135,50 @@ struct ArticleRepositoryImpl: ArticleRepository {
         self.mapper = mapper
     }
 
-    // MARK: - Public Methods
-
-    func fetchArticles() async throws -> [ArticleModel] {
+    func fetch() async throws -> [ArticleModel] {
         try await DomainError.catching {
-            let dtos = try await remoteDataSource.fetchArticles()
+            let dtos = try await remoteDataSource.fetch()
             return mapper.map(dtos)
         }
     }
 }
 ```
 
-### RemoteDataSource (returns DTO)
+### DTOs, Dates and Formatters
 
-```swift
-// Data/Article/DataSources/ArticleRemoteDataSource.swift
+- `ArticleDTO` is `Sendable`, `Equatable` and `Codable` with explicit `CodingKeys`, so renaming a property never changes the wire format by accident.
+- Keep a date (say a new `publishedAt` field) as `String` in the DTO and parse it in the DTOMapper with a format style: `try Date(dto.publishedAt, strategy: .iso8601)`. A mapper that can fail becomes `throws` (protocol, `Impl` and `ArticleDTOMapperMock`) and is called with `try` inside `DomainError.catching`; never fall back to `Date()`.
+- **Never `try?` in a decoder or a mapper**: it turns bad data into missing data. Let the error travel: `APIClientImpl` wraps decoding failures in `APIError.decodingError`, and `DomainError.catching` maps them to `DomainError.parsing`.
+- **Formatters**: never create a `DateFormatter`, `ISO8601DateFormatter` or `NumberFormatter` inline, and never store one in a mapper, View or ViewModel. Format with `.formatted()` (`model.publishedAt.formatted(date: .abbreviated, time: .omitted)`) and parse with `Date.ISO8601FormatStyle`. A formatter that must be shared is a single static instance in `Core/Common/Extensions/`. Configuring a formatter and formatting with it is the costly part, and a mapper is rebuilt on every Factory call.
 
-// MARK: - ArticleRemoteDataSource
+### External APIs
 
-protocol ArticleRemoteDataSource: Sendable {
-    func fetchArticles() async throws -> [ArticleDTO]
-}
+| Scenario | Endpoint type | Base URL |
+|---|---|---|
+| The app's own backend | `Endpoint` struct | from `EnvironmentConfiguration` |
+| Third-party API | a type conforming to `APIEndpoint` | embedded in the endpoint |
 
-// MARK: - ArticleRemoteDataSourceImpl
-
-struct ArticleRemoteDataSourceImpl: ArticleRemoteDataSource {
-    // MARK: - Properties
-
-    private let apiClient: APIClient
-
-    // MARK: - Init
-
-    init(apiClient: APIClient) {
-        self.apiClient = apiClient
-    }
-
-    // MARK: - Public Methods
-
-    func fetchArticles() async throws -> [ArticleDTO] {
-        try await apiClient.request(Endpoint.get(path: "/articles"))
-    }
-}
-```
-
-The generated `fetch()` is a `fatalError("TODO: ...")` placeholder: replace it with a real `Endpoint` / `APIEndpoint` call before running the screen.
-
-### DTOMapper
-
-```swift
-// Data/Article/Mappers/ArticleDTOMapper.swift
-
-// MARK: - ArticleDTOMapper
-
-protocol ArticleDTOMapper: Sendable {
-    func map(_ dto: ArticleDTO) -> ArticleModel
-    func map(_ dtos: [ArticleDTO]) -> [ArticleModel]
-}
-
-// MARK: - ArticleDTOMapperImpl
-
-struct ArticleDTOMapperImpl: ArticleDTOMapper {
-    // MARK: - Public Methods
-
-    func map(_ dtos: [ArticleDTO]) -> [ArticleModel] {
-        dtos.map { map($0) }
-    }
-
-    func map(_ dto: ArticleDTO) -> ArticleModel {
-        ArticleModel(
-            id: dto.id,
-            title: dto.title,
-            body: dto.content,
-            category: ArticleModel.Category(rawValue: dto.category) ?? .news,
-            publishedAt: Date(timeIntervalSince1970: dto.timestamp)
-        )
-    }
-}
-```
+Both go through `APIClient.request(_:)`. Protocol details and a full example: `networking.md`.
 
 ## 4) Presentation
 
-### State (in UI folder)
-
-```swift
-// Features/Article/UI/ArticleState.swift
-enum ArticleState: Equatable {
-    case idle
-    case loading
-    case loaded([ArticleSectionDecorator])
-    case error(ErrorDecorator)
-}
-```
-
-### Decorators (in UI folder)
-
-```swift
-// Features/Article/UI/ArticleDecorator.swift
-
-// MARK: - ArticleSectionDecorator
-
-struct ArticleSectionDecorator: Sendable, Identifiable, Equatable {
-    let id: String
-    let title: String
-    let items: [ArticleItemDecorator]
-}
-
-// MARK: - ArticleItemDecorator
-
-struct ArticleItemDecorator: Sendable, Identifiable, Equatable {
-    let id: String
-    let title: String
-    let formattedDate: String
-}
-```
-
-### DecoratorMapper (in Presentation/Mappers)
-
-Protocol + Impl in one file. Like the other mappers it is a nonisolated `Sendable` struct, not `@MainActor`.
-
-```swift
-// Features/Article/Presentation/Mappers/ArticleDecoratorMapper.swift
-
-// MARK: - ArticleDecoratorMapper
-
-protocol ArticleDecoratorMapper: Sendable {
-    func map(_ model: ArticleModel) -> ArticleItemDecorator
-    func mapToSections(_ models: [ArticleModel]) -> [ArticleSectionDecorator]
-}
-
-// MARK: - ArticleDecoratorMapperImpl
-
-struct ArticleDecoratorMapperImpl: ArticleDecoratorMapper {
-    // MARK: - Public Methods
-
-    func map(_ model: ArticleModel) -> ArticleItemDecorator {
-        ArticleItemDecorator(
-            id: model.id,
-            title: model.title,
-            formattedDate: model.publishedAt.formatted(date: .abbreviated, time: .omitted)
-        )
-    }
-
-    func mapToSections(_ models: [ArticleModel]) -> [ArticleSectionDecorator] {
-        Dictionary(grouping: models, by: \.category)
-            .map { category, items in
-                ArticleSectionDecorator(
-                    id: category.rawValue,
-                    title: category.rawValue,
-                    items: items.map { map($0) }
-                )
-            }
-            .sorted { $0.title < $1.title }
-    }
-}
-```
-
-### ViewModel (in Presentation/ViewModels)
-
-**Note**: No Action/Event enums. Actions are direct methods. **No default values** — everything is injected.
+- **State** (`UI/ArticleState.swift`): `idle`, `loading`, `loaded`, `error(ErrorDecorator)`. Loaded items live in the ViewModel (`items`), not in the enum. `ErrorDecorator` carries a closure, so the generated `==` is written by hand and compares title and message.
+- **Decorator** (`UI/ArticleDecorator.swift`): display-ready values only (`id`, `displayName`, `subtitle`); `Sendable`, `Identifiable`, `Equatable`.
+- **DecoratorMapper**: Model -> Decorator through `map(_:)`; a `Sendable` struct declared without `@MainActor`. All formatting happens here, so Views never format.
+- **ViewModel**: `@MainActor @Observable final class`. Actions are plain methods (no Action/Event enums) and every dependency is injected through `init` with no default value. On `CancellationError` it restores the previous state: `.task` is cancelled when the view goes away, and a state stuck in `.loading` would stop the next `load()` at its `guard`.
+- **Errors**: `DomainError` -> `ErrorDecorator.from(error)`, anything else -> `.generic`. `ErrorDecorator` is shared (`Core/Common/Models/`); there is no per-feature error decorator.
 
 ```swift
 // Features/Article/Presentation/ViewModels/ArticleViewModel.swift
-
-// MARK: - ArticleViewModel
-
 @MainActor
 @Observable
 final class ArticleViewModel {
-    // MARK: - Properties
-
     private(set) var state: ArticleState = .idle
+    private(set) var items: [ArticleDecorator] = []
 
     private let useCase: ArticleUseCase
     private let decoratorMapper: ArticleDecoratorMapper
     private let router: ArticleRouter
-
-    // MARK: - Init
 
     init(useCase: ArticleUseCase,
          decoratorMapper: ArticleDecoratorMapper,
@@ -351,9 +188,7 @@ final class ArticleViewModel {
         self.router = router
     }
 
-    // MARK: - Public Methods
-
-    func loadArticles() async {
+    func load() async {
         guard state != .loading else { return }
 
         let previousState = state
@@ -361,8 +196,9 @@ final class ArticleViewModel {
 
         do {
             let models = try await useCase.execute()
-            let sections = decoratorMapper.mapToSections(models)
-            state = .loaded(sections)
+            let decorators = models.map { decoratorMapper.map($0) }
+            items = decorators
+            state = .loaded
         } catch is CancellationError {
             state = previousState
         } catch let error as DomainError {
@@ -372,366 +208,87 @@ final class ArticleViewModel {
         }
     }
 
-    func navigateToDetail(articleId: String) {
-        router.navigateToDetail(articleId: articleId)
+    func navigateToDetail(id: String) {
+        router.navigateToDetail(id: id)
     }
 }
 ```
 
-### View (in UI folder)
+### View
 
-The View keeps the ViewModel in `@State`, set once with `State(initialValue:)` in `init`. Retry toggles a trigger that restarts `.task(id:)` instead of creating a loose `Task`.
+- Store the ViewModel as `@State private var` with no inline value and assign it in `init`, after every other stored property. `@State` keeps the first instance for the lifetime of the view's identity, so a repeated Factory call does not reset the screen.
+- First load: `.task { await viewModel.load() }`. It starts when the view appears and is cancelled when it goes away.
+- Retry: the action starts its own `Task` and calls the same method: `retryAction: { [viewModel] in Task { await viewModel.load() } }`. Capture `viewModel`, not `self`, because `ErrorDecorator.retryAction` is `@Sendable`. Do not restart `.task(id:)` with a flag: a reload on demand does not depend on an id.
+- `.idle` renders `Color.clear`, so nothing flashes before the first load starts.
 
 ```swift
 // Features/Article/UI/ArticleView.swift
+@State
+private var viewModel: ArticleViewModel
 
-// MARK: - ArticleView
-
-struct ArticleView: View {
-    // MARK: - Properties
-
-    @State
-    private var viewModel: ArticleViewModel
-
-    @State
-    private var retryTrigger = false
-
-    // MARK: - Init
-
-    init(viewModel: ArticleViewModel) {
-        self._viewModel = State(initialValue: viewModel)
-    }
-
-    // MARK: - Body
-
-    var body: some View {
-        content
-            .task(id: retryTrigger) {
-                await viewModel.loadArticles()
-            }
-    }
-}
-
-// MARK: - Private Views
-
-private extension ArticleView {
-    @ViewBuilder
-    var content: some View {
-        switch viewModel.state {
-        case .idle:
-            Color.clear
-        case .loading:
-            LoadingStateView()
-        case let .loaded(sections):
-            ArticleListContent(sections: sections, onSelect: viewModel.navigateToDetail)
-        case let .error(error):
-            ErrorView(error: ErrorDecorator(title: error.title,
-                                            message: error.message,
-                                            retryAction: { retryTrigger.toggle() }))
-        }
-    }
+init(viewModel: ArticleViewModel) {
+    self.viewModel = viewModel
 }
 ```
 
-## 5) Router
+The complete View, with `body`, the retry in `errorView(error:)` and the reason for each line, is in `swiftui-code-style.md`.
 
-`<Feature>Router.swift` is always generated. `<Feature>RouteResolver.swift` is optional: add it only when the feature owns destinations. A feature that only pushes routes another resolver already handles needs just the Router.
+### Accessibility Identifiers and UI-Test Stubs
 
-### 5.1) Router (Route enum + Protocol + Impl)
+With "Include UI tests" the scaffold adds `Shared/AccessibilityIDs/ArticleAccessibilityID.swift` (ids named `article_<element>`, such as `article_retry_button`), stub and fixture DataSources, a Page Object and Screen tests that pass as generated. It applies the ids in `ArticleView`, adds the stub branch to `ArticleFactory` and registers the screen in `UITestScreenRegistry`. A new id goes into the enum and the View reads it from there, as in `.accessibilityIdentifier(ArticleAccessibilityID.retryButton)`; never repeat the string literal. The naming convention, the launch contract and the stubs are in `ui-testing.md`.
+
+## 5) Navigation
+
+- `ArticleRouter.swift` is always generated: the `ArticleRoute` enum, a `@MainActor` protocol and `ArticleRouterImpl`, a `@MainActor struct` that forwards to `AppRouter` (`push`, `pop`, `popToRoot`). The ViewModel depends on the feature protocol, never on `AppRouter`.
+- Routes are `Hashable` and `Codable` and carry ids, not models. `Codable` is what lets the `NavigationPath` be saved and restored between launches; `AppRouter.push` accepts nothing else.
+- `ArticleRouteResolver.swift` is optional: add it only when the feature owns destinations. Each destination is its own screen with its own Factory.
+- SwiftUI can call a destination closure more than once for the same screen. `@State` keeps the first ViewModel, but every call builds the dependency graph again, so keep Factories cheap.
+
 ```swift
 // Features/Article/Navigation/ArticleRouter.swift
-
-// MARK: - ArticleRoute
-
 enum ArticleRoute: Hashable, Codable {
-    case detail(articleId: String)
-    case comments(articleId: String)
+    case detail(id: String)
 }
-
-// MARK: - ArticleRouter
 
 @MainActor
 protocol ArticleRouter: Sendable {
-    func navigateToDetail(articleId: String)
-    func navigateToComments(articleId: String)
+    func navigateToDetail(id: String)
     func goBack()
 }
-
-// MARK: - ArticleRouterImpl
-
-@MainActor
-struct ArticleRouterImpl: ArticleRouter {
-    // MARK: - Properties
-
-    private let appRouter: AppRouter
-
-    // MARK: - Init
-
-    init(appRouter: AppRouter) {
-        self.appRouter = appRouter
-    }
-
-    // MARK: - Public Methods
-
-    func navigateToDetail(articleId: String) {
-        appRouter.push(ArticleRoute.detail(articleId: articleId))
-    }
-
-    func navigateToComments(articleId: String) {
-        appRouter.push(ArticleRoute.comments(articleId: articleId))
-    }
-
-    func goBack() {
-        appRouter.pop()
-    }
-}
 ```
 
-### 5.2) Route Resolver (optional)
-```swift
-// Features/Article/Navigation/ArticleRouteResolver.swift
+The resolver is a `ViewModifier` that holds `appRouter` and `dependencies`, declares `.navigationDestination(for: ArticleRoute.self)` and maps each case to the destination's `Factory.makeView(...)`; the generated `.detail` destination is a `Text` placeholder. Show the screen by calling `ArticleFactory.makeView(appRouter:dependencies:)` at the root of the `NavigationStack` or from another feature's resolver, and register the resolver on the root view inside the `NavigationStack` of `App/Navigation/RootNavigationView.swift`, where `appRouter` and `dependencies` are already properties: `.withArticleRoutes(appRouter: appRouter, dependencies: dependencies)`.
 
-// MARK: - ArticleRouteResolver
-
-struct ArticleRouteResolver: ViewModifier {
-    // MARK: - Properties
-
-    let appRouter: AppRouter
-    let dependencies: AppDependencies
-
-    // MARK: - Body
-
-    func body(content: Content) -> some View {
-        content
-            .navigationDestination(for: ArticleRoute.self) { route in
-                destination(for: route)
-            }
-    }
-
-    // MARK: - Private Methods
-
-    @ViewBuilder
-    private func destination(for route: ArticleRoute) -> some View {
-        switch route {
-        case let .detail(articleId):
-            ArticleDetailFactory.makeView(articleId: articleId, appRouter: appRouter, dependencies: dependencies)
-        case let .comments(articleId):
-            ArticleCommentsFactory.makeView(articleId: articleId, appRouter: appRouter, dependencies: dependencies)
-        }
-    }
-}
-
-// MARK: - View Extension
-
-extension View {
-    func withArticleRoutes(appRouter: AppRouter, dependencies: AppDependencies) -> some View {
-        modifier(ArticleRouteResolver(appRouter: appRouter, dependencies: dependencies))
-    }
-}
-```
-
-Each destination is its own screen feature with its own Factory. The destination View stores its ViewModel with `@State`, so calling the Factory again inside `navigationDestination` does not reset it; keep Factories cheap.
-
-### 5.3) Register in App Root
-Add the resolver modifier inside the `NavigationStack` in `App/Navigation/RootNavigationView.swift` (`appRouter` and `dependencies` are already properties there):
-```swift
-NavigationStack(path: $appRouter.path) {
-    ArticleFactory.makeView(appRouter: appRouter, dependencies: dependencies)
-        .withArticleRoutes(appRouter: appRouter, dependencies: dependencies)
-}
-```
-
-To make a route deep-linkable, also handle it in `AppNavigationCoordinator.navigate(to:)` (see `ARCHITECTURE.md`, Deep Linking).
+To open a route from a URL, handle it in `AppNavigationCoordinator.navigate(to:)`. A deep link replaces the stack; it never pushes on top (`ARCHITECTURE.md`).
 
 ## 6) Dependency Injection
 
-**Rule**: Everything is injected. No default values. All dependencies are protocol implementations. App-lifetime dependencies (the shared `APIClient`, and the `SwiftDataStack` when SwiftData is enabled) come from `AppDependencies`; never create an `APIClientImpl` inside a Factory.
+- `ArticleFactory` is a `@MainActor enum` with one entry point, `makeView(appRouter:dependencies:)`, and one private `static func make...` per dependency, each returning the protocol type.
+- Everything is injected through `init`: no default values, no singletons.
+- App-lifetime objects (the shared `APIClient`, and `SwiftDataStack` when SwiftData is enabled) come from `AppDependencies`. Never create an `APIClientImpl` in a Factory: each one builds its own `URLSession` and interceptor chain.
 
 ```swift
 // Features/Article/DI/ArticleFactory.swift
-
-// MARK: - ArticleFactory
-
 @MainActor
 enum ArticleFactory {
-    // MARK: - Public Methods
-
     static func makeView(appRouter: AppRouter, dependencies: AppDependencies) -> some View {
         let viewModel = makeViewModel(appRouter: appRouter, apiClient: dependencies.apiClient)
         return ArticleView(viewModel: viewModel)
-    }
-}
-
-// MARK: - Private Factory Methods
-
-private extension ArticleFactory {
-    // MARK: - DataSources
-
-    static func makeRemoteDataSource(apiClient: APIClient) -> ArticleRemoteDataSource {
-        ArticleRemoteDataSourceImpl(apiClient: apiClient)
-    }
-
-    // MARK: - Mappers
-
-    static func makeDTOMapper() -> ArticleDTOMapper {
-        ArticleDTOMapperImpl()
-    }
-
-    // MARK: - Repositories
-
-    static func makeRepository(apiClient: APIClient) -> ArticleRepository {
-        ArticleRepositoryImpl(remoteDataSource: makeRemoteDataSource(apiClient: apiClient),
-                              mapper: makeDTOMapper())
-    }
-
-    // MARK: - UseCases
-
-    static func makeUseCase(apiClient: APIClient) -> ArticleUseCase {
-        ArticleUseCaseImpl(repository: makeRepository(apiClient: apiClient))
-    }
-
-    // MARK: - Decorator Mappers
-
-    static func makeDecoratorMapper() -> ArticleDecoratorMapper {
-        ArticleDecoratorMapperImpl()
-    }
-
-    // MARK: - Navigation
-
-    static func makeRouter(appRouter: AppRouter) -> ArticleRouter {
-        ArticleRouterImpl(appRouter: appRouter)
-    }
-
-    // MARK: - ViewModels
-
-    static func makeViewModel(appRouter: AppRouter, apiClient: APIClient) -> ArticleViewModel {
-        ArticleViewModel(useCase: makeUseCase(apiClient: apiClient),
-                         decoratorMapper: makeDecoratorMapper(),
-                         router: makeRouter(appRouter: appRouter))
     }
 }
 ```
 
 ## 7) Previews
 
-The generated `[Feature]...Mock` types live in the **test target** (`[Project]Tests/Mocks/`), so `#Preview` in the app target cannot use them. For previews, add small preview-only implementations of the UseCase and Router protocols in the app target (for example `ArticlePreviewUseCase` and `ArticlePreviewRouter`, wrapped in `#if DEBUG`) and inject them:
+The scaffold writes no `#Preview`. The generated mocks belong to the test target, so the app target cannot see them: add small `private` stubs of the UseCase and Router protocols at the bottom of the View file and one `#Preview` per state that draws something different. The stubs and an example are in `swiftui-code-style.md`.
 
-```swift
-// MARK: - Previews
+## 8) Tests
 
-#Preview("Loaded") {
-    ArticleView(
-        viewModel: ArticleViewModel(
-            useCase: ArticlePreviewUseCase(result: .success([])),
-            decoratorMapper: ArticleDecoratorMapperImpl(),
-            router: ArticlePreviewRouter()
-        )
-    )
-}
+`anvil feature` writes five suites under `<Project>Tests/`, in the same folders as the code they test (`Domain/Article/UseCases/`, `Data/Article/Repositories/`, `Data/Article/Mappers/`, `Features/Article/Presentation/ViewModels/` and `.../Mappers/`), plus six mocks in `Mocks/` named `Article<Type>Mock` (UseCase, Repository, Router, RemoteDataSource, DTOMapper, DecoratorMapper). The optional Local and Keychain data sources add their mocks, and the Local one a round-trip suite in `Data/Article/DataSources/`. Extend them as the feature grows. Test style and mocks are in `testing.md`; how to run them is in `tooling.md`.
 
-#Preview("Error") {
-    ArticleView(
-        viewModel: ArticleViewModel(
-            useCase: ArticlePreviewUseCase(result: .failure(DomainError.network)),
-            decoratorMapper: ArticleDecoratorMapperImpl(),
-            router: ArticlePreviewRouter()
-        )
-    )
-}
-```
-
-## 8) Tests (Minimum)
-
-### Test Locations
-
-`anvil feature` generates these tests and mocks; extend them as the feature grows.
-
-```
-[Project]Tests/
-  Domain/[Feature]/UseCases/
-    [Feature]UseCaseTests.swift
-  Data/[Feature]/
-    Repositories/
-      [Feature]RepositoryTests.swift
-    Mappers/
-      [Feature]DTOMapperTests.swift
-  Features/[Feature]/Presentation/
-    ViewModels/
-      [Feature]ViewModelTests.swift
-    Mappers/
-      [Feature]DecoratorMapperTests.swift
-  Mocks/
-    [Feature]UseCaseMock.swift
-    [Feature]RepositoryMock.swift
-    [Feature]RouterMock.swift
-    [Feature]RemoteDataSourceMock.swift
-    [Feature]DTOMapperMock.swift
-    [Feature]DecoratorMapperMock.swift
-```
-
-### What to Test
-- **UseCase**: success and error propagation (if there's logic).
-- **ViewModel**: success -> state `.loaded`, `DomainError` -> state `.error`, cancellation -> previous state.
-- **Repository**: DTO -> Domain mapping, `APIError` -> `DomainError` mapping (e.g. HTTP 404 -> `.notFound`).
-- **DTOMapper**: correct mapping from DTOs to models.
-- **Router**: verify correct route is pushed.
-- **DecoratorMapper**: correct mapping from models to decorators.
-
----
-
-## 9) Codable Patterns
-
-### DTO Design Rules
-
-```swift
-// Data/Article/DTO/ArticleDTO.swift
-struct ArticleDTO: Sendable, Codable {
-    let id: String
-    let title: String
-    let content: String
-    let publishedAt: String
-    let authorId: String
-}
-```
-
-### Date Handling
-
-```swift
-// Keep as String in DTO, parse in mapper
-struct ArticleDTO: Sendable, Codable {
-    let publishedAt: String
-}
-
-// In DTOMapper
-struct ArticleDTOMapperImpl: ArticleDTOMapper {
-    private let dateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    func map(_ dto: ArticleDTO) -> ArticleModel {
-        ArticleModel(
-            id: dto.id,
-            title: dto.title,
-            body: dto.content,
-            publishedAt: dateFormatter.date(from: dto.publishedAt) ?? Date()
-        )
-    }
-}
-```
-
----
-
-## 10) External API Features (APIEndpoint Pattern)
-
-When a feature uses an **external third-party API**, use the `APIEndpoint` protocol instead of the `Endpoint` struct. This pattern encapsulates the base URL within the endpoint itself.
-
-> See `networking.md` for full `APIEndpoint` protocol details.
-
-### When to Use Which
-
-| Scenario | Endpoint Type | Base URL |
-|----------|--------------|----------|
-| Your own backend API | `Endpoint` struct | From `EnvironmentConfiguration` |
-| External API (GitHub, etc.) | `APIEndpoint` protocol | Embedded in endpoint |
+What each suite must cover:
+- **UseCase**: success, and a `DomainError` from the repository passing through unchanged.
+- **Repository**: DTOs are mapped; a data-source failure is thrown as the mapped `DomainError` (HTTP 404 -> `.notFound`); `CancellationError` propagates as `CancellationError`, never as a `DomainError` (`#expect(throws: CancellationError.self)`).
+- **DTOMapper and DecoratorMapper**: every field, including parse failures and formatted strings.
+- **ViewModel**: success -> `.loaded` and `items`; `DomainError` -> `.error`; cancellation -> previous state; navigation methods call the router.
+- **Route**: a case with associated values encodes and decodes to an equal value.

@@ -423,13 +423,13 @@ For each selected pack, the PackRenderer executes up to 10 steps:
 
 **ios-architecture:**
 - `CLAUDE.md.tmpl` — Full project CLAUDE.md with architecture rules, anti-patterns, workflow
-- `docs/` — 13 reference documents:
+- `docs/` — 12 reference documents (the single source of the architecture rules; each one under 300 lines):
   - `ARCHITECTURE.md`, `PROJECT-STRUCTURE.md`, `new-feature.md`
   - `swiftui-code-style.md`, `design-system.md`
-  - `swift-concurrency.md`, `performance.md`
-  - `swiftdata.md`, `networking.md`
-  - `security-privacy.md`, `diagnostics.md`
-  - `testing.md`, `create-tests.md`
+  - `swift-concurrency.md`
+  - `swiftdata.md`, `networking.md`, `security-privacy.md`
+  - `testing.md`, `ui-testing.md`
+  - `tooling.md`
 
 **prd-planner:**
 - `CLAUDE-section.md.tmpl` — Appends workflow section to CLAUDE.md
@@ -554,9 +554,10 @@ Tests/Mocks/
 
 | Flag | File Generated |
 |------|---------------|
-| `IncludeLocalDataSource` | `<Feature>LocalDataSource.swift` |
-| `IncludeKeychain` | `<Feature>KeychainDataSource.swift` |
+| `IncludeLocalDataSource` | `<Feature>LocalDataSource.swift`, `<Feature>LocalDataSourceMock.swift`, `<Feature>LocalDataSourceTests.swift` |
+| `IncludeKeychain` | `<Feature>KeychainDataSource.swift`, `<Feature>KeychainDataSourceMock.swift` |
 | `IncludeRouteResolver` | `<Feature>RouteResolver.swift` |
+| `IncludeUITests` | `Shared/AccessibilityIDs/<Feature>AccessibilityID.swift`, `Data/<Feature>/DataStubs/` (Stub and Fixture), `<ProjectName>UITests/` Page Object and Screen tests, and an entry in `App/Navigation/UITestScreenRegistry.swift` |
 
 ### Wiring Instructions
 
@@ -597,6 +598,8 @@ All UUIDs in the pbxproj are deterministic using FNV1a hashing:
 | `RootGroup` | Top-level PBXGroup |
 | `AppTarget` | Application target |
 | `TestTarget` | Unit test target |
+| `UITestTarget` | UI test target |
+| `SharedGroup` | `Shared/` group, in the app and UI test targets |
 | `AppBuildConfigDebug/Release` | Build configurations |
 | `SwiftDataFramework` | SwiftData framework reference (conditional) |
 | `SwiftDataBuildFile` | SwiftData build file (conditional) |
@@ -819,12 +822,12 @@ release:
 ### Release Process
 
 ```bash
-git tag 0.7.0
-git push origin 0.7.0
+git tag 0.8.0
+git push origin 0.8.0
 # GitHub Actions triggers goreleaser automatically
 # Creates a release with:
-#   - anvil_0.7.0_darwin_arm64.tar.gz
-#   - anvil_0.7.0_darwin_amd64.tar.gz
+#   - anvil_0.8.0_darwin_arm64.tar.gz
+#   - anvil_0.8.0_darwin_amd64.tar.gz
 #   - checksums.txt
 ```
 

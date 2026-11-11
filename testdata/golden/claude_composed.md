@@ -11,7 +11,7 @@
 - **Concurrency**: `SWIFT_STRICT_CONCURRENCY = complete`, **no** default actor isolation (types are nonisolated unless annotated)
 - **Dependency Injection**: manual constructor injection through `AppDependencies` + per-feature Factories (no DI container)
 - **Persistence**: **none** — the SwiftData stack was not generated for this project
-- **Testing**: **Swift Testing** (`import Testing`) in `MyAppTests/`, mirroring `Domain/`, `Data/` and `Features/`, plus shared `Mocks/`
+- **Testing**: **Swift Testing** (`import Testing`) in `MyAppTests/`, mirroring `Domain/`, `Data/` and `Features/`, plus shared `Mocks/`; UI tests (XCTest) in `MyAppUITests/` (`ui-testing.md`)
 
 ## Build & Test
 
@@ -27,9 +27,11 @@
 
 | Action | Command |
 |--------|---------|
-| **Build** | `xcodebuild build -scheme MyApp-Dev -destination "platform=iOS Simulator,name=iPhone 16 Pro"` |
-| **Unit Tests** | `xcodebuild test -scheme MyApp-Dev -destination "platform=iOS Simulator,name=iPhone 16 Pro"` |
-| **Launch app** | `xcrun simctl launch booted com.testorg.MyApp` |
+| **Build** | `axbuild xcodebuild -scheme MyApp-Dev -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' build` |
+| **Tests** (unit + UI) | `axbuild xcodebuild -scheme MyApp-Dev -destination 'platform=iOS Simulator,id=<SIMULATOR_UDID>' test` |
+| **Launch app** | `xcrun simctl launch <SIMULATOR_UDID> com.testorg.MyApp` |
+
+`axbuild` ships with the Axiom plugin. Without it, and for simulator checks, crash logs and profiling, see `.claude/docs/tooling.md`. Always pass an explicit simulator UDID, never `booted`.
 
 ## Non-negotiable Rules
 
@@ -118,6 +120,14 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 - **Feature components**: in `Features/<Feature>/UI/Components/`.
 - **IMPORTANT - Don't use `Protocol` suffix** in protocols — it's redundant, use base name.
 
+### Tests
+
+- Unit tests use **Swift Testing**. UI tests use XCTest (see `.claude/docs/ui-testing.md`).
+- No comments inside test bodies, Given/When/Then markers included: separate the phases with blank lines.
+- `try #require(...)` instead of `as?` casts or manual unwrapping; `#expect(throws:)` for errors.
+- `@MainActor` on a suite only when the type under test is main-actor isolated (ViewModels, Routers).
+- Mocks are `final class <Feature><Type>Mock: ..., @unchecked Sendable` in the test target.
+
 ### ViewModel State
 
 - **State enum** in `UI/<Feature>State.swift` — only states (idle/loading/loaded/error).
@@ -155,7 +165,8 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 
 - Keep `body` small: extract to subviews / helpers if it grows.
 - No business logic in Views.
-- Use `.task(id:)` to load data, not loose `Task { }`.
+- Load data with `.task { }`; use `.task(id:)` only when the id drives the work (for example, the selected item).
+- A `Task { }` inside a user action (retry, refresh) is fine. Never start one from `body` or `init`.
 
 ### Localization
 
@@ -178,7 +189,7 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
   - The coordinator also saves the path to `@SceneStorage` with a debounce; a failed encode writes nothing.
 - ViewModels depend only on their `FeatureRouter` protocol, NOT on AppRouter directly.
 - If a feature only forwards to an already registered route, keep that logic inside `<Feature>Router.swift` and skip a resolver file.
-- **Factory + @State pattern**: when a RouteResolver exists, it calls the Factory inside `navigationDestination`, and the View stores the ViewModel with `@State` (`State(initialValue:)` in `init`).
+- **Factory + @State pattern**: when a RouteResolver exists, it calls the Factory inside `navigationDestination`, and the View stores the ViewModel in `@State private var viewModel`, assigned last in `init` (`self.viewModel = viewModel`).
 - **Why @State**: Without it, navigation back recreates View -> Factory creates NEW ViewModel -> state lost.
 - **Cost of the pattern**: SwiftUI can call the destination closure, and therefore the Factory, many times. `@State` keeps only the first ViewModel and the rest are built and thrown away, so Factories and the `init`s they call must stay cheap (no I/O or decoding).
 
@@ -198,7 +209,7 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 ### SwiftUI & State
 - **Don't use `@Published`** — that's Combine, use `@Observable`.
 - **Don't use `@StateObject` / `@ObservedObject`** — they're from the old paradigm.
-- **Don't use loose `Task { }`** in Views — use `.task(id:)`.
+- **Don't start a `Task { }` from `body` or `init`** — load with `.task { }`.
 - **Don't put ViewModifiers inline** — extract to `Core/Common/SwiftUI/Modifiers/`.
 - **Don't put multiple public Views** in the same file.
 - **Don't put State inside ViewModel** — separate into `UI/<Feature>State.swift`.
@@ -229,44 +240,43 @@ This is a deliberate, project-wide choice. Follow it consistently; changing it i
 
 | Doc | When to read |
 |-----|--------------|
-| `.claude/docs/ARCHITECTURE.md` | Understand layers, mappers, and error flow |
-| `.claude/docs/PROJECT-STRUCTURE.md` | Know where to create each file |
-| `.claude/docs/new-feature.md` | Checklist when creating a new feature |
+| `.claude/docs/ARCHITECTURE.md` | Layers, dependency direction, error flow, navigation, dependency injection |
+| `.claude/docs/PROJECT-STRUCTURE.md` | Before creating a file: where it goes and how it is named |
+| `.claude/docs/new-feature.md` | Adding a feature, step by step |
 
 ### UI & SwiftUI
 
 | Doc | When to read |
 |-----|--------------|
-| `.claude/docs/swiftui-code-style.md` | Before creating/modifying Views or ViewModels |
-| `.claude/docs/design-system.md` | HIG compliance, colors, typography, accessibility |
+| `.claude/docs/swiftui-code-style.md` | Before creating or changing a View or a ViewModel |
+| `.claude/docs/design-system.md` | Colors, typography, spacing, accessibility, Liquid Glass |
 
-### Concurrency & Performance
+### Concurrency
 
 | Doc | When to read |
 |-----|--------------|
-| `.claude/docs/swift-concurrency.md` | Swift 6 strict concurrency, Sendable, actors |
-| `.claude/docs/performance.md` | Profiling, optimization, memory management |
+| `.claude/docs/swift-concurrency.md` | Isolation per layer, Sendable, cancellation, tasks |
 
 ### Data & Networking
 
 | Doc | When to read |
 |-----|--------------|
 | `.claude/docs/swiftdata.md` | SwiftData persistence patterns (only if you add SwiftData — not generated for this project) |
-| `.claude/docs/networking.md` | URLSession, async networking, error handling |
+| `.claude/docs/networking.md` | Endpoints, `APIClient`, interceptors, retries, pinning |
+| `.claude/docs/security-privacy.md` | Keychain, secrets, Privacy Manifest, logging |
 
-### Security & Diagnostics
-
-| Doc | When to read |
-|-----|--------------|
-| `.claude/docs/security-privacy.md` | Privacy Manifests, Keychain, secure storage |
-| `.claude/docs/diagnostics.md` | Crash analysis, build optimization, troubleshooting |
-
-### Testing & QA
+### Testing
 
 | Doc | When to read |
 |-----|--------------|
-| `.claude/docs/testing.md` | Before writing tests |
-| `.claude/docs/create-tests.md` | Quick test templates |
+| `.claude/docs/testing.md` | Before writing unit tests or mocks |
+| `.claude/docs/ui-testing.md` | Accessibility identifiers, test data, UI tests |
+
+### Tooling
+
+| Doc | When to read |
+|-----|--------------|
+| `.claude/docs/tooling.md` | Building, running tests, checking the app in the simulator, crashes, profiling |
 
 ## How to Work
 

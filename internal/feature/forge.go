@@ -47,6 +47,13 @@ func (s *DefaultFeatureForge) Forge(cfg config.FeatureConfig) (config.ForgeResul
 		}
 	}
 
+	// UI tests need the registry that anvil init creates; check it before writing anything.
+	if cfg.IncludeUITests {
+		if err := checkUITestRegistry(cfg); err != nil {
+			return config.ForgeResult{}, err
+		}
+	}
+
 	// 3. Build template context
 	ctx := generator.NewFeatureContext(cfg)
 
@@ -95,10 +102,23 @@ func (s *DefaultFeatureForge) Forge(cfg config.FeatureConfig) (config.ForgeResul
 		created = append(created, destPath)
 	}
 
-	// 7. Build wiring instructions
+	// 7. Register the screen in the UI test registry, so UI tests can open it as the root view.
+	if cfg.IncludeUITests {
+		if err := registerUITestScreen(cfg); err != nil {
+			if rollbackErr := generator.RollbackCreated(created, createdDirs); rollbackErr != nil {
+				return config.ForgeResult{}, config.RollbackError{
+					OriginalError: err,
+					RollbackCause: rollbackErr,
+				}
+			}
+			return config.ForgeResult{}, fmt.Errorf("registering %s for UI tests: %w", cfg.FeatureName, err)
+		}
+	}
+
+	// 8. Build wiring instructions
 	instructions := WiringInstructions(cfg)
 
-	// 8. Return result
+	// 9. Return result
 	featureDir := filepath.Join("Features", cfg.FeatureName)
 	result := config.ForgeResult{
 		FeatureDir:         featureDir,

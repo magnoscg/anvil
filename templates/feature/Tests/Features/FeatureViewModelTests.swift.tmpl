@@ -27,68 +27,65 @@ struct {{ .FeatureName }}ViewModelTests {
 
     @Test("Given new view model, then initial state is idle")
     func initialState_isIdle() {
-        // Given / When - ViewModel just created in init
-
-        // Then
         #expect(sut.state == .idle)
     }
 
     // MARK: - Success
 
     @Test("Given use case returns models, when load, then state is loaded")
-    func load_success_setsLoadedState() async {
-        // Given
-        let models = [
+    func load_success_setsLoadedState() async throws {
+        mockUseCase.executeResult = .success([
             {{ .FeatureName }}Model(id: "1", name: "First", description: "First item")
-        ]
-        mockUseCase.executeResult = .success(models)
+        ])
+        mockDecoratorMapper.mapResult = {{ .FeatureName }}Decorator(id: "1",
+{{ "                                                                  " }}displayName: "First",
+{{ "                                                                  " }}subtitle: "First item")
 
-        let expectedDecorator = {{ .FeatureName }}Decorator(id: "1",
-{{ "                                                          " }}displayName: "First",
-{{ "                                                          " }}subtitle: "First item")
-        mockDecoratorMapper.mapResult = expectedDecorator
-
-        // When
         await sut.load()
 
-        // Then
+        let first = try #require(sut.items.first)
         #expect(sut.state == .loaded)
         #expect(sut.items.count == 1)
-        #expect(sut.items[0].id == "1")
+        #expect(first.id == "1")
         #expect(mockUseCase.executeCallCount == 1)
     }
 
     // MARK: - Error
 
-    @Test("Given use case throws error, when load, then state is error")
-    func load_failure_setsErrorState() async {
-        // Given
-        let expectedError = NSError(domain: "test", code: 42)
-        mockUseCase.executeResult = .failure(expectedError)
+    @Test("Given use case throws DomainError.network, when load, then state is the network error")
+    func load_domainError_setsMappedErrorState() async {
+        mockUseCase.executeResult = .failure(DomainError.network)
 
-        // When
         await sut.load()
 
-        // Then
-        guard case .error = sut.state else {
-            Issue.record("Expected error state, got \(sut.state)")
-            return
-        }
+        #expect(sut.state == .error(.from(.network)))
         #expect(mockUseCase.executeCallCount == 1)
+    }
+
+    // MARK: - Cancellation
+
+    @Test("Given a loaded screen, when a reload is cancelled, then the loaded state is kept")
+    func load_cancelled_restoresPreviousState() async {
+        mockUseCase.executeResult = .success([
+            {{ .FeatureName }}Model(id: "1", name: "First", description: "First item")
+        ])
+        await sut.load()
+        mockUseCase.executeResult = .failure(CancellationError())
+
+        await sut.load()
+
+        #expect(sut.state == .loaded)
+        #expect(sut.items.count == 1)
+        #expect(mockUseCase.executeCallCount == 2)
     }
 
     // MARK: - Navigation
 
     @Test("Given item id, when navigateToDetail, then router is called")
     func navigateToDetail_callsRouter() {
-        // Given
-        let itemId = "test-id"
+        sut.navigateToDetail(id: "test-id")
 
-        // When
-        sut.navigateToDetail(id: itemId)
-
-        // Then
         #expect(mockRouter.navigateToDetailCallCount == 1)
-        #expect(mockRouter.navigateToDetailId == itemId)
+        #expect(mockRouter.navigateToDetailId == "test-id")
     }
 }

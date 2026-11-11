@@ -43,7 +43,7 @@ Segun los ficheros que vas a verificar, lee docs adicionales de `.claude/docs/`:
 | Codigo con async/Task/actor/Sendable | swift-concurrency.md |
 | Data/*/DataSources/ con "Remote" | networking.md |
 | Codigo con ModelContext/ModelExecutor/SDModel | swiftdata.md |
-| *Tests/ | testing.md + create-tests.md |
+| *Tests/ | testing.md |
 | Componentes UI nuevos | design-system.md |
 | Keychain/SSL/privacy | security-privacy.md |
 

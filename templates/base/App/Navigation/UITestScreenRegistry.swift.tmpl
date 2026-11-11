@@ -1,0 +1,30 @@
+#if DEBUG
+import SwiftUI
+
+// MARK: - UITestScreen
+
+/// A screen that a UI test can open as the root view.
+struct UITestScreen {
+    let name: String
+    let makeView: @MainActor (AppRouter, AppDependencies) -> AnyView
+}
+
+// MARK: - UITestScreenRegistry
+
+/// Screens that a UI test opens as the root view by passing their name in `UITestLaunch.screenKey`.
+/// `anvil feature` adds an entry above the marker for every feature generated with UI tests.
+@MainActor
+enum UITestScreenRegistry {
+    // MARK: - Screens
+
+    static let screens: [UITestScreen] = [
+        // anvil:ui-test-screens
+    ]
+
+    // MARK: - Public Methods
+
+    static func makeView(screen: String, appRouter: AppRouter, dependencies: AppDependencies) -> AnyView? {
+        screens.first { $0.name == screen }?.makeView(appRouter, dependencies)
+    }
+}
+#endif

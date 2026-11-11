@@ -34,6 +34,18 @@ type UUIDSet struct {
 	TargetDependency   string
 	ContainerItemProxy string
 
+	// UI test target and the Shared group (compiled into the app and the UI test target)
+	UITestTarget           string
+	UITestProduct          string
+	UITestGroup            string
+	UITestSourcesPhase     string
+	UITestFrameworksPhase  string
+	UITestResourcesPhase   string
+	BuildConfigListUITest  string
+	UITestTargetDependency string
+	UITestContainerProxy   string
+	SharedGroup            string
+
 	// Per-scheme config UUIDs: map[schemeName]uuid
 	DebugConfigsProject  map[string]string
 	ReleaseConfigsProject map[string]string
@@ -41,6 +53,8 @@ type UUIDSet struct {
 	ReleaseConfigsApp    map[string]string
 	DebugConfigsTest     map[string]string
 	ReleaseConfigsTest   map[string]string
+	DebugConfigsUITest   map[string]string
+	ReleaseConfigsUITest map[string]string
 
 	// SwiftData (optional)
 	SwiftDataFramework string
@@ -66,6 +80,7 @@ type PbxprojContext struct {
 	Schemes          []string
 	IncludeSwiftData bool
 	TestTargetName   string
+	UITestTargetName string
 	UUIDs            UUIDSet
 	BuildConfigs     []BuildConfigEntry
 }
@@ -81,6 +96,8 @@ type XcschemeContext struct {
 	ReleaseConfigName string
 	AppTargetUUID     string
 	TestTargetUUID    string
+	UITestTargetName  string
+	UITestTargetUUID  string
 }
 
 // WorkspaceContext holds data needed to render the contents.xcworkspacedata template.
@@ -107,6 +124,7 @@ func NewPbxprojContext(cfg config.ProjectConfig) PbxprojContext {
 		Schemes:          cfg.Schemes,
 		IncludeSwiftData: cfg.IncludeSwiftData,
 		TestTargetName:   testTargetName,
+		UITestTargetName: cfg.Name + "UITests",
 		UUIDs:            uuids,
 		BuildConfigs:     buildConfigs,
 	}
@@ -129,6 +147,8 @@ func NewXcschemeContexts(cfg config.ProjectConfig, uuids UUIDSet) []XcschemeCont
 			ReleaseConfigName: releaseConfigName(scheme),
 			AppTargetUUID:     uuids.AppTarget,
 			TestTargetUUID:    uuids.TestTarget,
+			UITestTargetName:  cfg.Name + "UITests",
+			UITestTargetUUID:  uuids.UITestTarget,
 		}
 		contexts = append(contexts, ctx)
 	}
@@ -171,12 +191,25 @@ func generateUUIDSet(reg *UUIDRegistry, cfg config.ProjectConfig) UUIDSet {
 		TargetDependency:       reg.Generate("TargetDependency"),
 		ContainerItemProxy:     reg.Generate("ContainerItemProxy"),
 
+		UITestTarget:           reg.Generate("UITestTarget"),
+		UITestProduct:          reg.Generate("UITestProduct"),
+		UITestGroup:            reg.Generate("UITestGroup"),
+		UITestSourcesPhase:     reg.Generate("UITestSourcesPhase"),
+		UITestFrameworksPhase:  reg.Generate("UITestFrameworksPhase"),
+		UITestResourcesPhase:   reg.Generate("UITestResourcesPhase"),
+		BuildConfigListUITest:  reg.Generate("BuildConfigListUITest"),
+		UITestTargetDependency: reg.Generate("UITestTargetDependency"),
+		UITestContainerProxy:   reg.Generate("UITestContainerProxy"),
+		SharedGroup:            reg.Generate("SharedGroup"),
+
 		DebugConfigsProject:  make(map[string]string, len(cfg.Schemes)),
 		ReleaseConfigsProject: make(map[string]string, len(cfg.Schemes)),
 		DebugConfigsApp:      make(map[string]string, len(cfg.Schemes)),
 		ReleaseConfigsApp:    make(map[string]string, len(cfg.Schemes)),
 		DebugConfigsTest:     make(map[string]string, len(cfg.Schemes)),
 		ReleaseConfigsTest:   make(map[string]string, len(cfg.Schemes)),
+		DebugConfigsUITest:   make(map[string]string, len(cfg.Schemes)),
+		ReleaseConfigsUITest: make(map[string]string, len(cfg.Schemes)),
 	}
 
 	for _, scheme := range cfg.Schemes {
@@ -186,6 +219,8 @@ func generateUUIDSet(reg *UUIDRegistry, cfg config.ProjectConfig) UUIDSet {
 		set.ReleaseConfigsApp[scheme] = reg.Generate(seedForConfig("AppConfig", scheme, false))
 		set.DebugConfigsTest[scheme] = reg.Generate(seedForConfig("TestConfig", scheme, true))
 		set.ReleaseConfigsTest[scheme] = reg.Generate(seedForConfig("TestConfig", scheme, false))
+		set.DebugConfigsUITest[scheme] = reg.Generate(seedForConfig("UITestConfig", scheme, true))
+		set.ReleaseConfigsUITest[scheme] = reg.Generate(seedForConfig("UITestConfig", scheme, false))
 	}
 
 	if cfg.IncludeSwiftData {

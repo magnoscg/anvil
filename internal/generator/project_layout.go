@@ -133,7 +133,8 @@ func MapToProjectPath(relPath string, projectName string) string {
 //
 // Root-level files (Project.swift, .gitignore, .swiftlint.yml, etc.) stay at root.
 // Source files (App/, Core/, Domain/, Data/, Features/, Resources/) go inside <ProjectName>/.
-// Test files (Tests/) go at root level as <ProjectName>Tests/.
+// Test files (Tests/) go at root level as <ProjectName>Tests/, UI test files (UITests/) as
+// <ProjectName>UITests/, and Shared/ (compiled into the app and the UI test target) stays at root.
 // Claude files (.claude/) go at root level.
 func mapToProjectPath(relPath string, projectName string) string {
 	topDir := strings.SplitN(relPath, string(filepath.Separator), 2)[0]
@@ -176,6 +177,10 @@ func mapToProjectPath(relPath string, projectName string) string {
 		return filepath.Join(projectName, relPath)
 	case "Tests":
 		return filepath.Join(projectName+"Tests", strings.TrimPrefix(relPath, "Tests/"))
+	case "UITests":
+		return filepath.Join(projectName+"UITests", strings.TrimPrefix(relPath, "UITests/"))
+	case "Shared":
+		return relPath
 	default:
 		return relPath
 	}

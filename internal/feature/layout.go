@@ -36,10 +36,10 @@ func FeatureLayout(cfg config.FeatureConfig) []FileJob {
 	jobs = append(jobs, featuresJobs(name, cfg)...)
 
 	// Test files
-	jobs = append(jobs, testJobs(name)...)
+	jobs = append(jobs, testJobs(name, cfg)...)
 
 	// Mock files
-	jobs = append(jobs, mockJobs(name)...)
+	jobs = append(jobs, mockJobs(name, cfg)...)
 
 	// UI test files (conditional)
 	if cfg.IncludeUITests {
@@ -152,8 +152,8 @@ func featuresJobs(name string, cfg config.FeatureConfig) []FileJob {
 	return jobs
 }
 
-func testJobs(name string) []FileJob {
-	return []FileJob{
+func testJobs(name string, cfg config.FeatureConfig) []FileJob {
+	jobs := []FileJob{
 		{
 			TemplatePath: "feature/Tests/Domain/FeatureUseCaseTests.swift.tmpl",
 			DestPath:     filepath.Join("Tests", "Domain", name, "UseCases", name+"UseCaseTests.swift"),
@@ -175,10 +175,20 @@ func testJobs(name string) []FileJob {
 			DestPath:     filepath.Join("Tests", "Features", name, "Presentation", "Mappers", name+"DecoratorMapperTests.swift"),
 		},
 	}
+
+	if cfg.IncludeLocalDataSource {
+		jobs = append(jobs, FileJob{
+			TemplatePath: "feature/Tests/Data/FeatureLocalDataSourceTests.swift.tmpl",
+			DestPath:     filepath.Join("Tests", "Data", name, "DataSources", name+"LocalDataSourceTests.swift"),
+			Conditional:  true,
+		})
+	}
+
+	return jobs
 }
 
-func mockJobs(name string) []FileJob {
-	return []FileJob{
+func mockJobs(name string, cfg config.FeatureConfig) []FileJob {
+	jobs := []FileJob{
 		{
 			TemplatePath: "feature/Tests/Mocks/FeatureUseCaseMock.swift.tmpl",
 			DestPath:     filepath.Join("Tests", "Mocks", name+"UseCaseMock.swift"),
@@ -204,33 +214,51 @@ func mockJobs(name string) []FileJob {
 			DestPath:     filepath.Join("Tests", "Mocks", name+"DecoratorMapperMock.swift"),
 		},
 	}
+
+	if cfg.IncludeLocalDataSource {
+		jobs = append(jobs, FileJob{
+			TemplatePath: "feature/Tests/Mocks/FeatureLocalDataSourceMock.swift.tmpl",
+			DestPath:     filepath.Join("Tests", "Mocks", name+"LocalDataSourceMock.swift"),
+			Conditional:  true,
+		})
+	}
+
+	if cfg.IncludeKeychain {
+		jobs = append(jobs, FileJob{
+			TemplatePath: "feature/Tests/Mocks/FeatureKeychainDataSourceMock.swift.tmpl",
+			DestPath:     filepath.Join("Tests", "Mocks", name+"KeychainDataSourceMock.swift"),
+			Conditional:  true,
+		})
+	}
+
+	return jobs
 }
 
 func uiTestJobs(name string) []FileJob {
 	return []FileJob{
 		{
-			TemplatePath: "feature/Features/FeatureAccessibilityID.swift.tmpl",
-			DestPath:     filepath.Join("Features", name, "UI", name+"AccessibilityID.swift"),
+			TemplatePath: "feature/Shared/FeatureAccessibilityID.swift.tmpl",
+			DestPath:     filepath.Join("Shared", "AccessibilityIDs", name+"AccessibilityID.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/DataStubs/StubFeatureRemoteDataSource.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "DataStubs", name, "Stub"+name+"RemoteDataSource.swift"),
+			TemplatePath: "feature/Data/DataStubs/StubFeatureRemoteDataSource.swift.tmpl",
+			DestPath:     filepath.Join("Data", name, "DataStubs", "Stub"+name+"RemoteDataSource.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/DataStubs/FixtureFeatureRemoteDataSource.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "DataStubs", name, "Fixture"+name+"RemoteDataSource.swift"),
+			TemplatePath: "feature/Data/DataStubs/FixtureFeatureRemoteDataSource.swift.tmpl",
+			DestPath:     filepath.Join("Data", name, "DataStubs", "Fixture"+name+"RemoteDataSource.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/UITests/FeatureScreenTests.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "UITests", "Screens", name+"ScreenTests.swift"),
+			TemplatePath: "feature/UITests/FeatureScreenTests.swift.tmpl",
+			DestPath:     filepath.Join("UITests", "Screens", name+"ScreenTests.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/UITests/FeatureScreen.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "UITests", "Support", "Screens", name+"Screen.swift"),
+			TemplatePath: "feature/UITests/FeatureScreen.swift.tmpl",
+			DestPath:     filepath.Join("UITests", "Support", "Screens", name+"Screen.swift"),
 			Conditional:  true,
 		},
 	}

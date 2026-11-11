@@ -1,4 +1,4 @@
-.PHONY: build test test-integration validate-public-assets install clean lint fmt all
+.PHONY: build test test-integration validate-public-assets sync-skill sync-skill-check install clean lint fmt all
 
 VERSION ?= dev
 BINARY_NAME := anvil
@@ -20,6 +20,14 @@ test-integration:
 ## validate-public-assets: Verify social preview size, provenance, and integrity
 validate-public-assets:
 	./scripts/validate-public-assets.sh
+
+## sync-skill: Export the ios-architecture pack docs from main to a local agent skill (SKILL_DIR)
+sync-skill:
+	./scripts/sync-architecture-skill.sh
+
+## sync-skill-check: Fail if the local skill copy differs from the pack docs on main
+sync-skill-check:
+	./scripts/sync-architecture-skill.sh --check
 
 ## install: Install binary to GOPATH/bin
 install:

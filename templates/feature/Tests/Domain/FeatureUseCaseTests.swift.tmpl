@@ -18,22 +18,16 @@ struct {{ .FeatureName }}UseCaseImplTests {
 
     // MARK: - Success
 
-    @Test("Given repository returns models, when execute, then returns mapped models")
-    func execute_success_returnsMappedModels() async throws {
-        // Given
-        let expectedModels = [
+    @Test("Given repository returns models, when execute, then returns the models")
+    func execute_success_returnsModels() async throws {
+        mockRepository.fetchResult = .success([
             {{ .FeatureName }}Model(id: "1", name: "First", description: "First item"),
             {{ .FeatureName }}Model(id: "2", name: "Second", description: "Second item")
-        ]
-        mockRepository.fetchResult = .success(expectedModels)
+        ])
 
-        // When
         let result = try await sut.execute()
 
-        // Then
-        #expect(result.count == 2)
-        #expect(result[0].id == "1")
-        #expect(result[1].id == "2")
+        #expect(result.map(\.id) == ["1", "2"])
         #expect(mockRepository.fetchCallCount == 1)
     }
 
@@ -41,16 +35,9 @@ struct {{ .FeatureName }}UseCaseImplTests {
 
     @Test("Given repository throws a DomainError, when execute, then propagates it")
     func execute_repositoryThrows_propagatesError() async {
-        // Given
         mockRepository.fetchResult = .failure(DomainError.network)
 
-        // When / Then
-        do {
-            _ = try await sut.execute()
-            Issue.record("Expected error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .network)
-            #expect(mockRepository.fetchCallCount == 1)
-        }
+        await #expect(throws: DomainError.network) { try await sut.execute() }
+        #expect(mockRepository.fetchCallCount == 1)
     }
 }

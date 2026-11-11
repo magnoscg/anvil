@@ -25,7 +25,7 @@
 
 **🏗️ Un proyecto que compila desde el primer día**
 
-`anvil init` escribe un `.xcodeproj` nativo con las capas App, Core, Domain, Data y Features, un scheme por entorno y un target de tests. Sin Tuist ni XcodeGen.
+`anvil init` escribe un `.xcodeproj` nativo con las capas App, Core, Domain, Data y Features, un scheme por entorno y targets de tests unitarios y de UI. Sin Tuist ni XcodeGen.
 
 </td>
 <td width="33%" valign="top">
@@ -182,6 +182,8 @@ flowchart TB
 │   ├── Features/       pantallas: UI, ViewModels, routers y factories
 │   └── Resources/      assets y String Catalog
 ├── <ProjectName>Tests/ tests unitarios que replican el árbol de código
+├── <ProjectName>UITests/ UI tests: Page Objects y tests de pantalla
+├── Shared/             se compila en la app y en los UI tests: ids de accesibilidad, claves de lanzamiento
 ├── <ProjectName>.xcodeproj
 └── .anvil.yml          marcador que lee anvil feature
 ```
@@ -311,6 +313,7 @@ Las contribuciones siguen Gitflow: crea una rama `feature/*` desde `develop` y a
 | **Julio de 2026** | Se publica aquí como edición pública, release `0.5.1` |
 | **Agosto de 2026** | Generación e instalación de packs transaccionales, procedencia de recursos y skills, release `0.6.0` |
 | **Noviembre de 2026** | Los proyectos generados siguen la arquitectura de referencia: Domain y Data por concepto, navegación por ventana y red reforzada, release `0.7.0` |
+| **Noviembre de 2026** | Los proyectos generados traen un target de UI tests conectado de extremo a extremo y el pack de arquitectura se reescribe en 12 documentos más cortos, release `0.8.0` |
 
 El historial privado no se trajo, por eso el primer commit de este repositorio es la edición pública `0.5.1`.
 
