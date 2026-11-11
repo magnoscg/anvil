@@ -313,6 +313,7 @@ Las contribuciones siguen Gitflow: crea una rama `feature/*` desde `develop` y a
 | **Julio de 2026** | Se publica aquí como edición pública, release `0.5.1` |
 | **Agosto de 2026** | Generación e instalación de packs transaccionales, procedencia de recursos y skills, release `0.6.0` |
 | **Noviembre de 2026** | Los proyectos generados siguen la arquitectura de referencia: Domain y Data por concepto, navegación por ventana y red reforzada, release `0.7.0` |
+| **Noviembre de 2026** | Los proyectos generados traen un target de UI tests conectado de extremo a extremo y el pack de arquitectura se reescribe en 12 documentos más cortos, release `0.8.0` |
 
 El historial privado no se trajo, por eso el primer commit de este repositorio es la edición pública `0.5.1`.
 

@@ -313,6 +313,7 @@ Contributions follow Gitflow: branch `feature/*` from `develop` and open the pul
 | **July 2026** | Published here as a public edition, release `0.5.1` |
 | **August 2026** | Transactional generation and pack installation, asset and skill provenance, release `0.6.0` |
 | **November 2026** | Generated projects follow the reference architecture: Domain and Data by concept, per-window navigation, hardened networking, release `0.7.0` |
+| **November 2026** | Generated projects ship a UI test target wired end to end, and the architecture pack is rewritten as 12 shorter documents, release `0.8.0` |
 
 The private history was not carried over, which is why the first commit here is the `0.5.1` public edition.
 
