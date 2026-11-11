@@ -284,7 +284,7 @@ The scaffold writes no `#Preview`. The generated mocks belong to the test target
 
 ## 8) Tests
 
-`anvil feature` writes five suites under `<Project>Tests/`, in the same folders as the code they test (`Domain/Article/UseCases/`, `Data/Article/Repositories/`, `Data/Article/Mappers/`, `Features/Article/Presentation/ViewModels/` and `.../Mappers/`), plus six mocks in `Mocks/` named `Article<Type>Mock` (UseCase, Repository, Router, RemoteDataSource, DTOMapper, DecoratorMapper). Extend them as the feature grows. Test style and mocks are in `testing.md`; how to run them is in `tooling.md`.
+`anvil feature` writes five suites under `<Project>Tests/`, in the same folders as the code they test (`Domain/Article/UseCases/`, `Data/Article/Repositories/`, `Data/Article/Mappers/`, `Features/Article/Presentation/ViewModels/` and `.../Mappers/`), plus six mocks in `Mocks/` named `Article<Type>Mock` (UseCase, Repository, Router, RemoteDataSource, DTOMapper, DecoratorMapper). The optional Local and Keychain data sources add their mocks, and the Local one a round-trip suite in `Data/Article/DataSources/`. Extend them as the feature grows. Test style and mocks are in `testing.md`; how to run them is in `tooling.md`.
 
 What each suite must cover:
 - **UseCase**: success, and a `DomainError` from the repository passing through unchanged.

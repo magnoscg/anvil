@@ -1,0 +1,33 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}LocalDataSourceMock
+
+/// Mock implementation of {{ .FeatureName }}LocalDataSource for testing
+final class {{ .FeatureName }}LocalDataSourceMock: {{ .FeatureName }}LocalDataSource, @unchecked Sendable {
+    // MARK: - Properties
+
+    var saveResult: Result<Void, Error> = .success(())
+    var savedItems: [{{ .FeatureName }}DTO] = []
+    var saveCallCount = 0
+    var loadResult: Result<[{{ .FeatureName }}DTO], Error> = .success([])
+    var loadCallCount = 0
+    var clearCallCount = 0
+
+    // MARK: - {{ .FeatureName }}LocalDataSource
+
+    func save(_ items: [{{ .FeatureName }}DTO]) throws {
+        saveCallCount += 1
+        savedItems = items
+        try saveResult.get()
+    }
+
+    func load() throws -> [{{ .FeatureName }}DTO] {
+        loadCallCount += 1
+        return try loadResult.get()
+    }
+
+    func clear() {
+        clearCallCount += 1
+    }
+}

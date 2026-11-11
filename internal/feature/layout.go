@@ -36,10 +36,10 @@ func FeatureLayout(cfg config.FeatureConfig) []FileJob {
 	jobs = append(jobs, featuresJobs(name, cfg)...)
 
 	// Test files
-	jobs = append(jobs, testJobs(name)...)
+	jobs = append(jobs, testJobs(name, cfg)...)
 
 	// Mock files
-	jobs = append(jobs, mockJobs(name)...)
+	jobs = append(jobs, mockJobs(name, cfg)...)
 
 	// UI test files (conditional)
 	if cfg.IncludeUITests {
@@ -152,8 +152,8 @@ func featuresJobs(name string, cfg config.FeatureConfig) []FileJob {
 	return jobs
 }
 
-func testJobs(name string) []FileJob {
-	return []FileJob{
+func testJobs(name string, cfg config.FeatureConfig) []FileJob {
+	jobs := []FileJob{
 		{
 			TemplatePath: "feature/Tests/Domain/FeatureUseCaseTests.swift.tmpl",
 			DestPath:     filepath.Join("Tests", "Domain", name, "UseCases", name+"UseCaseTests.swift"),
@@ -175,10 +175,20 @@ func testJobs(name string) []FileJob {
 			DestPath:     filepath.Join("Tests", "Features", name, "Presentation", "Mappers", name+"DecoratorMapperTests.swift"),
 		},
 	}
+
+	if cfg.IncludeLocalDataSource {
+		jobs = append(jobs, FileJob{
+			TemplatePath: "feature/Tests/Data/FeatureLocalDataSourceTests.swift.tmpl",
+			DestPath:     filepath.Join("Tests", "Data", name, "DataSources", name+"LocalDataSourceTests.swift"),
+			Conditional:  true,
+		})
+	}
+
+	return jobs
 }
 
-func mockJobs(name string) []FileJob {
-	return []FileJob{
+func mockJobs(name string, cfg config.FeatureConfig) []FileJob {
+	jobs := []FileJob{
 		{
 			TemplatePath: "feature/Tests/Mocks/FeatureUseCaseMock.swift.tmpl",
 			DestPath:     filepath.Join("Tests", "Mocks", name+"UseCaseMock.swift"),
@@ -204,6 +214,24 @@ func mockJobs(name string) []FileJob {
 			DestPath:     filepath.Join("Tests", "Mocks", name+"DecoratorMapperMock.swift"),
 		},
 	}
+
+	if cfg.IncludeLocalDataSource {
+		jobs = append(jobs, FileJob{
+			TemplatePath: "feature/Tests/Mocks/FeatureLocalDataSourceMock.swift.tmpl",
+			DestPath:     filepath.Join("Tests", "Mocks", name+"LocalDataSourceMock.swift"),
+			Conditional:  true,
+		})
+	}
+
+	if cfg.IncludeKeychain {
+		jobs = append(jobs, FileJob{
+			TemplatePath: "feature/Tests/Mocks/FeatureKeychainDataSourceMock.swift.tmpl",
+			DestPath:     filepath.Join("Tests", "Mocks", name+"KeychainDataSourceMock.swift"),
+			Conditional:  true,
+		})
+	}
+
+	return jobs
 }
 
 func uiTestJobs(name string) []FileJob {

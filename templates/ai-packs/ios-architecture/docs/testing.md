@@ -35,7 +35,9 @@ Unit-test rules for the generated architecture: Swift Testing conventions, what 
 +- Data/Article/Mappers/ArticleDTOMapperTests.swift
 +- Features/Article/Presentation/ViewModels/ArticleViewModelTests.swift
 +- Features/Article/Presentation/Mappers/ArticleDecoratorMapperTests.swift
++- Data/Article/DataSources/ArticleLocalDataSourceTests.swift   only with the Local data source
 +- Mocks/Article{UseCase,Repository,RemoteDataSource,DTOMapper,DecoratorMapper,Router}Mock.swift
++- Mocks/Article{LocalDataSource,KeychainDataSource}Mock.swift   only with those data sources
 +- DataStubs/, UITests/             only with UI tests: see ui-testing.md
 ```
 

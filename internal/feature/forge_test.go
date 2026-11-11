@@ -421,8 +421,8 @@ func TestForgeWithOptionalFlags(t *testing.T) {
 		t.Fatalf("Forge failed: %v", err)
 	}
 
-	// All options: 29 files
-	want := 29
+	// All options: base 26 + local(3) + keychain(2) + route resolver(1) = 32
+	want := 32
 	if len(result.FilesCreated) != want {
 		t.Errorf("FilesCreated count = %d, want %d", len(result.FilesCreated), want)
 	}
@@ -595,8 +595,8 @@ func TestForgeWithAllOptionsIncludingUITests(t *testing.T) {
 		t.Fatalf("Forge failed: %v", err)
 	}
 
-	// All options: 29 (base+optional) + 5 UI test files = 34
-	want := 34
+	// All options: 32 (base+optional) + 5 UI test files = 37
+	want := 37
 	if len(result.FilesCreated) != want {
 		t.Errorf("FilesCreated count = %d, want %d", len(result.FilesCreated), want)
 	}

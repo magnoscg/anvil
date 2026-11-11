@@ -11,17 +11,23 @@ protocol {{ .FeatureName }}LocalDataSource: Sendable {
 
 // MARK: - {{ .FeatureName }}LocalDataSourceImpl
 
-/// Implementation of {{ .FeatureName }}LocalDataSource using UserDefaults
+/// Implementation of {{ .FeatureName }}LocalDataSource using UserDefaults.
+/// `UserDefaults` is not `Sendable`, so the data source stores the suite name and resolves the store on each call.
 struct {{ .FeatureName }}LocalDataSourceImpl: {{ .FeatureName }}LocalDataSource {
     // MARK: - Properties
 
-    private let defaults: UserDefaults
+    private let suiteName: String?
     private let key = "{{ .FeatureNameSnake }}_cache"
+
+    private var defaults: UserDefaults {
+        suiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+    }
 
     // MARK: - Init
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    /// - Parameter suiteName: The `UserDefaults` suite; nil uses `.standard`.
+    init(suiteName: String? = nil) {
+        self.suiteName = suiteName
     }
 
     // MARK: - Public Methods

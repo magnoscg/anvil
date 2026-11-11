@@ -8,15 +8,21 @@ struct {{ .FeatureName }}RepositoryImplTests {
 
     private var mockRemoteDataSource: {{ .FeatureName }}RemoteDataSourceMock
     private var mockDTOMapper: {{ .FeatureName }}DTOMapperMock
-    private var sut: {{ .FeatureName }}RepositoryImpl
+{{ if .IncludeLocalDataSource }}    private var mockLocalDataSource: {{ .FeatureName }}LocalDataSourceMock
+{{ end }}{{ if .IncludeKeychain }}    private var mockKeychainDataSource: {{ .FeatureName }}KeychainDataSourceMock
+{{ end }}    private var sut: {{ .FeatureName }}RepositoryImpl
 
     // MARK: - Setup
 
     init() {
         mockRemoteDataSource = {{ .FeatureName }}RemoteDataSourceMock()
         mockDTOMapper = {{ .FeatureName }}DTOMapperMock()
-        sut = {{ .FeatureName }}RepositoryImpl(remoteDataSource: mockRemoteDataSource,
-{{ "                                              " }}mapper: mockDTOMapper)
+{{ if .IncludeLocalDataSource }}        mockLocalDataSource = {{ .FeatureName }}LocalDataSourceMock()
+{{ end }}{{ if .IncludeKeychain }}        mockKeychainDataSource = {{ .FeatureName }}KeychainDataSourceMock()
+{{ end }}        sut = {{ .FeatureName }}RepositoryImpl(remoteDataSource: mockRemoteDataSource,
+{{ "                                              " }}mapper: mockDTOMapper{{ if .IncludeLocalDataSource }},
+{{ "                                              " }}localDataSource: mockLocalDataSource{{ end }}{{ if .IncludeKeychain }},
+{{ "                                              " }}keychainDataSource: mockKeychainDataSource{{ end }})
     }
 
     // MARK: - Success

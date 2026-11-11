@@ -1,0 +1,46 @@
+import Testing
+import Foundation
+@testable import {{ .ProjectName }}
+
+@Suite("{{ .FeatureName }}LocalDataSourceImpl Tests")
+struct {{ .FeatureName }}LocalDataSourceImplTests {
+    // MARK: - Properties
+
+    private let suiteName = "{{ .FeatureName }}LocalDataSourceImplTests.\(UUID().uuidString)"
+    private var sut: {{ .FeatureName }}LocalDataSourceImpl
+
+    // MARK: - Setup
+
+    init() {
+        sut = {{ .FeatureName }}LocalDataSourceImpl(suiteName: suiteName)
+    }
+
+    // MARK: - Save and Load
+
+    @Test("Given saved items, when load, then returns the same items")
+    func load_afterSave_returnsSavedItems() throws {
+        let items = [{{ .FeatureName }}DTO(id: "1", name: "First", description: "First item")]
+        try sut.save(items)
+
+        let loaded = try sut.load()
+
+        #expect(loaded == items)
+        sut.clear()
+    }
+
+    @Test("Given an empty store, when load, then returns no items")
+    func load_emptyStore_returnsEmpty() throws {
+        let loaded = try sut.load()
+
+        #expect(loaded.isEmpty)
+    }
+
+    @Test("Given saved items, when clear, then load returns no items")
+    func clear_afterSave_removesItems() throws {
+        try sut.save([{{ .FeatureName }}DTO(id: "1", name: "First", description: "First item")])
+
+        sut.clear()
+
+        #expect(try sut.load().isEmpty)
+    }
+}
