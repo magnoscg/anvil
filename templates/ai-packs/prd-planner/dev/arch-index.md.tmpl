@@ -15,7 +15,7 @@ Generated: {{ .Date }}
 2. Domain models MUST be pure — no framework imports
 3. Data layer MUST map DTOs to Domain models via Mappers
 4. DecoratorMappers transform Domain → Decorator (presentation models)
-5. Repository protocol lives in Data, NOT in Domain
+5. Repository protocol lives in Domain; Data holds only the Impl
 
 ## PROJECT-STRUCTURE.md
 **Path**: .claude/docs/PROJECT-STRUCTURE.md
@@ -68,7 +68,7 @@ Generated: {{ .Date }}
 **Reglas criticas**:
 1. SwiftData MUST only be in Data layer — NEVER in Domain or Presentation
 2. Each repository MUST use its own ModelExecutor, NEVER the main ModelContext
-3. MUST use ModelContainer.shared for production, .preview for tests
+3. MUST use ModelContainer.shared in production and an in-memory container in previews and tests
 4. MUST map SwiftData models to Domain models, NEVER expose SD models
 
 ## networking.md
@@ -82,29 +82,12 @@ Generated: {{ .Date }}
 
 ## testing.md
 **Path**: .claude/docs/testing.md
-**Read when**: Writing tests
+**Read when**: Writing unit tests, mocks, or test stubs
 **Reglas criticas**:
 1. MUST use Swift Testing (import Testing), NEVER XCTest for new tests
 2. High priority: UseCase, ViewModel (state transitions), Error Mappers
 3. MUST mirror source structure in test folder: Tests/Domain, Tests/Data, Tests/Features
 4. MUST create Mock types in Tests/Mocks/ folder
-
-## create-tests.md
-**Path**: .claude/docs/create-tests.md
-**Read when**: Quick test templates
-**Reglas criticas**:
-1. MUST use import Testing, NEVER XCTest
-2. MUST use @MainActor on ViewModel test suites
-3. MUST follow Given/When/Then structure in test bodies
-4. MUST create Mock types for all dependencies
-
-## performance.md
-**Path**: .claude/docs/performance.md
-**Read when**: Profiling, optimization, memory management
-**Reglas criticas**:
-1. Use /axiom:profile for quick CPU profiling
-2. Use /axiom:audit swiftui-performance for view update issues
-3. Use /axiom:audit memory for leak detection
 
 ## security-privacy.md
 **Path**: .claude/docs/security-privacy.md
@@ -115,12 +98,21 @@ Generated: {{ .Date }}
 3. MUST declare Required Reason APIs in Privacy Manifest
 4. NEVER log sensitive data (tokens, passwords, PII)
 
-## diagnostics.md
-**Path**: .claude/docs/diagnostics.md
-**Read when**: Crash analysis, build optimization, troubleshooting
+## ui-testing.md
+**Path**: .claude/docs/ui-testing.md
+**Read when**: Accessibility identifiers, UI test data, Page Objects, UI tests
 **Reglas criticas**:
-1. Check crash logs in ~/Library/Logs/DiagnosticReports/ for simulator
-2. Use MetricKit for field diagnostics
-3. Use Axiom skills for systematic crash analysis
+1. MUST locate elements by accessibility identifier, NEVER by label
+2. Test data MUST enter through the Factory (stub or fixture data sources), NEVER by changing ViewModels or Views
+3. NEVER use sleep() — wait on conditions
+4. UI tests use XCTest; unit tests use Swift Testing
+
+## tooling.md
+**Path**: .claude/docs/tooling.md
+**Read when**: Building, running tests, checking the app in the simulator, crashes, profiling
+**Reglas criticas**:
+1. Build and test through axbuild when it is installed
+2. ALWAYS pass an explicit simulator UDID, NEVER `booted`
+3. Verify the effect of a UI action, NEVER the tap itself
 
 {{ end -}}

@@ -25,7 +25,7 @@ struct RootNavigationView: View {
     init(appRouter: AppRouterImpl, dependencies: AppDependencies) {
         self.appRouter = appRouter
         self.dependencies = dependencies
-        self._coordinator = State(initialValue: AppNavigationCoordinator(appRouter: appRouter))
+        self.coordinator = AppNavigationCoordinator(appRouter: appRouter)
     }
 
     // MARK: - Body
@@ -40,7 +40,7 @@ struct RootNavigationView: View {
         .onOpenURL { url in
             coordinator.handleDeepLink(url)
         }
-        .task(id: "restore") {
+        .task {
             coordinator.restoreNavigationState(from: navigationData)
         }
         .onChange(of: appRouter.path) { _, _ in

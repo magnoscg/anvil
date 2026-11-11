@@ -423,13 +423,13 @@ For each selected pack, the PackRenderer executes up to 10 steps:
 
 **ios-architecture:**
 - `CLAUDE.md.tmpl` — Full project CLAUDE.md with architecture rules, anti-patterns, workflow
-- `docs/` — 13 reference documents:
+- `docs/` — 12 reference documents (the single source of the architecture rules; each one under 300 lines):
   - `ARCHITECTURE.md`, `PROJECT-STRUCTURE.md`, `new-feature.md`
   - `swiftui-code-style.md`, `design-system.md`
-  - `swift-concurrency.md`, `performance.md`
-  - `swiftdata.md`, `networking.md`
-  - `security-privacy.md`, `diagnostics.md`
-  - `testing.md`, `create-tests.md`
+  - `swift-concurrency.md`
+  - `swiftdata.md`, `networking.md`, `security-privacy.md`
+  - `testing.md`, `ui-testing.md`
+  - `tooling.md`
 
 **prd-planner:**
 - `CLAUDE-section.md.tmpl` — Appends workflow section to CLAUDE.md
