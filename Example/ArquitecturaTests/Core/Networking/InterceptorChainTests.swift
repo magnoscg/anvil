@@ -12,7 +12,7 @@ struct InterceptorChainTests {
     func chainExecutesThroughAllInterceptors() async throws {
         let chain = DefaultInterceptorChain()
 
-        let expectedData = "test".data(using: .utf8)!
+        let expectedData = try #require("test".data(using: .utf8))
         let url = try #require(URL(string: "https://example.com"))
         let expectedResponse = try #require(HTTPURLResponse(url: url,
                                                             statusCode: 200,

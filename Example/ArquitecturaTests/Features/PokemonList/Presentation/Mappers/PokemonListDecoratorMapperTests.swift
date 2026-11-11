@@ -17,9 +17,9 @@ struct PokemonListDecoratorMapperTests {
     func mapSingleModel() {
         // Given
         let model = PokemonSummaryModel(id: 25,
-                                     name: "pikachu",
-                                     imageURL: URL(string: "https://example.com/25.png"),
-                                     types: [.electric])
+                                        name: "pikachu",
+                                        imageURL: URL(string: "https://example.com/25.png"),
+                                        types: [.electric])
 
         // When
         let decorator = mapper.map(model)
@@ -98,9 +98,9 @@ struct PokemonListDecoratorMapperTests {
     func modelWithMultipleTypes() {
         // Given
         let model = PokemonSummaryModel(id: 6,
-                                     name: "charizard",
-                                     imageURL: nil,
-                                     types: [.fire, .flying])
+                                        name: "charizard",
+                                        imageURL: nil,
+                                        types: [.fire, .flying])
 
         // When
         let decorator = mapper.map(model)

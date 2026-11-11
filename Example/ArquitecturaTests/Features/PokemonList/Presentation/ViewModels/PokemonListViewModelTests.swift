@@ -27,9 +27,9 @@ struct PokemonListViewModelTests {
                                    totalCount: Int = 1302) -> PokemonListResult {
         let pokemon = (1 ... count).map { index in
             PokemonSummaryModel(id: index,
-                             name: "pokemon-\(index)",
-                             imageURL: URL(string: "https://example.com/\(index).png"),
-                             types: [.fire])
+                                name: "pokemon-\(index)",
+                                imageURL: URL(string: "https://example.com/\(index).png"),
+                                types: [.fire])
         }
         return PokemonListResult(pokemon: pokemon, hasMore: hasMore, totalCount: totalCount)
     }
@@ -141,9 +141,9 @@ struct PokemonListViewModelTests {
         await viewModel.loadPokemon()
 
         let nextPageResult = PokemonListResult(pokemon: [PokemonSummaryModel(id: 10,
-                                                                          name: "caterpie",
-                                                                          imageURL: URL(string: "https://example.com/10.png"),
-                                                                          types: [.bug])],
+                                                                             name: "caterpie",
+                                                                             imageURL: URL(string: "https://example.com/10.png"),
+                                                                             types: [.bug])],
                                                hasMore: false,
                                                totalCount: 1302)
         await mockUseCase.setExecuteResult(.success(nextPageResult))
@@ -188,9 +188,9 @@ struct PokemonListViewModelTests {
         let callCountAfterLoad = await mockUseCase.executeCallCount
 
         let nextResult = PokemonListResult(pokemon: [PokemonSummaryModel(id: 10,
-                                                                      name: "caterpie",
-                                                                      imageURL: nil,
-                                                                      types: [.bug])],
+                                                                         name: "caterpie",
+                                                                         imageURL: nil,
+                                                                         types: [.bug])],
                                            hasMore: false,
                                            totalCount: 4)
         await mockUseCase.setExecuteResult(.success(nextResult))

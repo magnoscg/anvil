@@ -9,9 +9,9 @@ struct PokemonListDTOMapperImpl: PokemonListDTOMapper {
 
     nonisolated func mapToDomain(_ dto: PokemonListDTO) -> PokemonSummaryModel {
         PokemonSummaryModel(id: dto.id,
-                         name: formatName(dto.name),
-                         imageURL: mapImageURL(from: dto),
-                         types: mapTypes(from: dto.types))
+                            name: formatName(dto.name),
+                            imageURL: mapImageURL(from: dto),
+                            types: mapTypes(from: dto.types))
     }
 
     nonisolated func mapToDomain(_ dtos: [PokemonListDTO]) -> [PokemonSummaryModel] {

@@ -123,9 +123,9 @@ struct APIErrorTests {
 struct APIErrorResponseTests {
     @Test("Decodes standard error response")
     func decodesStandardResponse() throws {
-        let json = """
+        let json = try #require("""
         {"message": "Bad Request", "code": "INVALID_PARAMS", "details": "Missing name field"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let response = try JSONDecoder().decode(APIErrorResponse.self, from: json)
 
@@ -136,9 +136,9 @@ struct APIErrorResponseTests {
 
     @Test("Decodes alternative key names")
     func decodesAlternativeKeys() throws {
-        let json = """
+        let json = try #require("""
         {"error": "Unauthorized", "error_code": "AUTH_FAILED"}
-        """.data(using: .utf8)!
+        """.data(using: .utf8))
 
         let response = try JSONDecoder().decode(APIErrorResponse.self, from: json)
 

@@ -63,8 +63,10 @@ struct PokemonListRepositoryTests {
     @Test("Fetch throws the mapped DomainError when every detail request fails")
     func fetchWithAllDetailFailuresThrows() async {
         // Given
-        let listResponse = makeListResponse(count: 2, next: "next-url", results: [makeResultDTO(name: "bulbasaur", id: 1),
-                                                                                  makeResultDTO(name: "charmander", id: 4)])
+        let listResponse = makeListResponse(count: 2, next: "next-url",
+                                            results: [makeResultDTO(name: "bulbasaur", id: 1),
+                                                      makeResultDTO(name: "charmander",
+                                                                    id: 4)])
 
         let mockDataSource = MockPokemonListRemoteDataSource()
         await mockDataSource.setFetchListResult(.success(listResponse))

@@ -42,9 +42,9 @@ enum AppEnvironment: String, CaseIterable {
     /// Returns true if the app is built in DEBUG mode
     var isDebugBuild: Bool {
         #if DEBUG
-        return true
+        true
         #else
-        return false
+        false
         #endif
     }
 
