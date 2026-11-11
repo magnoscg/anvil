@@ -1,276 +1,59 @@
-# Design System & HIG Guidelines
+# design-system.md — Design Tokens and UI Rules
 
-> Apple Human Interface Guidelines compliance for iOS apps.
+The tokens the generator emits (`AppColors`, `AppTypography`, `Spacing`), where shared components live, and the rules Views follow when they use them.
 
-## Color Guidelines
+## Tokens
 
-### Use Semantic Colors
+All tokens live in `Core/DesignSystem/Tokens/`. Views use tokens, never literals. A missing value is added to the token file, so there is one place to change it and one place to audit.
 
-Always prefer system semantic colors over custom colors:
-
-```swift
-// Correct: Semantic colors adapt to Dark Mode automatically
-Color(.systemBackground)
-Color(.secondarySystemBackground)
-Color(.tertiarySystemBackground)
-Color(.systemGroupedBackground)
-Color(.secondarySystemGroupedBackground)
-
-Color(.label)
-Color(.secondaryLabel)
-Color(.tertiaryLabel)
-Color(.quaternaryLabel)
-
-Color(.systemFill)
-Color(.secondarySystemFill)
-Color(.tertiarySystemFill)
-Color(.quaternarySystemFill)
-
-Color(.separator)
-Color(.opaqueSeparator)
-
-// Wrong: Hardcoded colors break in Dark Mode
-Color.black
-Color.white
-Color(hex: "#FFFFFF")
-```
-
-### System Colors for Accents
-
-```swift
-// System colors (adapt to accessibility settings)
-Color(.systemBlue)
-Color(.systemGreen)
-Color(.systemRed)
-Color(.systemOrange)
-Color(.systemYellow)
-Color(.systemPink)
-Color(.systemPurple)
-Color(.systemTeal)
-Color(.systemIndigo)
-
-// For tint color
-Color.accentColor  // Uses app's accent color from asset catalog
-```
-
-### Custom Colors (When Necessary)
-
-The generated tokens use semantic system colors where possible and `Color.adaptive(light:dark:)` (from `Core/Common/Extensions/ColorHex.swift`) for brand colors, so every custom color has a Dark Mode variant:
+### AppColors
 
 ```swift
 // Core/DesignSystem/Tokens/AppColors.swift
-import SwiftUI
-
-// MARK: - AppColors
-
 enum AppColors {
-    // MARK: - Brand / Accent
-
     static let secondary = Color.adaptive(light: "5856D6", dark: "5E5CE6")
     static let accent = Color.adaptive(light: "FF9500", dark: "FF9F0A")
     static let primary = Color(.systemBlue)
-
-    // MARK: - Status
 
     static let success = Color.adaptive(light: "34C759", dark: "30D158")
     static let warning = Color.adaptive(light: "FFCC00", dark: "FFD60A")
     static let error = Color(.systemRed)
 
-    // MARK: - Surfaces
-
     static let background = Color(.systemBackground)
     static let surface = Color(.secondarySystemBackground)
     static let cardBackground = Color(.secondarySystemBackground)
 
-    // MARK: - Text
-
     static let text = Color(.label)
     static let textSecondary = Color(.secondaryLabel)
     static let textTertiary = Color(.tertiaryLabel)
+
+    static let cardBorder = Color(.separator)
+    static let divider = Color(.separator)
+    static let shadowColor = Color(.label)
 }
 ```
 
-The generated file also defines `cardBorder`, `divider` and `shadowColor`.
+- Surfaces, text and borders use semantic system colors, and `primary` and `error` use system colors. They adapt to Light, Dark, elevated and Increase Contrast with no extra work, so reach for them first.
+- Brand and status colors with no system equivalent are defined in code with `Color.adaptive(light:dark:)` (`Core/Common/Extensions/ColorHex.swift`), which resolves one hex value for Light and one for Dark. This is what the generator emits.
+- **Code or asset catalog**: `Color.adaptive` only knows Light and Dark. When a custom color needs high-contrast variants, create a Color Set in `Resources/Assets.xcassets` (Any, Dark and their High Contrast appearances; the project already ships one, `AccentColor`) and point the same `AppColors` member at it: `static let accent = Color("BrandAccent")`. Views do not change, because they only see the token.
+- No `Color(hex:)`, `Color.black` or `Color.white` in a View: a literal has no Dark Mode variant and escapes the token audit.
+- No in-app Dark Mode selector. The app follows the system appearance; a second setting makes users configure the same thing twice.
 
-### Dark Mode Rules
+### AppTypography
 
-| Rule | Description |
-|------|-------------|
-| **Never create a Dark Mode toggle** | Respect system preference via `@Environment(\.colorScheme)` |
-| **Use semantic colors** | They adapt automatically |
-| **Test in both modes** | Always verify appearance in Light and Dark |
-| **Asset catalog variants** | Define Light/Dark variants for custom colors |
-
----
-
-## Typography
-
-### Use System Fonts
+An enum of semantic text styles (`AppTypography.swift`). Its `font` property maps each case to a Dynamic Type style, never to a fixed size: `largeTitle`, `title1` (`.title`), `title2`, `title3`, `headline`, `body`, `callout`, `subheadline`, `footnote`, `caption1` (`.caption`), `caption2`.
 
 ```swift
-// Correct: Dynamic Type compatible
-.font(.largeTitle)
-.font(.title)
-.font(.title2)
-.font(.title3)
-.font(.headline)
-.font(.subheadline)
-.font(.body)
-.font(.callout)
-.font(.footnote)
-.font(.caption)
-.font(.caption2)
-
-// With weight
-.font(.body.weight(.semibold))
-.font(.headline.bold())
-```
-
-### Typography Tokens
-
-`AppTypography` is an enum of semantic text styles; each case maps to a Dynamic Type `Font` through `.font` (no fixed sizes):
-
-```swift
-// Core/DesignSystem/Tokens/AppTypography.swift
-import SwiftUI
-
-// MARK: - AppTypography
-
-enum AppTypography {
-    case largeTitle
-    case title1
-    case title2
-    case title3
-    case headline
-    case body
-    case callout
-    case subheadline
-    case footnote
-    case caption1
-    case caption2
-
-    // MARK: - Font
-
-    var font: Font {
-        switch self {
-        case .largeTitle: .largeTitle
-        case .title1: .title
-        case .title2: .title2
-        case .title3: .title3
-        case .headline: .headline
-        case .body: .body
-        case .callout: .callout
-        case .subheadline: .subheadline
-        case .footnote: .footnote
-        case .caption1: .caption
-        case .caption2: .caption2
-        }
-    }
-}
-
-// Usage
 Text(error.title)
     .font(AppTypography.title2.font)
 ```
 
-### Dynamic Type Support
+No `.font(.system(size: 16))`: a fixed size ignores the user's text size. When a number is unavoidable (an icon), scale it with `@ScaledMetric`, as `IconType.image(size:color:)` does in `AppIcons.swift`.
 
-```swift
-// Always support Dynamic Type
-Text("Hello")
-    .font(.body)  // Scales with user's text size preference
-
-// Use scaledMetric for custom sizes
-@ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 24
-
-// Never use fixed font sizes for body text
-Text("Hello")
-    .font(.system(size: 16))  // WRONG: Won't scale
-```
-
----
-
-## Accessibility Requirements
-
-### Minimum Standards
-
-| Requirement | Value | Notes |
-|-------------|-------|-------|
-| **Contrast Ratio** | >= 4.5:1 | Text on background (WCAG AA) |
-| **Large Text Contrast** | >= 3:1 | For 18pt+ or 14pt+ bold |
-| **Touch Targets** | >= 44x44 pt | All interactive elements |
-| **Dynamic Type** | Up to 200% | Text must not truncate |
-
-### Touch Target Sizes
-
-```swift
-// Ensure minimum 44x44 touch target
-Button(action: {}) {
-    Image(systemName: "plus")
-}
-.frame(minWidth: 44, minHeight: 44)
-
-// Use .contentShape for expanded hit area
-HStack {
-    Image(systemName: "star")
-    Text("Favorite")
-}
-.contentShape(Rectangle())
-.frame(minHeight: 44)
-.onTapGesture { }
-```
-
-### Accessibility Labels
-
-```swift
-// Icons without text need labels
-Button(action: delete) {
-    Image(systemName: "trash")
-}
-.accessibilityLabel("Delete item")
-
-// Decorative images should be hidden
-Image("decorative-pattern")
-    .accessibilityHidden(true)
-
-// Meaningful images need descriptions
-Image("product-photo")
-    .accessibilityLabel("Blue sneakers, side view")
-```
-
-### VoiceOver Best Practices
-
-```swift
-// Group related elements
-HStack {
-    Image(systemName: "star.fill")
-    Text("4.5")
-    Text("(120 reviews)")
-}
-.accessibilityElement(children: .combine)
-.accessibilityLabel("Rating: 4.5 stars, 120 reviews")
-
-// Custom actions
-.accessibilityAction(named: "Mark as favorite") {
-    toggleFavorite()
-}
-
-// Hints for complex interactions
-.accessibilityHint("Double tap to open details, swipe up for more options")
-```
-
----
-
-## Spacing
-
-### Spacing Scale
+### Spacing
 
 ```swift
 // Core/DesignSystem/Tokens/Spacing.swift
-import SwiftUI
-
-// MARK: - Spacing
-
 enum Spacing {
     static let xs: CGFloat = 4
     static let sm: CGFloat = 8
@@ -283,198 +66,61 @@ enum Spacing {
 }
 ```
 
-`Spacing.md` (16pt) is the default padding used by the generated screens.
+`Spacing.md` is the default padding of generated screens. Use the scale for `padding` and stack `spacing`; no numeric literals in Views. The same folder holds `IconSize` (`sm` 16, `md` 24, `lg` 32, `xl` 48) and `AppIcons` (typed SF Symbols and `IconType`).
 
-### Usage
+## Shared Components
 
-```swift
-VStack(spacing: Spacing.sm) {
-    Text("Title")
-    Text("Subtitle")
-}
-.padding(Spacing.md)
-```
+| Path | Contents |
+|---|---|
+| `Core/Common/SwiftUI/Components/` | `ErrorView` (takes an `ErrorDecorator`), `LoadingStateView` |
+| `Core/Common/SwiftUI/Modifiers/` | `.primaryButtonStyle(isEnabled:)`, `.customListRow(top:leading:bottom:trailing:)` |
+| `Core/Common/SwiftUI/Builders/` | `.if(_:transform:)` |
 
----
+A view or modifier used by two or more features goes here and reads only tokens. A subview used by one screen stays in `Features/<Feature>/UI/Components/`. Prefer system button styles (`.borderedProminent`, `.bordered`, `role: .destructive`) and `.primaryButtonStyle()` over one-off styling.
 
-## Component Patterns
+## Rules for Views
 
-### Buttons
+- Interactive elements have a hit area of at least 44x44 pt (`.frame(minWidth: 44, minHeight: 44)`, or `.contentShape` on a larger frame). Smaller targets get missed.
+- Text contrast is at least 4.5:1, or 3:1 for large text. Semantic colors already meet it; check every custom pair in Light and Dark.
+- Layouts hold up to the accessibility Dynamic Type sizes without truncation: let text wrap and change the layout instead of shrinking fonts.
+- Icon-only buttons carry an `.accessibilityLabel`, decorative images are `.accessibilityHidden(true)`, and meaning is never conveyed by color alone.
+- Accessibility identifiers for UI tests are covered in `ui-testing.md`.
 
-```swift
-// Primary action (system style)
-Button("Save") { }
-    .buttonStyle(.borderedProminent)
+## Adaptive Layout
 
-// Primary action (generated design-system modifier, Core/Common/SwiftUI/Modifiers/PrimaryButtonStyle.swift)
-Button("Save") { }
-    .primaryButtonStyle()
-
-// Secondary action
-Button("Cancel") { }
-    .buttonStyle(.bordered)
-
-// Tertiary/text action
-Button("Learn more") { }
-    .buttonStyle(.plain)
-    .foregroundStyle(.tint)
-
-// Destructive action
-Button("Delete", role: .destructive) { }
-```
-
-### Lists
+Do not branch with `if sizeClass == .compact { VStack } else { HStack }`. The `if` destroys and recreates the children, so scroll position, focus and text being typed are lost, and the size class alone does not describe a narrow window on iPad. Let the layout adapt:
 
 ```swift
-// Grouped list (settings-style)
-List {
-    Section("Account") {
-        NavigationLink("Profile") { }
-        NavigationLink("Security") { }
-    }
-}
-.listStyle(.insetGrouped)
-
-// Plain list (content-style)
-List(items) { item in
-    ItemRow(item: item)
-}
-.listStyle(.plain)
-```
-
----
-
-## SF Symbols
-
-### Symbol Selection
-
-```swift
-// Use filled variants for selected/active states
-Image(systemName: isSelected ? "star.fill" : "star")
-
-// Use semantic symbols when available
-Image(systemName: "person.crop.circle")  // Profile
-Image(systemName: "gear")                // Settings
-Image(systemName: "magnifyingglass")     // Search
-Image(systemName: "plus")               // Add
-Image(systemName: "trash")              // Delete
-```
-
-### Symbol Configuration
-
-```swift
-// Size with font
-Image(systemName: "star.fill")
-    .font(.title)
-
-// With rendering mode
-Image(systemName: "heart.fill")
-    .symbolRenderingMode(.multicolor)
-
-// With variable value (iOS 16+)
-Image(systemName: "speaker.wave.3.fill", variableValue: 0.75)
-```
-
----
-
-## Safe Areas & Layout
-
-### Respect Safe Areas
-
-```swift
-// Content respects safe areas by default
-VStack {
-    Text("Content")
-}
-
-// Backgrounds can extend into safe areas
-VStack {
-    Text("Content")
-}
-.background(Color.blue.ignoresSafeArea())
-
-// Don't ignore safe areas for interactive content
-```
-
-### Adaptive Layouts
-
-```swift
-// Respond to size class
-@Environment(\.horizontalSizeClass) var sizeClass
-
-var body: some View {
-    if sizeClass == .compact {
-        VStack { content }
-    } else {
-        HStack { content }
-    }
-}
-
-// Or use ViewThatFits
 ViewThatFits {
-    HStack { content }
-    VStack { content }
+    HStack { title; actions }
+    VStack(alignment: .leading) { title; actions }
 }
 ```
 
----
+`ViewThatFits` shows the first variant that fits. When the switch must animate or follows a condition (size class, `dynamicTypeSize.isAccessibilitySize`), choose between `AnyLayout(HStackLayout())` and `AnyLayout(VStackLayout())` and keep a single content closure.
 
-## Checklist Before Release
+## Liquid Glass (iOS 26+)
 
-### Visual Review
-
-- [ ] Test in Light Mode
-- [ ] Test in Dark Mode
-- [ ] Test with Increased Contrast enabled
-- [ ] Test at smallest Dynamic Type size
-- [ ] Test at largest Dynamic Type size (Accessibility sizes)
-- [ ] Verify contrast ratios meet 4.5:1 minimum
-
-### Accessibility Review
-
-- [ ] All interactive elements have 44x44pt minimum touch targets
-- [ ] All icons have accessibility labels
-- [ ] VoiceOver navigation makes sense
-- [ ] Screen reader announces content in logical order
-- [ ] No information conveyed by color alone
-
-### Layout Review
-
-- [ ] Content respects safe areas
-- [ ] Works in portrait and landscape (if supported)
-- [ ] Works on all supported device sizes
-- [ ] Text doesn't truncate at large Dynamic Type sizes
-
----
-
-## SwiftUI Accessibility Modifiers Reference
+- Standard bars and controls adopt Liquid Glass on iOS 26 and later as soon as the app is built with the iOS 26 SDK or a newer one; they need no code. Do not plan around the `UIDesignRequiresCompatibility` opt-out: an app built with the iOS 27 SDK ignores it on iOS 27.
+- Glass belongs to controls and the navigation layer: toolbars, floating buttons, custom bars over content. Never put it on content; list rows, cards and section backgrounds keep their color or material.
+- API: `.glassEffect()` (or `.glassEffect(.regular, in: shape)`), `GlassEffectContainer { }` around glass elements that sit close together, and `.buttonStyle(.glass)` / `.buttonStyle(.glassProminent)` for buttons.
+- An existing material is not converted for you: `.background(.regularMaterial)` stays a material until you replace it.
+- With a deployment target below iOS 26 (the generator defaults to iOS 18), gate every glass call and keep a designed fallback:
 
 ```swift
-// Labels and Descriptions
-.accessibilityLabel("Close button")
-.accessibilityHint("Double tap to dismiss")
-.accessibilityValue("50 percent")
-
-// Traits
-.accessibilityAddTraits(.isHeader)
-.accessibilityAddTraits(.isButton)
-.accessibilityAddTraits(.isSelected)
-.accessibilityRemoveTraits(.isImage)
-
-// Grouping
-.accessibilityElement(children: .combine)
-.accessibilityElement(children: .contain)
-.accessibilityElement(children: .ignore)
-
-// Actions
-.accessibilityAction(named: "Delete") { delete() }
-.accessibilityAdjustableAction { direction in
-    // Handle increment/decrement
+if #available(iOS 26, *) {
+    content.glassEffect(.regular, in: .rect(cornerRadius: 16))
+} else {
+    content.background(.ultraThinMaterial, in: .rect(cornerRadius: 16))
 }
-
-// Ordering
-.accessibilitySortPriority(1)
-
-// Hiding
-.accessibilityHidden(true)
 ```
+
+## Before Release
+
+- [ ] Light and Dark Mode, plus Increase Contrast.
+- [ ] Smallest and largest Dynamic Type sizes: nothing truncated, nothing overlapping.
+- [ ] Every interactive element is reachable and labelled with VoiceOver.
+- [ ] No hex colors, fixed font sizes or numeric paddings outside `Core/DesignSystem/Tokens/`.
+- [ ] iOS 26 and the oldest supported iOS: glass and its fallback both look intended.
+
+Deeper reference (Axiom plugin, if installed): `axiom-design` (HIG, Liquid Glass, typography, SF Symbols), `axiom-accessibility` (VoiceOver, Dynamic Type, contrast), `axiom-swiftui` (adaptive layout).

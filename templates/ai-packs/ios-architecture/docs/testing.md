@@ -1,191 +1,58 @@
-# Testing Rules — Swift Testing (`import Testing`)
+# Testing
 
-## Framework
+Unit-test rules for the generated architecture: Swift Testing conventions, what to cover per layer, mocks, and the canonical ViewModel and Repository tests. UI tests are in `ui-testing.md`.
 
-- Use `import Testing` (avoid XCTest except for legacy).
-- Swift Testing is the standard for iOS 18+.
+## Rules
 
-## What to Test (Priority)
+- **Framework.** Unit tests use Swift Testing (`import Testing`, `@Suite`, `@Test`, `#expect`). XCTest stays only for UI tests (`ui-testing.md`) and performance metrics (`XCTMetric`).
+- **Suite.** A `struct` that holds `sut` and its mocks as `private var` and builds them in a synchronous `init()`. Every test gets a fresh instance, so no state leaks between tests. Make `init` `async` only when it awaits something.
+- **Names.** Given/When/Then goes in the display name, `@Test("Given …, when …, then …")`. The function is `<method>_<condition>_<expectedResult>`, as in `load_success_setsLoadedState`.
+- **Body.** No comments inside a test body, phase markers included: the display name already states the scenario. Separate arrange, act and assert with one blank line. `// MARK: -` is fine outside functions.
+- **Determinism.** No `Task.sleep`, no `Date()` in test data (use a fixed value such as `Date(timeIntervalSince1970: 0)`), no dependence on test order: tests run in parallel by default.
+- **State.** The State is `Equatable`, so compare it whole: `#expect(sut.state == .error(.from(.network)))`. Two `.error` states are equal when title and message match. Do not unpack it with `guard case … else { Issue.record(…) }`: that checks the case and ignores the payload.
+- **Unwrapping.** `try #require(…)` for optionals and casts (`let first = try #require(sut.items.first)`), not a bare `as?`, `if let` or `guard let`: the test stops there and reports the failed expression.
+- **Errors.** `#expect(throws:)`, with `await` when the closure is async. Pass a value for `Equatable` errors (`DomainError.notFound`) and a type otherwise (`CancellationError.self`). No `do`/`catch` + `Issue.record` + `as?`: it takes five lines per assertion and passes when nothing is thrown if the `Issue.record` is forgotten.
+- **Known failures.** `withKnownIssue` instead of `.disabled`: the test still compiles and runs, and you are told when the issue is fixed.
+- **Isolation.** `@MainActor` on a suite only when the SUT is MainActor-isolated: ViewModels and Routers. Never on UseCase, Repository or mapper suites: with the generated build settings (no default actor isolation) those types are nonisolated, and an annotated suite would keep compiling if one became MainActor-isolated by mistake. Other isolation modes: `swift-concurrency.md`.
 
-| Priority | Component | What to Verify |
-|----------|-----------|----------------|
-| High | UseCase | Success / error / edge cases / business logic |
-| High | ViewModel | State transitions (loading -> loaded, loading -> error) |
-| High | Error Mapping | `APIError` -> `DomainError` (`DomainError.map` / repository tests) |
-| Medium | Repository | Data and error mapping |
-| Medium | DTOMapper | DTO -> Model mapping |
-| Medium | DecoratorMapper | Model -> Decorator mapping |
-| Low | Router | Emits correct routes |
+## What to test
 
-## File Structure
+| Component | Priority | Cases to cover |
+|---|---|---|
+| UseCase | High | Success; the Repository error propagates unchanged; business rules and edge cases |
+| ViewModel | High | Success -> `.loaded` and `items`; `DomainError` -> `.error(.from(_:))`; any other error -> `.error(.generic)`; `CancellationError` -> previous state, no error shown; `load()` while `.loading` is ignored; navigation passes the right arguments to the Router |
+| Error mapping | High | In the Repository (`DomainError.catching`): each `APIError` -> its `DomainError`, and the mapper is not called; `CancellationError` propagates unmapped |
+| Repository | Medium | Success: data source and mapper called once, mapped models returned |
+| DTOMapper, DecoratorMapper | Medium | Field-by-field mapping with the real `…Impl`, no mocks |
+| Router | Low | Pushes the expected route |
 
-`anvil feature` generates the Domain, Data, Features and Mocks files below for every feature. The test target builds with the same `SWIFT_STRICT_CONCURRENCY = complete` and no default actor isolation as the app.
+## Test target layout
 
-```
-[Project]Tests/
-+- Domain/
-|  +- <Feature>/
-|     +- UseCases/
-|        +- <Feature>UseCaseTests.swift
-+- Data/
-|  +- <Feature>/
-|     +- Repositories/
-|     |  +- <Feature>RepositoryTests.swift
-|     +- Mappers/
-|        +- <Feature>DTOMapperTests.swift
-+- Features/
-|  +- <Feature>/
-|     +- Presentation/
-|        +- ViewModels/
-|        |  +- <Feature>ViewModelTests.swift
-|        +- Mappers/
-|           +- <Feature>DecoratorMapperTests.swift
-+- Core/                                  # Add by hand when needed
-|  +- Networking/
-|     +- APIClientTests.swift
-+- Mocks/
-   +- <Feature>UseCaseMock.swift
-   +- <Feature>RepositoryMock.swift
-   +- <Feature>RouterMock.swift
-   +- <Feature>RemoteDataSourceMock.swift
-   +- <Feature>DTOMapperMock.swift
-   +- <Feature>DecoratorMapperMock.swift
+```text
+[Project]Tests/                     written by `anvil feature Article`; mirrors the app tree
++- Domain/Article/UseCases/ArticleUseCaseTests.swift
++- Data/Article/Repositories/ArticleRepositoryTests.swift
++- Data/Article/Mappers/ArticleDTOMapperTests.swift
++- Features/Article/Presentation/ViewModels/ArticleViewModelTests.swift
++- Features/Article/Presentation/Mappers/ArticleDecoratorMapperTests.swift
++- Mocks/Article{UseCase,Repository,RemoteDataSource,DTOMapper,DecoratorMapper,Router}Mock.swift
++- DataStubs/, UITests/             only with UI tests: see ui-testing.md
 ```
 
-## Naming & Structure
-
-### Given / When / Then Pattern
-
-Use the pattern in the test name or in comments:
-
-```swift
-@Test("Given success, when load, then state is loaded with sections")
-func testGivenSuccessWhenLoadThenStateIsLoaded() async {
-    // Given
-    // When
-    // Then
-}
-```
-
-### Alternative Naming
-
-Also valid: descriptive name without `test` prefix:
-
-```swift
-@Test("Load articles successfully returns loaded state")
-func loadArticlesSuccessfullyReturnsLoadedState() async { }
-```
-
-## Complete Example: ViewModel
-
-```swift
-// [Project]Tests/Features/Article/Presentation/ViewModels/ArticleViewModelTests.swift
-import Testing
-@testable import MyApp
-
-@MainActor
-@Suite("ArticleViewModel Tests")
-struct ArticleViewModelTests {
-
-    // MARK: - Properties
-
-    private var useCaseMock: ArticleUseCaseMock
-    private var decoratorMapperMock: ArticleDecoratorMapperMock
-    private var routerMock: ArticleRouterMock
-    private var sut: ArticleViewModel
-
-    // MARK: - Setup
-
-    init() {
-        useCaseMock = ArticleUseCaseMock()
-        decoratorMapperMock = ArticleDecoratorMapperMock()
-        routerMock = ArticleRouterMock()
-        sut = ArticleViewModel(useCase: useCaseMock,
-                               decoratorMapper: decoratorMapperMock,
-                               router: routerMock)
-    }
-
-    // MARK: - Success
-
-    @Test("Given success, when loadArticles, then state is loaded with sections")
-    func testGivenSuccessWhenLoadThenStateIsLoaded() async {
-        // Given
-        let models = [ArticleModel.stub(id: "123", title: "Test Article")]
-        useCaseMock.executeResult = .success(models)
-
-        // When
-        await sut.loadArticles()
-
-        // Then
-        guard case .loaded(let sections) = sut.state else {
-            Issue.record("Expected loaded state, got \(sut.state)")
-            return
-        }
-        #expect(sections.count >= 1)
-        #expect(useCaseMock.executeCallCount == 1)
-    }
-
-    // MARK: - Error
-
-    @Test("Given DomainError.network, when loadArticles, then state is the network error")
-    func testGivenErrorWhenLoadThenError() async {
-        // Given
-        useCaseMock.executeResult = .failure(DomainError.network)
-
-        // When
-        await sut.loadArticles()
-
-        // Then
-        guard case .error(let errorDecorator) = sut.state else {
-            Issue.record("Expected error state, got \(sut.state)")
-            return
-        }
-        #expect(errorDecorator.title == ErrorDecorator.network.title)
-    }
-
-    // MARK: - Navigation
-
-    @Test("Given articleId, when navigateToDetail, then router is called")
-    func testNavigateToDetailCallsRouter() async {
-        // Given
-        let articleId = "test-article-id"
-
-        // When
-        sut.navigateToDetail(articleId: articleId)
-
-        // Then
-        #expect(routerMock.navigateToDetailCallCount == 1)
-        #expect(routerMock.navigateToDetailArticleId == articleId)
-    }
-}
-```
+The generator covers `fetch()` / `execute()` / `load()`. When a feature grows, extend these suites and mocks instead of starting new files. Nothing is generated for `Core/`: add `[Project]Tests/Core/` by hand.
 
 ## Mocks
 
-### Rules
-
-- Simple mocks, no external frameworks.
-- Naming: `<Feature><Type>Mock` (suffix), one per file in `[Project]Tests/Mocks/`.
-- Mocks of nonisolated protocols (UseCase, Repository, DataSource, mappers) are `final class ...: <Protocol>, @unchecked Sendable`, configured by assigning `Result` properties directly (no async setters). Each test owns its own instances, so the unchecked conformance is safe.
-- Mocks of `@MainActor` protocols (Routers) are `@MainActor final class`.
-- Track calls with plain counters (`var executeCallCount = 0`) and captured arguments.
-
-### Template: UseCase Mock
+- Hand-written, no mocking framework. Named `<Feature><Type>Mock` (suffix), one per file in `[Project]Tests/Mocks/`.
+- Mocks of nonisolated protocols (UseCase, Repository, DataSource, mappers) are `final class <Feature><Type>Mock: <Protocol>, @unchecked Sendable`: a `Result` to stub and a call counter, assigned directly from the test, with no `await` as an `actor` would need.
+- Limit of `@unchecked Sendable`: the mutable state has no lock. That is safe only while each test owns its mocks and the SUT calls them one at a time. If the SUT calls a mock in parallel (`async let`, task group), make that mock an `actor` or guard its state with `Mutex` (`Synchronization`, iOS 18+).
+- Mocks of `@MainActor` protocols (Routers) are `@MainActor final class` with plain properties; they need no `@unchecked Sendable`.
+- Throw what the real layer throws: a DataSource mock throws `APIError`; Repository and UseCase mocks throw `DomainError`. The ViewModel maps only `DomainError`; anything else becomes `.generic`.
 
 ```swift
-// [Project]Tests/Mocks/ArticleUseCaseMock.swift
-import Foundation
-@testable import MyApp
-
-// MARK: - ArticleUseCaseMock
-
 final class ArticleUseCaseMock: ArticleUseCase, @unchecked Sendable {
-    // MARK: - Properties
-
     var executeResult: Result<[ArticleModel], Error> = .success([])
     var executeCallCount = 0
-
-    // MARK: - ArticleUseCase
 
     func execute() async throws -> [ArticleModel] {
         executeCallCount += 1
@@ -194,261 +61,78 @@ final class ArticleUseCaseMock: ArticleUseCase, @unchecked Sendable {
 }
 ```
 
-### Template: Repository Mock
+## ViewModel suite
 
 ```swift
-// [Project]Tests/Mocks/ArticleRepositoryMock.swift
-import Foundation
-@testable import MyApp
-
-// MARK: - ArticleRepositoryMock
-
-final class ArticleRepositoryMock: ArticleRepository, @unchecked Sendable {
-    // MARK: - Properties
-
-    var fetchArticlesResult: Result<[ArticleModel], Error> = .success([])
-    var fetchArticlesCallCount = 0
-
-    // MARK: - ArticleRepository
-
-    func fetchArticles() async throws -> [ArticleModel] {
-        fetchArticlesCallCount += 1
-        return try fetchArticlesResult.get()
-    }
-}
-```
-
-### Template: Router Mock
-
-```swift
-// [Project]Tests/Mocks/ArticleRouterMock.swift
-import Foundation
-@testable import MyApp
-
-// MARK: - ArticleRouterMock
-
 @MainActor
-final class ArticleRouterMock: ArticleRouter {
-
-    // MARK: - Properties
-
-    var navigateToDetailArticleId: String?
-    var navigateToDetailCallCount = 0
-    var goBackCallCount = 0
-
-    // MARK: - ArticleRouter
-
-    func navigateToDetail(articleId: String) {
-        navigateToDetailArticleId = articleId
-        navigateToDetailCallCount += 1
-    }
-
-    func goBack() {
-        goBackCallCount += 1
-    }
-}
-```
-
-## UseCase Tests
-
-```swift
-// [Project]Tests/Domain/Article/UseCases/ArticleUseCaseTests.swift
-import Testing
-@testable import MyApp
-
-@Suite("ArticleUseCaseImpl Tests")
-struct ArticleUseCaseImplTests {
-    // MARK: - Properties
-
-    private var repositoryMock: ArticleRepositoryMock
-    private var sut: ArticleUseCaseImpl
-
-    // MARK: - Setup
+@Suite("ArticleViewModel Tests")
+struct ArticleViewModelTests {
+    private var mockUseCase: ArticleUseCaseMock
+    private var mockDecoratorMapper: ArticleDecoratorMapperMock
+    private var mockRouter: ArticleRouterMock
+    private var sut: ArticleViewModel
 
     init() {
-        repositoryMock = ArticleRepositoryMock()
-        sut = ArticleUseCaseImpl(repository: repositoryMock)
+        mockUseCase = ArticleUseCaseMock()
+        mockDecoratorMapper = ArticleDecoratorMapperMock()
+        mockRouter = ArticleRouterMock()
+        sut = ArticleViewModel(useCase: mockUseCase, decoratorMapper: mockDecoratorMapper, router: mockRouter)
     }
 
-    // MARK: - Tests
+    @Test("Given use case returns models, when load, then state is loaded")
+    func load_success_setsLoadedState() async {
+        mockUseCase.executeResult = .success([ArticleModel(id: "1", name: "First", description: "First item")])
 
-    @Test("Execute returns articles")
-    func executeReturnsArticles() async throws {
-        // Given
-        repositoryMock.fetchArticlesResult = .success([.stub(), .stub()])
+        await sut.load()
 
-        // When
-        let result = try await sut.execute()
-
-        // Then
-        #expect(result.count == 2)
-        #expect(repositoryMock.fetchArticlesCallCount == 1)
+        #expect(sut.state == .loaded)
+        #expect(sut.items.count == 1)
+        #expect(mockUseCase.executeCallCount == 1)
     }
 
-    @Test("Execute propagates the repository DomainError unchanged")
-    func executePropagatesError() async {
-        // Given
-        repositoryMock.fetchArticlesResult = .failure(DomainError.network)
+    @Test("Given use case throws DomainError.network, when load, then state is the network error")
+    func load_domainError_setsMappedErrorState() async {
+        mockUseCase.executeResult = .failure(DomainError.network)
 
-        // When/Then
-        do {
-            _ = try await sut.execute()
-            Issue.record("Expected error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .network)
-        }
+        await sut.load()
+
+        #expect(sut.state == .error(.from(.network)))
+    }
+
+    @Test("Given a loaded screen, when a reload is cancelled, then the loaded state is kept")
+    func load_cancelled_restoresPreviousState() async {
+        mockUseCase.executeResult = .success([ArticleModel(id: "1", name: "First", description: "First item")])
+        await sut.load()
+        mockUseCase.executeResult = .failure(CancellationError())
+
+        await sut.load()
+
+        #expect(sut.state == .loaded)
+        #expect(sut.items.count == 1)
     }
 }
 ```
 
-UseCase suites don't need `@MainActor`: UseCases are nonisolated.
-
-## Repository Tests (Error Mapping)
-
-The repository is where `APIError` becomes `DomainError`, so test the mapping there:
+## Repository: error mapping and cancellation
 
 ```swift
-// [Project]Tests/Data/Article/Repositories/ArticleRepositoryTests.swift
-
 @Test("Given data source throws HTTP 404, when fetch, then throws DomainError.notFound")
-func fetchMapsNotFound() async {
-    // Given
-    remoteDataSourceMock.fetchArticlesResult = .failure(APIError.httpError(statusCode: 404, data: nil))
+func fetch_dataSourceThrows_throwsDomainError() async {
+    mockRemoteDataSource.fetchResult = .failure(APIError.httpError(statusCode: 404, data: nil))
 
-    // When / Then
-    do {
-        _ = try await sut.fetchArticles()
-        Issue.record("Expected error to be thrown")
-    } catch {
-        #expect(error as? DomainError == .notFound)
-        #expect(dtoMapperMock.mapMultipleCallCount == 0)
-    }
+    await #expect(throws: DomainError.notFound) { try await sut.fetch() }
+    #expect(mockDTOMapper.mapMultipleCallCount == 0)
+}
+
+@Test("Given data source is cancelled, when fetch, then CancellationError propagates")
+func fetch_cancelled_propagatesCancellationError() async {
+    mockRemoteDataSource.fetchResult = .failure(CancellationError())
+
+    await #expect(throws: CancellationError.self) { try await sut.fetch() }
 }
 ```
 
-## Stubs
+## Running tests and deeper reference
 
-Add `.stub()` extensions to facilitate test data creation:
-
-```swift
-// [Project]Tests/Support/Stubs/ArticleModel+Stub.swift
-@testable import MyApp
-
-extension ArticleModel {
-    static func stub(
-        id: String = "stub-id",
-        title: String = "Stub Article",
-        body: String = "Stub body",
-        category: Category = .news,
-        publishedAt: Date = Date()
-    ) -> ArticleModel {
-        ArticleModel(
-            id: id,
-            title: title,
-            body: body,
-            category: category,
-            publishedAt: publishedAt
-        )
-    }
-}
-```
-
-## Typical Cases to Cover
-
-| Case | What to Verify |
-|------|----------------|
-| Success | State `.loaded`, sections with correct data |
-| Known error | `DomainError` -> State `.error` with the matching `ErrorDecorator` (`ErrorDecorator.from(_:)`) |
-| Unknown error | State `.error` with `.generic` decorator |
-| Loading | State `.loading` before completion |
-| Idempotency | Call twice, verify expected behavior (`load()` ignores calls while `.loading`) |
-| Cancellation | `CancellationError` restores the previous state, no error shown |
-| Parameters | Mock captured correct parameters |
-
-## Tips
-
-- Keep tests deterministic (no long sleeps).
-- Use `Issue.record()` instead of `XCTFail()`.
-- Use `#expect()` instead of `XCTAssert*()`.
-- ViewModel tests need `@MainActor`.
-- Prefer simple stubs over complex fixtures.
-- Use `// MARK: -` to organize sections in tests.
-
----
-
-## Advanced Patterns
-
-### Confirmation for Async Events
-
-Use `confirmation` when testing that async events occur:
-
-```swift
-@Test("Notification is sent when article is saved")
-func testNotificationSent() async throws {
-    await confirmation("Article saved notification") { confirm in
-        let repository = ArticleRepositoryImpl()
-
-        NotificationCenter.default.addObserver(
-            forName: .articleSaved,
-            object: nil,
-            queue: nil
-        ) { _ in
-            confirm()
-        }
-
-        try await repository.save(ArticleModel.stub())
-    }
-}
-```
-
-### .serialized Trait for Test Isolation
-
-Use `.serialized` when tests must run sequentially (shared state, filesystem, etc.):
-
-```swift
-@Suite("Database Tests", .serialized)
-struct DatabaseTests {
-
-    @Test func testSave() async throws {
-        // First test modifies database
-    }
-
-    @Test func testFetch() async throws {
-        // Second test reads database
-        // Runs AFTER testSave completes
-    }
-}
-```
-
-### Parameterized Tests
-
-```swift
-@Test("Category maps to correct section title", arguments: [
-    (ArticleModel.Category.news, "News"),
-    (ArticleModel.Category.tutorial, "Tutorial")
-])
-func testCategoryMapping(category: ArticleModel.Category, expectedTitle: String) {
-    let mapper = ArticleDecoratorMapperImpl()
-    let models = [ArticleModel.stub(category: category)]
-
-    let sections = mapper.mapToSections(models)
-
-    #expect(sections.first?.title == expectedTitle)
-}
-```
-
-### Testing MainActor Isolation
-
-```swift
-@MainActor
-@Test("ViewModel updates state on MainActor")
-func testMainActorIsolation() async {
-    let viewModel = ArticleViewModel(...)
-
-    #expect(viewModel.state == .idle)
-
-    await viewModel.loadArticles()
-
-    #expect(viewModel.state == .loaded([]))
-}
-```
+- Commands to run the tests: `tooling.md`.
+- Deeper reference (Axiom plugin, if installed): `axiom-testing` (`skills/swift-testing.md`, `skills/testing-async.md`) for confirmations, parameterized tests, traits and `.serialized`.
