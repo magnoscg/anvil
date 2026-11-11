@@ -45,6 +45,9 @@ struct {{ .FeatureName }}View: View {
 private extension {{ .FeatureName }}View {
     var loadingView: some View {
         LoadingStateView()
+{{- if .IncludeUITests }}
+            .accessibilityIdentifier({{ .FeatureName }}AccessibilityID.loadingIndicator)
+{{- end }}
     }
 
     var loadedView: some View {
@@ -58,10 +61,16 @@ private extension {{ .FeatureName }}View {
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, Spacing.md)
+{{- if .IncludeUITests }}
+                    .accessibilityIdentifier({{ .FeatureName }}AccessibilityID.itemRow(id: item.id))
+{{- end }}
                 }
             }
             .padding(.vertical, Spacing.md)
         }
+{{- if .IncludeUITests }}
+        .accessibilityIdentifier({{ .FeatureName }}AccessibilityID.itemList)
+{{- end }}
     }
 
     func errorView(error: ErrorDecorator) -> some View {
@@ -70,6 +79,12 @@ private extension {{ .FeatureName }}View {
             message: error.message,
             retryAction: { [viewModel] in Task { await viewModel.load() } }
         )
+{{- if .IncludeUITests }}
+        return ErrorView(error: retryError, retryButtonID: {{ .FeatureName }}AccessibilityID.retryButton)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier({{ .FeatureName }}AccessibilityID.errorView)
+{{- else }}
         return ErrorView(error: retryError)
+{{- end }}
     }
 }

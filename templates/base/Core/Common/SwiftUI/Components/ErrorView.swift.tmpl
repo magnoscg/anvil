@@ -8,11 +8,14 @@ struct ErrorView: View {
     // MARK: - Properties
 
     let error: ErrorDecorator
+    let retryButtonID: String?
 
     // MARK: - Init
 
-    init(error: ErrorDecorator) {
+    /// `retryButtonID` is the accessibility identifier of the retry button, for UI tests.
+    init(error: ErrorDecorator, retryButtonID: String? = nil) {
         self.error = error
+        self.retryButtonID = retryButtonID
     }
 
     // MARK: - Body
@@ -58,6 +61,7 @@ private extension ErrorView {
                 retryAction()
             }
             .primaryButtonStyle()
+            .accessibilityIdentifier(retryButtonID ?? "")
         }
     }
 }

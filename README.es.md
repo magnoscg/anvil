@@ -25,7 +25,7 @@
 
 **🏗️ Un proyecto que compila desde el primer día**
 
-`anvil init` escribe un `.xcodeproj` nativo con las capas App, Core, Domain, Data y Features, un scheme por entorno y un target de tests. Sin Tuist ni XcodeGen.
+`anvil init` escribe un `.xcodeproj` nativo con las capas App, Core, Domain, Data y Features, un scheme por entorno y targets de tests unitarios y de UI. Sin Tuist ni XcodeGen.
 
 </td>
 <td width="33%" valign="top">
@@ -182,6 +182,8 @@ flowchart TB
 │   ├── Features/       pantallas: UI, ViewModels, routers y factories
 │   └── Resources/      assets y String Catalog
 ├── <ProjectName>Tests/ tests unitarios que replican el árbol de código
+├── <ProjectName>UITests/ UI tests: Page Objects y tests de pantalla
+├── Shared/             se compila en la app y en los UI tests: ids de accesibilidad, claves de lanzamiento
 ├── <ProjectName>.xcodeproj
 └── .anvil.yml          marcador que lee anvil feature
 ```

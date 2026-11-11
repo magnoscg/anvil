@@ -3,17 +3,11 @@ import Foundation
 // MARK: - {{ .FeatureName }}AccessibilityID
 
 /// Accessibility identifiers for {{ .FeatureName }} UI elements.
-/// Used by both production code (.accessibilityIdentifier) and UI tests (Page Objects).
+/// Lives in Shared/, compiled into the app and the UI test target, so the View and the Page Object
+/// read the same strings. There is no screen-wide id: SwiftUI hands a container's identifier to its
+/// only child and overrides the child's own, so a state element marks the screen instead.
 enum {{ .FeatureName }}AccessibilityID {
-    // MARK: - Screen
-
-    static let screen = "{{ .FeatureNameSnake }}_screen"
-
-    // MARK: - Navigation
-
-    static let navigationTitle = "{{ .FeatureNameSnake }}_navigation_title"
-
-    // MARK: - Content
+    // MARK: - States
 
     static let loadingIndicator = "{{ .FeatureNameSnake }}_loading"
     static let errorView = "{{ .FeatureNameSnake }}_error"

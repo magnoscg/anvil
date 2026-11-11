@@ -1,0 +1,44 @@
+import XCTest
+
+// MARK: - {{ .FeatureName }}ScreenTests
+
+/// UI tests for the {{ .FeatureName }} screen on stub data.
+/// Uses Page Object pattern via {{ .FeatureName }}Screen for readable, maintainable tests.
+final class {{ .FeatureName }}ScreenTests: XCTestCase {
+    // MARK: - Setup
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
+    // MARK: - Tests
+
+    @MainActor
+    func testScreenLoadsSuccessfully() {
+        let screen = {{ .FeatureName }}Screen.launch()
+
+        screen.waitForScreen()
+
+        XCTAssertTrue(screen.isLoaded, "{{ .FeatureName }} screen should be loaded")
+    }
+
+    @MainActor
+    func testItemListDisplaysItems() {
+        let screen = {{ .FeatureName }}Screen.launch()
+
+        screen.waitForItems()
+
+        XCTAssertTrue(screen.hasItems, "Item list should be displayed")
+        XCTAssertTrue(screen.item(id: "stub-1").exists, "First stub item should be displayed")
+    }
+
+    @MainActor
+    func testErrorScenarioShowsRetryButton() {
+        let screen = {{ .FeatureName }}Screen.launch(fixture: "error")
+
+        screen.waitForError()
+
+        XCTAssertTrue(screen.isShowingError, "Error view should be displayed")
+        XCTAssertTrue(screen.retryButton.exists, "Retry button should be displayed")
+    }
+}

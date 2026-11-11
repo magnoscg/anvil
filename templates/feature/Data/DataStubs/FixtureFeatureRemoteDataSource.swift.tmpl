@@ -1,16 +1,16 @@
+#if DEBUG
 import Foundation
-@testable import {{ .ProjectName }}
 
 // MARK: - Fixture{{ .FeatureName }}RemoteDataSource
 
-/// Fixture scenarios for {{ .FeatureName }} UI tests.
-/// Each case represents a deterministic test scenario.
+/// Fixture scenarios for {{ .FeatureName }} UI tests. A UI test selects one by its raw value
+/// (`UITestLaunch.fixtureKey(screen: "{{ .FeatureName }}")`); Debug builds only.
 enum Fixture{{ .FeatureName }}RemoteDataSource: String {
     // MARK: - Cases
 
-    case `default` = "default"
-    case empty = "empty"
-    case error = "error"
+    case `default`
+    case empty
+    case error
 
     // MARK: - Sample Data
 
@@ -20,3 +20,4 @@ enum Fixture{{ .FeatureName }}RemoteDataSource: String {
         {{ .FeatureName }}DTO(id: "stub-3", name: "Stub Item 3", description: "Third stub item"),
     ]
 }
+#endif

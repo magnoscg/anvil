@@ -47,5 +47,5 @@ These contradict the pack docs and are not intentional. Fix them here, not in th
   `<Feature><Type>Mock`, `final class ... @unchecked Sendable`.
 - Test bodies carry `// Given`, `// When`, `// Then` comments, and use `guard case` with `Issue.record`
   where `#expect` and `try #require` apply.
-- There is no UI test target and no `accessibilityIdentifier` in the app, so `ui-testing.md` is not
-  exercised here.
+- There is no UI test code, no `Shared/` group, no `UITestScreenRegistry` and no `accessibilityIdentifier`
+  in the app, so `ui-testing.md` is not exercised here.

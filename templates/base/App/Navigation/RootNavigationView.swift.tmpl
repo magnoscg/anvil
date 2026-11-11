@@ -32,7 +32,7 @@ struct RootNavigationView: View {
 
     var body: some View {
         NavigationStack(path: $appRouter.path) {
-            Text(String(localized: "root.placeholder.title"))
+            rootView
 {{- if .IncludeExample }}
                 .withExampleRoutes(appRouter: appRouter, dependencies: dependencies)
 {{- end }}
@@ -41,7 +41,7 @@ struct RootNavigationView: View {
             coordinator.handleDeepLink(url)
         }
         .task {
-            coordinator.restoreNavigationState(from: navigationData)
+            coordinator.restoreNavigationState(from: restorableNavigationData)
         }
         .onChange(of: appRouter.path) { _, _ in
             coordinator.saveNavigationStateDebounced { data in
@@ -49,4 +49,44 @@ struct RootNavigationView: View {
             }
         }
     }
+}
+
+// MARK: - Root Content
+
+private extension RootNavigationView {
+    @ViewBuilder
+    var rootView: some View {
+        #if DEBUG
+        if let uiTestScreen {
+            uiTestScreen
+        } else {
+            placeholderView
+        }
+        #else
+        placeholderView
+        #endif
+    }
+
+    var placeholderView: some View {
+        Text(String(localized: "root.placeholder.title"))
+    }
+
+    /// Saved navigation is ignored in UI test mode, so every UI test starts from its own root.
+    var restorableNavigationData: Data? {
+        #if DEBUG
+        if ProcessInfo.isUITestMode {
+            return nil
+        }
+        #endif
+        return navigationData
+    }
+
+    #if DEBUG
+    var uiTestScreen: AnyView? {
+        guard ProcessInfo.isUITestMode, let screen = ProcessInfo.uiTestScreen else {
+            return nil
+        }
+        return UITestScreenRegistry.makeView(screen: screen, appRouter: appRouter, dependencies: dependencies)
+    }
+    #endif
 }

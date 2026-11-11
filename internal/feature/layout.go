@@ -237,28 +237,28 @@ func mockJobs(name string, cfg config.FeatureConfig) []FileJob {
 func uiTestJobs(name string) []FileJob {
 	return []FileJob{
 		{
-			TemplatePath: "feature/Features/FeatureAccessibilityID.swift.tmpl",
-			DestPath:     filepath.Join("Features", name, "UI", name+"AccessibilityID.swift"),
+			TemplatePath: "feature/Shared/FeatureAccessibilityID.swift.tmpl",
+			DestPath:     filepath.Join("Shared", "AccessibilityIDs", name+"AccessibilityID.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/DataStubs/StubFeatureRemoteDataSource.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "DataStubs", name, "Stub"+name+"RemoteDataSource.swift"),
+			TemplatePath: "feature/Data/DataStubs/StubFeatureRemoteDataSource.swift.tmpl",
+			DestPath:     filepath.Join("Data", name, "DataStubs", "Stub"+name+"RemoteDataSource.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/DataStubs/FixtureFeatureRemoteDataSource.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "DataStubs", name, "Fixture"+name+"RemoteDataSource.swift"),
+			TemplatePath: "feature/Data/DataStubs/FixtureFeatureRemoteDataSource.swift.tmpl",
+			DestPath:     filepath.Join("Data", name, "DataStubs", "Fixture"+name+"RemoteDataSource.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/UITests/FeatureScreenTests.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "UITests", "Screens", name+"ScreenTests.swift"),
+			TemplatePath: "feature/UITests/FeatureScreenTests.swift.tmpl",
+			DestPath:     filepath.Join("UITests", "Screens", name+"ScreenTests.swift"),
 			Conditional:  true,
 		},
 		{
-			TemplatePath: "feature/Tests/UITests/FeatureScreen.swift.tmpl",
-			DestPath:     filepath.Join("Tests", "UITests", "Support", "Screens", name+"Screen.swift"),
+			TemplatePath: "feature/UITests/FeatureScreen.swift.tmpl",
+			DestPath:     filepath.Join("UITests", "Support", "Screens", name+"Screen.swift"),
 			Conditional:  true,
 		},
 	}

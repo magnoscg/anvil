@@ -512,8 +512,31 @@ func TestRollbackRemovesOnlyCreatedFiles(t *testing.T) {
 	}
 }
 
+// uiTestRegistryFixture is the registry that anvil init emits, reduced to the lines the forge edits.
+const uiTestRegistryFixture = `@MainActor
+enum UITestScreenRegistry {
+    static let screens: [UITestScreen] = [
+        // anvil:ui-test-screens
+    ]
+}
+`
+
+// writeUITestRegistry creates the UI test registry of an anvil init project under dir.
+func writeUITestRegistry(t *testing.T, dir, projectName, content string) string {
+	t.Helper()
+	path := filepath.Join(dir, projectName, "App", "Navigation", "UITestScreenRegistry.swift")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestForgeWithUITests(t *testing.T) {
 	dir := t.TempDir()
+	registry := writeUITestRegistry(t, dir, "MyApp", uiTestRegistryFixture)
 
 	renderer := &stubRenderer{}
 	forge := NewFeatureForge(renderer)
@@ -536,46 +559,108 @@ func TestForgeWithUITests(t *testing.T) {
 		t.Errorf("FilesCreated count = %d, want %d", len(result.FilesCreated), want)
 	}
 
-	hasAccessibilityID := false
-	hasStub := false
-	hasFixture := false
-	hasScreenTests := false
-	hasScreen := false
-
+	created := make(map[string]bool, len(result.FilesCreated))
 	for _, f := range result.FilesCreated {
-		switch filepath.Base(f) {
-		case "PokemonAccessibilityID.swift":
-			hasAccessibilityID = true
-		case "StubPokemonRemoteDataSource.swift":
-			hasStub = true
-		case "FixturePokemonRemoteDataSource.swift":
-			hasFixture = true
-		case "PokemonScreenTests.swift":
-			hasScreenTests = true
-		case "PokemonScreen.swift":
-			hasScreen = true
+		created[f] = true
+	}
+	for _, want := range []string{
+		filepath.Join("Shared", "AccessibilityIDs", "PokemonAccessibilityID.swift"),
+		filepath.Join("MyApp", "Data", "Pokemon", "DataStubs", "StubPokemonRemoteDataSource.swift"),
+		filepath.Join("MyApp", "Data", "Pokemon", "DataStubs", "FixturePokemonRemoteDataSource.swift"),
+		filepath.Join("MyAppUITests", "Screens", "PokemonScreenTests.swift"),
+		filepath.Join("MyAppUITests", "Support", "Screens", "PokemonScreen.swift"),
+	} {
+		if !created[want] {
+			t.Errorf("expected %s in created files", want)
 		}
 	}
 
-	if !hasAccessibilityID {
-		t.Error("expected PokemonAccessibilityID.swift in created files")
+	content, err := os.ReadFile(registry)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !hasStub {
-		t.Error("expected StubPokemonRemoteDataSource.swift in created files")
+	wantRegistry := `@MainActor
+enum UITestScreenRegistry {
+    static let screens: [UITestScreen] = [
+        UITestScreen(name: "Pokemon") { AnyView(PokemonFactory.makeView(appRouter: $0, dependencies: $1)) },
+        // anvil:ui-test-screens
+    ]
+}
+`
+	if string(content) != wantRegistry {
+		t.Errorf("registry =\n%s\nwant\n%s", content, wantRegistry)
 	}
-	if !hasFixture {
-		t.Error("expected FixturePokemonRemoteDataSource.swift in created files")
+}
+
+func TestForgeWithUITestsKeepsExistingRegistryEntry(t *testing.T) {
+	dir := t.TempDir()
+	existing := `    static let screens: [UITestScreen] = [
+        UITestScreen(name: "Pokemon") { AnyView(PokemonFactory.makeView(appRouter: $0, dependencies: $1)) },
+        // anvil:ui-test-screens
+    ]
+`
+	registry := writeUITestRegistry(t, dir, "MyApp", existing)
+
+	_, err := NewFeatureForge(&stubRenderer{}).Forge(config.FeatureConfig{
+		FeatureName:    "Pokemon",
+		ProjectRoot:    dir,
+		ProjectName:    "MyApp",
+		IncludeUITests: true,
+	})
+	if err != nil {
+		t.Fatalf("Forge failed: %v", err)
 	}
-	if !hasScreenTests {
-		t.Error("expected PokemonScreenTests.swift in created files")
+
+	content, err := os.ReadFile(registry)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !hasScreen {
-		t.Error("expected PokemonScreen.swift in created files")
+	if string(content) != existing {
+		t.Errorf("registry changed:\n%s", content)
+	}
+}
+
+func TestForgeWithUITestsWithoutRegistryWritesNothing(t *testing.T) {
+	tests := []struct {
+		name     string
+		registry string
+	}{
+		{name: "no registry file"},
+		{name: "registry without marker", registry: "enum UITestScreenRegistry {}\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tt.registry != "" {
+				writeUITestRegistry(t, dir, "MyApp", tt.registry)
+			}
+			renderer := &stubRenderer{}
+
+			_, err := NewFeatureForge(renderer).Forge(config.FeatureConfig{
+				FeatureName:    "Pokemon",
+				ProjectRoot:    dir,
+				ProjectName:    "MyApp",
+				IncludeUITests: true,
+			})
+
+			var missing UITestRegistryMissingError
+			if !errors.As(err, &missing) {
+				t.Fatalf("error = %v, want UITestRegistryMissingError", err)
+			}
+			if want := filepath.Join("MyApp", "App", "Navigation", "UITestScreenRegistry.swift"); missing.Path != want {
+				t.Errorf("Path = %q, want %q", missing.Path, want)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "MyApp", "Features", "Pokemon")); !os.IsNotExist(err) {
+				t.Error("no feature file should be written when the registry is missing")
+			}
+		})
 	}
 }
 
 func TestForgeWithAllOptionsIncludingUITests(t *testing.T) {
 	dir := t.TempDir()
+	writeUITestRegistry(t, dir, "MyApp", uiTestRegistryFixture)
 
 	renderer := &stubRenderer{}
 	forge := NewFeatureForge(renderer)
@@ -623,5 +708,41 @@ func TestForgeWiringInstructionsWithRouteResolver(t *testing.T) {
 	// Should have at least 3 instructions (factory, routes modifier, route resolver)
 	if len(result.WiringInstructions) < 3 {
 		t.Errorf("expected at least 3 wiring instructions with RouteResolver, got %d", len(result.WiringInstructions))
+	}
+}
+
+func TestForgeWithUITestsRollsBackWhenRegistryWriteFails(t *testing.T) {
+	dir := t.TempDir()
+	registry := writeUITestRegistry(t, dir, "MyApp", uiTestRegistryFixture)
+	if err := os.Chmod(registry, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(registry, 0o644) })
+
+	_, err := NewFeatureForge(&stubRenderer{}).Forge(config.FeatureConfig{
+		FeatureName:    "Pokemon",
+		ProjectRoot:    dir,
+		ProjectName:    "MyApp",
+		IncludeUITests: true,
+	})
+	if err == nil {
+		t.Fatal("expected an error when the registry cannot be written")
+	}
+
+	for _, path := range []string{
+		filepath.Join(dir, "MyApp", "Features", "Pokemon"),
+		filepath.Join(dir, "Shared", "AccessibilityIDs", "PokemonAccessibilityID.swift"),
+		filepath.Join(dir, "MyAppUITests", "Screens", "PokemonScreenTests.swift"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s should have been rolled back", path)
+		}
+	}
+	content, err := os.ReadFile(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != uiTestRegistryFixture {
+		t.Errorf("registry should be unchanged, got:\n%s", content)
 	}
 }

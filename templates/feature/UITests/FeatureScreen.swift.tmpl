@@ -4,6 +4,7 @@ import XCTest
 
 /// Page Object for the {{ .FeatureName }} screen.
 /// Encapsulates UI element queries and actions for readable UI tests.
+@MainActor
 struct {{ .FeatureName }}Screen {
     // MARK: - Properties
 
@@ -15,10 +16,26 @@ struct {{ .FeatureName }}Screen {
         self.app = app
     }
 
+    // MARK: - Launch
+
+    /// Launches the app with this screen as the root view.
+    /// `fixture` is a scenario of `Fixture{{ .FeatureName }}RemoteDataSource`: "default", "empty" or "error".
+    static func launch(fixture: String? = nil) -> {{ .FeatureName }}Screen {
+        {{ .FeatureName }}Screen(app: .launchForUITesting(screen: "{{ .FeatureName }}", fixture: fixture))
+    }
+
     // MARK: - Elements
 
+    /// The element of whichever state the screen shows: loading, items or error.
     var screenElement: XCUIElement {
-        app.otherElements[{{ .FeatureName }}AccessibilityID.screen]
+        let stateIDs = [
+            {{ .FeatureName }}AccessibilityID.loadingIndicator,
+            {{ .FeatureName }}AccessibilityID.itemList,
+            {{ .FeatureName }}AccessibilityID.errorView,
+        ]
+        return app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier IN %@", stateIDs))
+            .firstMatch
     }
 
     var loadingIndicator: XCUIElement {
@@ -37,6 +54,10 @@ struct {{ .FeatureName }}Screen {
         app.scrollViews[{{ .FeatureName }}AccessibilityID.itemList]
     }
 
+    func item(id: String) -> XCUIElement {
+        app.buttons[{{ .FeatureName }}AccessibilityID.itemRow(id: id)]
+    }
+
     // MARK: - Queries
 
     var isLoaded: Bool {
@@ -45,6 +66,10 @@ struct {{ .FeatureName }}Screen {
 
     var hasItems: Bool {
         itemList.exists
+    }
+
+    var isShowingError: Bool {
+        errorView.exists
     }
 
     // MARK: - Actions
@@ -57,9 +82,12 @@ struct {{ .FeatureName }}Screen {
         _ = itemList.waitForExistence(timeout: timeout)
     }
 
+    func waitForError(timeout: TimeInterval = 10) {
+        _ = errorView.waitForExistence(timeout: timeout)
+    }
+
     func tapItem(id: String) {
-        let item = app.buttons[{{ .FeatureName }}AccessibilityID.itemRow(id: id)]
-        item.tap()
+        item(id: id).tap()
     }
 
     func tapRetry() {

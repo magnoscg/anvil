@@ -1,0 +1,18 @@
+import Foundation
+
+// MARK: - UITestLaunch
+
+/// Launch contract between the UI tests and the app. This folder is compiled into both targets:
+/// the UI tests set these values before `launch()` and the app reads them only in Debug builds.
+enum UITestLaunch {
+    // MARK: - Keys
+
+    static let argument = "--uitesting"
+    static let screenKey = "UITEST_SCREEN"
+
+    // MARK: - Fixtures
+
+    static func fixtureKey(screen: String) -> String {
+        "UITEST_FIXTURE_\(screen)"
+    }
+}
