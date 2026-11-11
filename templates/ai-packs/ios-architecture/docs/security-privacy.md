@@ -28,24 +28,26 @@ enum KeychainError: Error, Sendable {
 }
 
 struct KeychainHelper: Sendable {
-    func save(_ data: Data, for key: String) throws
+    init(service: String = Bundle.main.bundleIdentifier ?? "<bundle id>")
+    func save(_ data: Data, for key: String, accessibility: KeychainAccessibility = .whenUnlocked) throws
     func retrieve(for key: String) throws -> Data
     func delete(for key: String) throws
-    func save<T: Encodable>(_ item: T, for key: String) throws
+    func save<T: Encodable>(_ item: T, for key: String, accessibility: KeychainAccessibility = .whenUnlocked) throws
     func read<T: Decodable>(for key: String) throws -> T
 }
 ```
 
-- `retrieve` and `read` throw `.itemNotFound` when the key is missing. `delete` treats a missing item as success. Any other failure is `.unexpectedStatus(OSStatus)`.
+- `save` updates the item with `SecItemUpdate` and adds it only when it does not exist, so the item keeps its metadata; a concurrent add surfaces as `.duplicateItem`. `retrieve` and `read` throw `.itemNotFound` when the key is missing. `delete` treats a missing item as success. Any other failure is `.unexpectedStatus(OSStatus)`.
 - The generic overloads store JSON and throw `.encodingFailed` or `.decodingFailed`. **One format per key**: a `String` passed straight to `save(_:for:)` selects the generic overload and is stored as quoted JSON, which does not round-trip through `retrieve` plus UTF-8 decoding. Read with the call that matches the write.
-- The helper identifies an item by `key` alone, so keys are app-wide. Prefix them with the feature: `"article.session_token"`.
+- An item is identified by `kSecAttrService` (`service`, the bundle identifier by default) plus `key`, so keys are app-wide within a service. Prefix them with the feature: `"article.session_token"`.
 
 ### Accessibility
 
-The helper stores every item with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`: excluded from backups and readable in the background after the first unlock. It takes no accessibility parameter. The criterion:
+`save` takes a `KeychainAccessibility`. Both levels are `ThisDeviceOnly`: the item never moves to another device through a backup restore or migration.
 
-- A token read only while the app is in use: `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. If the project never reads the Keychain in the background, tighten the level in `save`.
-- `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` only for items read in the background (background refresh, push handling).
+- `.whenUnlocked` (default, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`): readable only while the device is unlocked. Right for tokens used from the UI.
+- `.afterFirstUnlock` (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`): only for items read by background work (background refresh, push handling). Pass it explicitly at the write.
+- The level is applied on every save, so writing an item again with another level changes it.
 - `kSecAttrAccessibleAlways` and `kSecAttrAccessibleAlwaysThisDeviceOnly` are deprecated: do not use.
 - A read that fails because the device is locked (`errSecInteractionNotAllowed`) does not mean the item is broken. Never delete an item on that error.
 - Biometric gating needs `SecAccessControl`, which the helper does not cover.

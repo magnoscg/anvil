@@ -34,7 +34,6 @@ struct Endpoint: Sendable {
     let headers: [String: String]?
     let body: Data?
     let contentType: ContentType
-    let requiresAuthentication: Bool
 
     // MARK: - Init
 
@@ -44,8 +43,7 @@ struct Endpoint: Sendable {
         queryParameters: [String: String]? = nil,
         headers: [String: String]? = nil,
         body: Data? = nil,
-        contentType: ContentType = .json,
-        requiresAuthentication: Bool = true
+        contentType: ContentType = .json
     ) {
         self.path = path
         self.method = method
@@ -53,7 +51,6 @@ struct Endpoint: Sendable {
         self.headers = headers
         self.body = body
         self.contentType = contentType
-        self.requiresAuthentication = requiresAuthentication
     }
 
     // MARK: - URL Building
@@ -93,68 +90,53 @@ struct Endpoint: Sendable {
 extension Endpoint {
     static func get(
         path: String,
-        queryParameters: [String: String]? = nil,
-        requiresAuthentication: Bool = true
+        queryParameters: [String: String]? = nil
     ) -> Endpoint {
         Endpoint(
             path: path,
             method: .get,
-            queryParameters: queryParameters,
-            requiresAuthentication: requiresAuthentication
+            queryParameters: queryParameters
         )
     }
 
     static func post<Body: Encodable>(
         path: String,
         body: Body,
-        encoder: JSONEncoder = JSONEncoder(),
-        requiresAuthentication: Bool = true
+        encoder: JSONEncoder = JSONEncoder()
     ) throws -> Endpoint {
         Endpoint(
             path: path,
             method: .post,
-            body: try encoder.encode(body),
-            requiresAuthentication: requiresAuthentication
+            body: try encoder.encode(body)
         )
     }
 
     static func put<Body: Encodable>(
         path: String,
         body: Body,
-        encoder: JSONEncoder = JSONEncoder(),
-        requiresAuthentication: Bool = true
+        encoder: JSONEncoder = JSONEncoder()
     ) throws -> Endpoint {
         Endpoint(
             path: path,
             method: .put,
-            body: try encoder.encode(body),
-            requiresAuthentication: requiresAuthentication
+            body: try encoder.encode(body)
         )
     }
 
-    static func delete(
-        path: String,
-        requiresAuthentication: Bool = true
-    ) -> Endpoint {
-        Endpoint(
-            path: path,
-            method: .delete,
-            requiresAuthentication: requiresAuthentication
-        )
+    static func delete(path: String) -> Endpoint {
+        Endpoint(path: path, method: .delete)
     }
 
     static func withBody<Body: Encodable>(
         path: String,
         method: HTTPMethod,
         body: Body,
-        encoder: JSONEncoder = JSONEncoder(),
-        requiresAuthentication: Bool = true
+        encoder: JSONEncoder = JSONEncoder()
     ) throws -> Endpoint {
         Endpoint(
             path: path,
             method: method,
-            body: try encoder.encode(body),
-            requiresAuthentication: requiresAuthentication
+            body: try encoder.encode(body)
         )
     }
 }
