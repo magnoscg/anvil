@@ -85,7 +85,7 @@ func buildTestFS() fstest.MapFS {
 		fs[f] = &fstest.MapFile{Data: []byte("// template\n")}
 	}
 
-	// Claude templates (1 .tmpl + 13 .md = 14 files)
+	// Claude templates (1 .tmpl + 12 .md = 13 files)
 	claudeFiles := []string{
 		"ai-packs/ios-architecture/CLAUDE.md.tmpl",
 		"ai-packs/ios-architecture/docs/ARCHITECTURE.md",
@@ -97,10 +97,9 @@ func buildTestFS() fstest.MapFS {
 		"ai-packs/ios-architecture/docs/swiftdata.md",
 		"ai-packs/ios-architecture/docs/networking.md",
 		"ai-packs/ios-architecture/docs/security-privacy.md",
-		"ai-packs/ios-architecture/docs/diagnostics.md",
 		"ai-packs/ios-architecture/docs/testing.md",
-		"ai-packs/ios-architecture/docs/create-tests.md",
-		"ai-packs/ios-architecture/docs/performance.md",
+		"ai-packs/ios-architecture/docs/ui-testing.md",
+		"ai-packs/ios-architecture/docs/tooling.md",
 	}
 	for _, f := range claudeFiles {
 		fs[f] = &fstest.MapFile{Data: []byte("// content\n")}
@@ -180,9 +179,9 @@ func TestProjectLayoutBaseWithClaude(t *testing.T) {
 		t.Fatalf("ProjectLayout failed: %v", err)
 	}
 
-	// 46 base + 14 claude = 60
-	if len(jobs) != 60 {
-		t.Errorf("base+claude: got %d jobs, want 60", len(jobs))
+	// 46 base + 13 claude = 59
+	if len(jobs) != 59 {
+		t.Errorf("base+claude: got %d jobs, want 59", len(jobs))
 		for _, j := range jobs {
 			if j.Condition == "AIPack:ios-architecture" {
 				t.Logf("  claude: %s -> %s (tmpl=%v)", j.TemplatePath, j.DestinationPath, j.IsTemplate)
@@ -196,8 +195,8 @@ func TestProjectLayoutBaseWithClaude(t *testing.T) {
 			claudeCount++
 		}
 	}
-	if claudeCount != 14 {
-		t.Errorf("Claude conditional jobs: got %d, want 14", claudeCount)
+	if claudeCount != 13 {
+		t.Errorf("Claude conditional jobs: got %d, want 13", claudeCount)
 	}
 
 	// Verify mix of template and non-template files
@@ -215,8 +214,8 @@ func TestProjectLayoutBaseWithClaude(t *testing.T) {
 	if tmplCount != 1 {
 		t.Errorf("Claude .tmpl files: got %d, want 1", tmplCount)
 	}
-	if copyCount != 13 {
-		t.Errorf("Claude .md files (copy): got %d, want 13", copyCount)
+	if copyCount != 12 {
+		t.Errorf("Claude .md files (copy): got %d, want 12", copyCount)
 	}
 }
 
@@ -235,9 +234,9 @@ func TestProjectLayoutAllOptions(t *testing.T) {
 		t.Fatalf("ProjectLayout failed: %v", err)
 	}
 
-	// 46 base + 3 swiftdata + 14 claude = 63
-	if len(jobs) != 63 {
-		t.Errorf("all options: got %d jobs, want 63", len(jobs))
+	// 46 base + 3 swiftdata + 13 claude = 62
+	if len(jobs) != 62 {
+		t.Errorf("all options: got %d jobs, want 62", len(jobs))
 	}
 }
 
