@@ -2,39 +2,43 @@ import XCTest
 
 // MARK: - {{ .FeatureName }}ScreenTests
 
-/// UI tests for the {{ .FeatureName }} screen.
+/// UI tests for the {{ .FeatureName }} screen on stub data.
 /// Uses Page Object pattern via {{ .FeatureName }}Screen for readable, maintainable tests.
 final class {{ .FeatureName }}ScreenTests: XCTestCase {
-    // MARK: - Properties
-
-    private var app: XCUIApplication!
-    private var screen: {{ .FeatureName }}Screen!
-
     // MARK: - Setup
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments = ["--uitesting"]
-        app.launch()
-        screen = {{ .FeatureName }}Screen(app: app)
-    }
-
-    override func tearDownWithError() throws {
-        app = nil
-        screen = nil
     }
 
     // MARK: - Tests
 
+    @MainActor
     func testScreenLoadsSuccessfully() {
+        let screen = {{ .FeatureName }}Screen.launch()
+
         screen.waitForScreen()
+
         XCTAssertTrue(screen.isLoaded, "{{ .FeatureName }} screen should be loaded")
     }
 
+    @MainActor
     func testItemListDisplaysItems() {
-        screen.waitForScreen()
+        let screen = {{ .FeatureName }}Screen.launch()
+
         screen.waitForItems()
-        XCTAssertTrue(screen.hasItems, "Item list should display items")
+
+        XCTAssertTrue(screen.hasItems, "Item list should be displayed")
+        XCTAssertTrue(screen.item(id: "stub-1").exists, "First stub item should be displayed")
+    }
+
+    @MainActor
+    func testErrorScenarioShowsRetryButton() {
+        let screen = {{ .FeatureName }}Screen.launch(fixture: "error")
+
+        screen.waitForError()
+
+        XCTAssertTrue(screen.isShowingError, "Error view should be displayed")
+        XCTAssertTrue(screen.retryButton.exists, "Retry button should be displayed")
     }
 }

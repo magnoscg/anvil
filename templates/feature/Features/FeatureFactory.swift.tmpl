@@ -19,7 +19,17 @@ private extension {{ .FeatureName }}Factory {
     // MARK: - DataSources
 
     static func makeRemoteDataSource(apiClient: APIClient) -> {{ .FeatureName }}RemoteDataSource {
+{{- if .IncludeUITests }}
+        #if DEBUG
+        if ProcessInfo.isUITestMode {
+            let scenario = ProcessInfo.uiTestFixture(screen: "{{ .FeatureName }}") ?? ""
+            return Stub{{ .FeatureName }}RemoteDataSource(fixture: Fixture{{ .FeatureName }}RemoteDataSource(rawValue: scenario) ?? .default)
+        }
+        #endif
+        return {{ .FeatureName }}RemoteDataSourceImpl(apiClient: apiClient)
+{{- else }}
         {{ .FeatureName }}RemoteDataSourceImpl(apiClient: apiClient)
+{{- end }}
     }
 {{ if .IncludeLocalDataSource }}
     static func makeLocalDataSource() -> {{ .FeatureName }}LocalDataSource {

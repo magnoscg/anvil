@@ -231,3 +231,65 @@ func TestIntegrationFeatureRenderedContent(t *testing.T) {
 		t.Fatalf("walking feature directory: %v", err)
 	}
 }
+
+func TestIntegrationFeatureWithUITests(t *testing.T) {
+	dir := t.TempDir()
+
+	gen, _ := newRealGenerator()
+	result, err := gen.Generate(context.Background(), testProjectConfig(dir))
+	if err != nil {
+		t.Fatalf("project generation failed: %v", err)
+	}
+	projectDir := result.ProjectDir
+
+	renderer := generator.NewRenderer(generator.TemplateFS, generator.NewDiskWriter())
+	_, err = feature.NewFeatureForge(renderer).Forge(config.FeatureConfig{
+		FeatureName:    "Article",
+		ProjectRoot:    projectDir,
+		ProjectName:    "TestApp",
+		IncludeUITests: true,
+	})
+	if err != nil {
+		t.Fatalf("forge failed: %v", err)
+	}
+
+	read := func(parts ...string) string {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(append([]string{projectDir}, parts...)...))
+		if err != nil {
+			t.Fatalf("reading %s: %v", filepath.Join(parts...), err)
+		}
+		return string(data)
+	}
+
+	checks := []struct {
+		file     []string
+		contains string
+	}{
+		{[]string{"Shared", "UITestLaunch.swift"}, `static let argument = "--uitesting"`},
+		{[]string{"Shared", "AccessibilityIDs", "ArticleAccessibilityID.swift"}, `static let retryButton = "article_retry_button"`},
+		{[]string{"TestAppUITests", "Support", "XCUIApplication+UITesting.swift"}, "static func launchForUITesting"},
+		{[]string{"TestAppUITests", "Support", "Screens", "ArticleScreen.swift"}, "@MainActor\nstruct ArticleScreen"},
+		{[]string{"TestAppUITests", "Screens", "ArticleScreenTests.swift"}, `ArticleScreen.launch(fixture: "error")`},
+		{[]string{"TestApp", "Data", "Article", "DataStubs", "StubArticleRemoteDataSource.swift"}, "throw APIError.httpError(statusCode: 500, data: nil)"},
+		{[]string{"TestApp", "Data", "Article", "DataStubs", "FixtureArticleRemoteDataSource.swift"}, "#if DEBUG"},
+		{[]string{"TestApp", "Features", "Article", "DI", "ArticleFactory.swift"}, `ProcessInfo.uiTestFixture(screen: "Article")`},
+		{[]string{"TestApp", "Features", "Article", "UI", "ArticleView.swift"}, "retryButtonID: ArticleAccessibilityID.retryButton"},
+		{[]string{"TestApp", "App", "Navigation", "UITestScreenRegistry.swift"}, `UITestScreen(name: "Article") { AnyView(ArticleFactory.makeView(appRouter: $0, dependencies: $1)) },
+        // anvil:ui-test-screens`},
+	}
+	for _, c := range checks {
+		if content := read(c.file...); !strings.Contains(content, c.contains) {
+			t.Errorf("%s should contain %q", filepath.Join(c.file...), c.contains)
+		}
+	}
+
+	for _, file := range [][]string{
+		{"TestApp", "Data", "Article", "DataStubs", "StubArticleRemoteDataSource.swift"},
+		{"TestApp", "Data", "Article", "DataStubs", "FixtureArticleRemoteDataSource.swift"},
+	} {
+		if strings.Contains(read(file...), "@testable") {
+			t.Errorf("%s is compiled into the app and must not use @testable import", filepath.Join(file...))
+		}
+	}
+}
