@@ -1,10 +1,10 @@
 import Foundation
 @testable import Arquitectura
 
-// MARK: - MockArchitectureDetailDecoratorMapper
+// MARK: - ArchitectureDetailDecoratorMapperMock
 
 /// Mock implementation of ArchitectureDetailDecoratorMapper for testing
-struct MockArchitectureDetailDecoratorMapper: ArchitectureDetailDecoratorMapper {
+struct ArchitectureDetailDecoratorMapperMock: ArchitectureDetailDecoratorMapper {
     // MARK: - Properties
 
     var mapResult: ArchitectureDetailDecorator?

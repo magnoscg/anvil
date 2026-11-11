@@ -11,16 +11,13 @@ struct PokemonDetailUseCaseTests {
 
     @Test("Execute returns model from repository")
     func executeReturnsModelFromRepository() async throws {
-        // Given
         let expectedModel = makeExpectedModel()
-        let mockRepository = MockPokemonDetailRepository()
-        await mockRepository.setFetchPokemonDetailResult(.success(expectedModel))
+        let mockRepository = PokemonDetailRepositoryMock()
+        mockRepository.fetchPokemonDetailResult = .success(expectedModel)
         let useCase = PokemonDetailUseCaseImpl(repository: mockRepository)
 
-        // When
         let result = try await useCase.execute(pokemonId: 25)
 
-        // Then
         #expect(result.id == expectedModel.id)
         #expect(result.name == expectedModel.name)
         #expect(result.description == expectedModel.description)
@@ -29,49 +26,31 @@ struct PokemonDetailUseCaseTests {
 
     @Test("Execute propagates the repository's DomainError")
     func executePropagatesRepositoryError() async {
-        // Given
-        let mockRepository = MockPokemonDetailRepository()
-        await mockRepository.setFetchPokemonDetailResult(.failure(DomainError.server))
+        let mockRepository = PokemonDetailRepositoryMock()
+        mockRepository.fetchPokemonDetailResult = .failure(DomainError.server)
         let useCase = PokemonDetailUseCaseImpl(repository: mockRepository)
 
-        // When/Then
-        do {
-            _ = try await useCase.execute(pokemonId: 25)
-            #expect(Bool(false), "Expected error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .server)
-        }
+        await #expect(throws: DomainError.server) { try await useCase.execute(pokemonId: 25) }
     }
 
     @Test("Execute propagates CancellationError")
     func executePropagatesCancellationError() async {
-        // Given
-        let mockRepository = MockPokemonDetailRepository()
-        await mockRepository.setFetchPokemonDetailResult(.failure(CancellationError()))
+        let mockRepository = PokemonDetailRepositoryMock()
+        mockRepository.fetchPokemonDetailResult = .failure(CancellationError())
         let useCase = PokemonDetailUseCaseImpl(repository: mockRepository)
 
-        // When/Then
-        do {
-            _ = try await useCase.execute(pokemonId: 25)
-            #expect(Bool(false), "Expected CancellationError to be thrown")
-        } catch {
-            #expect(error is CancellationError)
-        }
+        await #expect(throws: CancellationError.self) { try await useCase.execute(pokemonId: 25) }
     }
 
     @Test("Execute passes correct pokemonId to repository")
     func executePassesCorrectPokemonId() async throws {
-        // Given
-        let mockRepository = MockPokemonDetailRepository()
-        await mockRepository.setFetchPokemonDetailResult(.success(makeExpectedModel()))
+        let mockRepository = PokemonDetailRepositoryMock()
+        mockRepository.fetchPokemonDetailResult = .success(makeExpectedModel())
         let useCase = PokemonDetailUseCaseImpl(repository: mockRepository)
 
-        // When
         _ = try await useCase.execute(pokemonId: 42)
 
-        // Then
-        let lastId = await mockRepository.fetchPokemonDetailLastId
-        #expect(lastId == 42)
+        #expect(mockRepository.fetchPokemonDetailLastId == 42)
     }
 
     // MARK: - Test Helpers

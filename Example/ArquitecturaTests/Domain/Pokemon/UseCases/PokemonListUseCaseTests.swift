@@ -11,22 +11,20 @@ struct PokemonListUseCaseTests {
 
     @Test("Execute converts the page into a limit and offset")
     func executeConvertsPageToOffset() async throws {
-        let mockRepository = MockPokemonListRepository()
-        await mockRepository.setGetPokemonListResult(.success(makeRepositoryResult(hasMore: true)))
+        let mockRepository = PokemonListRepositoryMock()
+        mockRepository.getPokemonListResult = .success(makeRepositoryResult(hasMore: true))
         let useCase = PokemonListUseCaseImpl(repository: mockRepository)
 
         _ = try await useCase.execute(page: 2, pageSize: 20)
 
-        let lastLimit = await mockRepository.lastLimit
-        let lastOffset = await mockRepository.lastOffset
-        #expect(lastLimit == 20)
-        #expect(lastOffset == 40)
+        #expect(mockRepository.lastLimit == 20)
+        #expect(mockRepository.lastOffset == 40)
     }
 
     @Test("Execute returns the repository's Pokemon and pagination info")
     func executeReturnsRepositoryResult() async throws {
-        let mockRepository = MockPokemonListRepository()
-        await mockRepository.setGetPokemonListResult(.success(makeRepositoryResult(hasMore: false)))
+        let mockRepository = PokemonListRepositoryMock()
+        mockRepository.getPokemonListResult = .success(makeRepositoryResult(hasMore: false))
         let useCase = PokemonListUseCaseImpl(repository: mockRepository)
 
         let result = try await useCase.execute(page: 0, pageSize: 20)
@@ -38,30 +36,20 @@ struct PokemonListUseCaseTests {
 
     @Test("Execute propagates the repository's DomainError")
     func executePropagatesDomainError() async {
-        let mockRepository = MockPokemonListRepository()
-        await mockRepository.setGetPokemonListResult(.failure(DomainError.server))
+        let mockRepository = PokemonListRepositoryMock()
+        mockRepository.getPokemonListResult = .failure(DomainError.server)
         let useCase = PokemonListUseCaseImpl(repository: mockRepository)
 
-        do {
-            _ = try await useCase.execute(page: 0, pageSize: 20)
-            Issue.record("Expected an error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .server)
-        }
+        await #expect(throws: DomainError.server) { try await useCase.execute(page: 0, pageSize: 20) }
     }
 
     @Test("Execute propagates CancellationError")
     func executePropagatesCancellation() async {
-        let mockRepository = MockPokemonListRepository()
-        await mockRepository.setGetPokemonListResult(.failure(CancellationError()))
+        let mockRepository = PokemonListRepositoryMock()
+        mockRepository.getPokemonListResult = .failure(CancellationError())
         let useCase = PokemonListUseCaseImpl(repository: mockRepository)
 
-        do {
-            _ = try await useCase.execute(page: 0, pageSize: 20)
-            Issue.record("Expected CancellationError to be thrown")
-        } catch {
-            #expect(error is CancellationError)
-        }
+        await #expect(throws: CancellationError.self) { try await useCase.execute(page: 0, pageSize: 20) }
     }
 
     // MARK: - Helpers

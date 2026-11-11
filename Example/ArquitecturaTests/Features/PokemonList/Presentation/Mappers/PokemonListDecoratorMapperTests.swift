@@ -15,16 +15,13 @@ struct PokemonListDecoratorMapperTests {
 
     @Test("Map single model correctly maps id, name, imageURL, and types")
     func mapSingleModel() {
-        // Given
         let model = PokemonSummaryModel(id: 25,
                                         name: "pikachu",
                                         imageURL: URL(string: "https://example.com/25.png"),
                                         types: [.electric])
 
-        // When
         let decorator = mapper.map(model)
 
-        // Then
         #expect(decorator.id == "25")
         #expect(decorator.name == "Pikachu")
         #expect(decorator.imageURL?.absoluteString == "https://example.com/25.png")
@@ -36,15 +33,12 @@ struct PokemonListDecoratorMapperTests {
 
     @Test("Map array of models returns correct count")
     func mapArrayOfModels() {
-        // Given
         let models = [PokemonSummaryModel(id: 1, name: "bulbasaur", imageURL: nil, types: [.grass, .poison]),
                       PokemonSummaryModel(id: 4, name: "charmander", imageURL: nil, types: [.fire]),
                       PokemonSummaryModel(id: 7, name: "squirtle", imageURL: nil, types: [.water])]
 
-        // When
         let items = mapper.mapToItems(models)
 
-        // Then
         #expect(items.count == 3)
         #expect(items[0].name == "Bulbasaur")
         #expect(items[1].name == "Charmander")
@@ -53,16 +47,13 @@ struct PokemonListDecoratorMapperTests {
 
     @Test("Map empty array returns empty result")
     func mapEmptyArrayReturnsEmpty() {
-        // When
         let items = mapper.mapToItems([])
 
-        // Then
         #expect(items.isEmpty)
     }
 
     @Test("All PokemonType cases map to correct PokemonTypeColor")
     func allTypesMapCorrectly() {
-        // Given
         let typeMapping: [(PokemonType, PokemonTypeColor)] = [(.normal, .normal),
                                                               (.fire, .fire),
                                                               (.water, .water),
@@ -84,11 +75,9 @@ struct PokemonListDecoratorMapperTests {
                                                               (.unknown, .unknown)]
 
         for (pokemonType, expectedColor) in typeMapping {
-            // When
             let model = PokemonSummaryModel(id: 1, name: "test", imageURL: nil, types: [pokemonType])
             let decorator = mapper.map(model)
 
-            // Then
             #expect(decorator.types.first?.typeColor == expectedColor,
                     "Expected \(expectedColor) for \(pokemonType), got \(String(describing: decorator.types.first?.typeColor))")
         }
@@ -96,16 +85,13 @@ struct PokemonListDecoratorMapperTests {
 
     @Test("Model with multiple types maps all types correctly")
     func modelWithMultipleTypes() {
-        // Given
         let model = PokemonSummaryModel(id: 6,
                                         name: "charizard",
                                         imageURL: nil,
                                         types: [.fire, .flying])
 
-        // When
         let decorator = mapper.map(model)
 
-        // Then
         #expect(decorator.types.count == 2)
         #expect(decorator.types[0].typeColor == .fire)
         #expect(decorator.types[1].typeColor == .flying)

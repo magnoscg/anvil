@@ -65,14 +65,15 @@ struct RetryInterceptorTests {
     func patchNetworkFailureIsNotRetried() async throws {
         let counter = CallCounter()
         let request = try makeRequest(method: "PATCH")
-
         let interceptor = self.interceptor
+
         await #expect(throws: URLError.self) {
             _ = try await interceptor.intercept(request: request) { _ in
                 await counter.increment()
                 throw URLError(.networkConnectionLost)
             }
         }
+
         let callCount = await counter.count
         #expect(callCount == 1)
     }
@@ -102,14 +103,15 @@ struct RetryInterceptorTests {
     func deviceStateFailureIsNotRetried(code: URLError.Code) async throws {
         let counter = CallCounter()
         let request = try makeRequest(method: "GET")
-
         let interceptor = self.interceptor
+
         await #expect(throws: URLError.self) {
             _ = try await interceptor.intercept(request: request) { _ in
                 await counter.increment()
                 throw URLError(code)
             }
         }
+
         let callCount = await counter.count
         #expect(callCount == 1)
     }
@@ -278,7 +280,6 @@ struct RetryInterceptorTests {
         let counter = CallCounter()
         let request = try makeRequest(method: "POST")
         let interceptor = self.interceptor
-
         let task = Task {
             while !Task.isCancelled {
                 await Task.yield()
@@ -293,6 +294,7 @@ struct RetryInterceptorTests {
         await #expect(throws: CancellationError.self) {
             try await task.value
         }
+
         let callCount = await counter.count
         #expect(callCount == 0)
     }

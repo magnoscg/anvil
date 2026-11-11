@@ -1,10 +1,10 @@
 import Foundation
 @testable import Arquitectura
 
-// MARK: - MockPokemonListDecoratorMapper
+// MARK: - PokemonListDecoratorMapperMock
 
 /// Mock implementation of PokemonListDecoratorMapper for testing
-struct MockPokemonListDecoratorMapper: PokemonListDecoratorMapper {
+struct PokemonListDecoratorMapperMock: PokemonListDecoratorMapper {
     // MARK: - Properties
 
     var mapResult: PokemonListItemDecorator?

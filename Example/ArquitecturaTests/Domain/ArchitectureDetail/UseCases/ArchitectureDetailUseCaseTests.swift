@@ -38,73 +38,50 @@ struct ArchitectureDetailUseCaseTests {
 
     @Test("Execute returns feature from repository")
     func executeReturnsFeature() async throws {
-        // Given
         let expectedFeature = makeDetailModel(id: "test-id",
                                               name: "Clean Architecture",
                                               subtitle: "A layered architecture pattern",
                                               isImplemented: true)
-
-        let mockRepository = MockArchitectureDetailRepository()
-        await mockRepository.setGetFeatureDetailResult(.success(expectedFeature))
-
+        let mockRepository = ArchitectureDetailRepositoryMock()
+        mockRepository.getFeatureDetailResult = .success(expectedFeature)
         let useCase = ArchitectureDetailUseCaseImpl(repository: mockRepository)
 
-        // When
         let result = try await useCase.execute(id: "test-id")
 
-        // Then
         #expect(result?.id == expectedFeature.id)
         #expect(result?.name == expectedFeature.name)
     }
 
     @Test("Execute returns nil when feature not found")
     func executeReturnsNilWhenNotFound() async throws {
-        // Given
-        let mockRepository = MockArchitectureDetailRepository()
-        await mockRepository.setGetFeatureDetailResult(.success(nil))
-
+        let mockRepository = ArchitectureDetailRepositoryMock()
+        mockRepository.getFeatureDetailResult = .success(nil)
         let useCase = ArchitectureDetailUseCaseImpl(repository: mockRepository)
 
-        // When
         let result = try await useCase.execute(id: "nonexistent-id")
 
-        // Then
         #expect(result.isNil)
     }
 
     @Test("Execute calls repository with correct id")
     func executeCallsRepositoryWithCorrectId() async throws {
-        // Given
-        let mockRepository = MockArchitectureDetailRepository()
-        await mockRepository.setGetFeatureDetailResult(.success(nil))
-
+        let mockRepository = ArchitectureDetailRepositoryMock()
+        mockRepository.getFeatureDetailResult = .success(nil)
         let useCase = ArchitectureDetailUseCaseImpl(repository: mockRepository)
         let expectedId = "specific-feature-id"
 
-        // When
         _ = try await useCase.execute(id: expectedId)
 
-        // Then
-        let lastId = await mockRepository.getFeatureDetailLastId
-        #expect(lastId == expectedId)
-        let callCount = await mockRepository.getFeatureDetailCallCount
-        #expect(callCount == 1)
+        #expect(mockRepository.getFeatureDetailLastId == expectedId)
+        #expect(mockRepository.getFeatureDetailCallCount == 1)
     }
 
     @Test("Execute propagates the repository's DomainError")
     func executePropagatesError() async {
-        // Given
-        let mockRepository = MockArchitectureDetailRepository()
-        await mockRepository.setGetFeatureDetailResult(.failure(DomainError.parsing))
-
+        let mockRepository = ArchitectureDetailRepositoryMock()
+        mockRepository.getFeatureDetailResult = .failure(DomainError.parsing)
         let useCase = ArchitectureDetailUseCaseImpl(repository: mockRepository)
 
-        // When/Then
-        do {
-            _ = try await useCase.execute(id: "test-id")
-            #expect(Bool(false), "Expected error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .parsing)
-        }
+        await #expect(throws: DomainError.parsing) { try await useCase.execute(id: "test-id") }
     }
 }

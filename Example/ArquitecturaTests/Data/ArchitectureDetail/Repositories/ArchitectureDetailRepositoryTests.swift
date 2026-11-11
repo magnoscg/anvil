@@ -32,12 +32,7 @@ struct ArchitectureDetailRepositoryTests {
             ArchitectureDetailRepositoryImpl(dataSource: ArchitectureDetailJSONDataSourceImpl(fileURL: fileURL),
                                              mapper: ArchitectureDetailDTOMapperImpl())
 
-        do {
-            _ = try await repository.getFeatureDetail(id: "any")
-            Issue.record("Expected an error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .parsing)
-        }
+        await #expect(throws: DomainError.parsing) { try await repository.getFeatureDetail(id: "any") }
     }
 
     @Test("getFeatureDetail throws DomainError.unknown when the catalogue file is missing")
@@ -46,11 +41,6 @@ struct ArchitectureDetailRepositoryTests {
             ArchitectureDetailRepositoryImpl(dataSource: ArchitectureDetailJSONDataSourceImpl(fileURL: nil),
                                              mapper: ArchitectureDetailDTOMapperImpl())
 
-        do {
-            _ = try await repository.getFeatureDetail(id: "any")
-            Issue.record("Expected an error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .unknown)
-        }
+        await #expect(throws: DomainError.unknown) { try await repository.getFeatureDetail(id: "any") }
     }
 }

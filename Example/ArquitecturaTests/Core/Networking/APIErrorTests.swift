@@ -11,42 +11,49 @@ struct APIErrorTests {
     @Test("Network timeout error is retryable")
     func networkTimeoutIsRetryable() {
         let error = APIError.networkError(URLError(.timedOut))
+
         #expect(error.isRetryable == true)
     }
 
     @Test("Network connection lost is retryable")
     func networkConnectionLostIsRetryable() {
         let error = APIError.networkError(URLError(.networkConnectionLost))
+
         #expect(error.isRetryable == true)
     }
 
     @Test("Not connected to internet is not retryable")
     func notConnectedIsNotRetryable() {
         let error = APIError.networkError(URLError(.notConnectedToInternet))
+
         #expect(error.isRetryable == false)
     }
 
     @Test("Server error 500 is retryable")
     func serverError500IsRetryable() {
         let error = APIError.httpError(statusCode: 500, data: nil)
+
         #expect(error.isRetryable == true)
     }
 
     @Test("Rate limiting 429 is retryable")
     func rateLimiting429IsRetryable() {
         let error = APIError.httpError(statusCode: 429, data: nil)
+
         #expect(error.isRetryable == true)
     }
 
     @Test("Client error 404 is not retryable")
     func clientError404IsNotRetryable() {
         let error = APIError.httpError(statusCode: 404, data: nil)
+
         #expect(error.isRetryable == false)
     }
 
     @Test("Client error 401 is not retryable")
     func clientError401IsNotRetryable() {
         let error = APIError.httpError(statusCode: 401, data: nil)
+
         #expect(error.isRetryable == false)
     }
 
@@ -54,18 +61,21 @@ struct APIErrorTests {
     func decodingErrorIsNotRetryable() {
         let context = DecodingError.Context(codingPath: [], debugDescription: "test")
         let error = APIError.decodingError(.dataCorrupted(context))
+
         #expect(error.isRetryable == false)
     }
 
     @Test("Invalid URL is not retryable")
     func invalidURLIsNotRetryable() {
         let error = APIError.invalidURL
+
         #expect(error.isRetryable == false)
     }
 
     @Test("Unknown error is not retryable")
     func unknownErrorIsNotRetryable() {
         let error = APIError.unknown(SendableError(NSError(domain: "test", code: 1)))
+
         #expect(error.isRetryable == false)
     }
 
@@ -74,18 +84,21 @@ struct APIErrorTests {
     @Test("Network error has localized description")
     func networkErrorDescription() {
         let error = APIError.networkError(URLError(.timedOut))
+
         #expect(error.errorDescription != nil)
     }
 
     @Test("HTTP error description contains status code")
     func httpErrorDescription() {
         let error = APIError.httpError(statusCode: 503, data: nil)
+
         #expect(error.errorDescription?.contains("503") == true)
     }
 
     @Test("Invalid URL description is correct")
     func invalidURLDescription() {
         let error = APIError.invalidURL
+
         #expect(error.errorDescription == "Invalid URL")
     }
 
@@ -96,8 +109,8 @@ struct APIErrorTests {
         let json = """
         {"message": "Not Found", "code": "NOT_FOUND"}
         """.data(using: .utf8)
-
         let error = APIError.httpError(statusCode: 404, data: json)
+
         let serverError = error.serverError
 
         #expect(serverError?.message == "Not Found")
@@ -107,12 +120,14 @@ struct APIErrorTests {
     @Test("serverError returns nil for non-HTTP errors")
     func serverErrorReturnsNilForNonHTTPErrors() {
         let error = APIError.invalidURL
+
         #expect(error.serverError == nil)
     }
 
     @Test("serverError returns nil for nil data")
     func serverErrorReturnsNilForNilData() {
         let error = APIError.httpError(statusCode: 500, data: nil)
+
         #expect(error.serverError == nil)
     }
 }
@@ -155,6 +170,7 @@ struct APIErrorResponseTests {
     @Test("decode falls back to raw string for invalid JSON")
     func decodeFallsBackToRawString() {
         let data = "Something went wrong".data(using: .utf8)
+
         let response = APIErrorResponse.decode(from: data)
 
         #expect(response?.message == "Something went wrong")
@@ -167,6 +183,7 @@ struct APIErrorResponseTests {
                                         details: "Something failed")
 
         let desc = response.description
+
         #expect(desc.contains("[ERR_001]"))
         #expect(desc.contains("Error"))
         #expect(desc.contains("Something failed"))
@@ -175,6 +192,7 @@ struct APIErrorResponseTests {
     @Test("description returns 'Unknown error' when all fields nil")
     func descriptionWithAllNilFields() {
         let response = APIErrorResponse(message: nil)
+
         #expect(response.description == "Unknown error")
     }
 }

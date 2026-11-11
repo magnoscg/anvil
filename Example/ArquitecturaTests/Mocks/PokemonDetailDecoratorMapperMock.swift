@@ -1,11 +1,11 @@
 import Foundation
 @testable import Arquitectura
 
-// MARK: - MockPokemonDetailDecoratorMapper
+// MARK: - PokemonDetailDecoratorMapperMock
 
 /// Mock implementation of PokemonDetailDecoratorMapper for testing.
 /// Uses struct since the protocol's map method is nonisolated and synchronous.
-struct MockPokemonDetailDecoratorMapper: PokemonDetailDecoratorMapper {
+struct PokemonDetailDecoratorMapperMock: PokemonDetailDecoratorMapper {
     // MARK: - Properties
 
     /// The result to return from map calls.
