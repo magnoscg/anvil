@@ -8,13 +8,10 @@ struct {{ .FeatureName }}View: View {
     @State
     private var viewModel: {{ .FeatureName }}ViewModel
 
-    @State
-    private var retryTrigger = false
-
     // MARK: - Init
 
     init(viewModel: {{ .FeatureName }}ViewModel) {
-        self._viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
     }
 
     // MARK: - Body
@@ -37,7 +34,7 @@ struct {{ .FeatureName }}View: View {
         }
         .navigationTitle(String(localized: "{{ .FeatureNameLower }}.title"))
         .navigationBarTitleDisplayMode(.large)
-        .task(id: retryTrigger) {
+        .task {
             await viewModel.load()
         }
     }
@@ -71,7 +68,7 @@ private extension {{ .FeatureName }}View {
         let retryError = ErrorDecorator(
             title: error.title,
             message: error.message,
-            retryAction: { retryTrigger.toggle() }
+            retryAction: { [viewModel] in Task { await viewModel.load() } }
         )
         return ErrorView(error: retryError)
     }
