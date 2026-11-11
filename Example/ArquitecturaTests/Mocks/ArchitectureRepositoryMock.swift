@@ -4,6 +4,7 @@ import Foundation
 // MARK: - ArchitectureRepositoryMock
 
 /// Mock implementation of ArchitectureRepository for testing
+@MainActor
 final class ArchitectureRepositoryMock: ArchitectureRepository {
     // MARK: - Properties
 

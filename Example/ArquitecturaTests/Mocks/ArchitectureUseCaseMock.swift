@@ -4,6 +4,7 @@ import Foundation
 // MARK: - ArchitectureUseCaseMock
 
 /// Mock implementation of ArchitectureUseCase for testing
+@MainActor
 final class ArchitectureUseCaseMock: ArchitectureUseCase {
     // MARK: - Properties
 

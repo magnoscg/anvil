@@ -20,9 +20,13 @@ Consequences in `Example/` (see the isolation table in `swift-concurrency.md`):
 - A `nonisolated async` function stays on the caller's actor. Work that must leave the main actor is marked
   `@concurrent` and lives in a DataSource.
 - Test suites are main-actor isolated by default, so an unannotated suite is not evidence of anything.
-- A mock of an unannotated protocol is `@MainActor` like its caller, so `await mock.execute()` never
-  suspends. A test that needs a call in flight (a second `load()` while `.loading`) sets the mock's one-shot
-  `onExecute` hook and re-enters the ViewModel from it, instead of racing two calls with `async let`.
+- Mocks of UseCases, Repositories and DataSources are declared `@MainActor`, like the ViewModel that calls
+  them. The annotation is written out because compilers disagree on the default for a class that conforms
+  to one of these `Sendable` protocols: Xcode 27.2 infers `@MainActor`, Xcode 26.6 leaves it nonisolated
+  and rejects its mutable stubs.
+- A `@MainActor` mock never suspends on `await mock.execute()`. A test that needs a call in flight (a
+  second `load()` while `.loading`) sets the mock's one-shot `onExecute` hook and re-enters the ViewModel
+  from it, instead of racing two calls with `async let`.
 
 ## Code shape
 
@@ -38,7 +42,7 @@ Consequences in `Example/` (see the isolation table in `swift-concurrency.md`):
 | Networking extras | `RetryInterceptor` only | also `LoggingInterceptor`, per-request `decoderFactory` |
 | Persistence | optional SwiftData stack | none (only the navigation path, in `@SceneStorage`) |
 | Domain folders | one per feature until merged | by concept (`Domain/Pokemon` serves two screens) |
-| Test mocks of UseCases, Repositories and DataSources | `final class ..., @unchecked Sendable` | `final class`, main-actor isolated by default, no `@unchecked Sendable` |
+| Test mocks of UseCases, Repositories and DataSources | `final class ..., @unchecked Sendable` | `@MainActor final class`, no `@unchecked Sendable` |
 
 ## Known gap to close in `Example/`
 

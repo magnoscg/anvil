@@ -4,6 +4,7 @@ import Foundation
 // MARK: - PokemonDetailUseCaseMock
 
 /// Mock implementation of PokemonDetailUseCase for testing.
+@MainActor
 final class PokemonDetailUseCaseMock: PokemonDetailUseCase {
     // MARK: - Properties
 
