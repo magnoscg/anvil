@@ -10,15 +10,12 @@ struct PokemonDetailView: View {
     private var viewModel: PokemonDetailViewModel
 
     @State
-    private var retryTrigger = false
-
-    @State
     private var selectedTab: DetailTab = .about
 
     // MARK: - Init
 
     init(viewModel: PokemonDetailViewModel) {
-        self._viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
     }
 
     // MARK: - Body
@@ -41,7 +38,7 @@ struct PokemonDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .background(AppColors.background)
-        .task(id: retryTrigger) {
+        .task {
             await viewModel.loadDetail()
         }
     }
@@ -149,7 +146,7 @@ private extension PokemonDetailView {
 
     func errorView(error: ErrorDecorator) -> some View {
         ErrorView(error: error) {
-            retryTrigger.toggle()
+            Task { await viewModel.loadDetail() }
         }
     }
 }
