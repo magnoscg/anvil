@@ -4,6 +4,7 @@ import Foundation
 // MARK: - PokemonDetailRepositoryMock
 
 /// Mock implementation of PokemonDetailRepository for testing.
+@MainActor
 final class PokemonDetailRepositoryMock: PokemonDetailRepository {
     // MARK: - Properties
 

@@ -4,6 +4,7 @@ import Foundation
 // MARK: - PokemonListRemoteDataSourceMock
 
 /// Mock implementation of PokemonListRemoteDataSource for testing.
+@MainActor
 final class PokemonListRemoteDataSourceMock: PokemonListRemoteDataSource {
     // MARK: - Properties
 

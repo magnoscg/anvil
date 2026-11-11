@@ -4,6 +4,7 @@ import Foundation
 // MARK: - PokemonListUseCaseMock
 
 /// Mock implementation of PokemonListUseCase for testing
+@MainActor
 final class PokemonListUseCaseMock: PokemonListUseCase {
     // MARK: - Properties
 
