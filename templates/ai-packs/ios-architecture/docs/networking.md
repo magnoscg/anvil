@@ -62,7 +62,7 @@ protocol EnvironmentConfiguration: Sendable {
 
 ### `Endpoint` (own backend)
 
-Properties: `path`, `method`, `queryParameters: [String: String]?`, `headers`, `body: Data?`, `contentType` (default `.json`) and `requiresAuthentication` (default `true`). `path` starts with `/`; the client prepends `/<apiVersion>`. Build endpoints with the static factories:
+Properties: `path`, `method`, `queryParameters: [String: String]?`, `headers`, `body: Data?`, and `contentType` (default `.json`). `path` starts with `/`; the client prepends `/<apiVersion>`. Build endpoints with the static factories:
 
 ```swift
 Endpoint.get(path: "/articles", queryParameters: ["page": "1"])
@@ -204,7 +204,7 @@ The generator ships no authentication: no token provider and no auth interceptor
 
 - Write a `RequestInterceptor` that sets the `Authorization` header and pass it in `interceptors:` together with `RetryInterceptor()`.
 - The token comes from a Data-layer source backed by the Keychain (see `security-privacy.md`), never from a ViewModel.
-- `Endpoint.requiresAuthentication` is declared but nothing reads it: `buildRequest` does not copy it into the `URLRequest`, which is all an interceptor receives. Wire it when you add auth.
+- `Endpoint` carries no auth flag, and an interceptor receives only the `URLRequest`. If some endpoints must go out without a token, let the interceptor decide by path; never invent a marker header, because it travels to the server.
 - A 401 already maps to `DomainError.unauthorized`. The ViewModel and its Router decide the navigation; a UseCase or Repository never navigates.
 
 ## Connectivity

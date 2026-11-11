@@ -43,6 +43,7 @@ enum IconType: Equatable {
 
     // MARK: - View Builder
 
+    @MainActor
     @ViewBuilder
     func image(size: CGFloat = IconSize.md, color: Color? = nil) -> some View {
         switch self {

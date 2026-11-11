@@ -1,0 +1,33 @@
+import Foundation
+@testable import {{ .ProjectName }}
+
+// MARK: - {{ .FeatureName }}KeychainDataSourceMock
+
+/// Mock implementation of {{ .FeatureName }}KeychainDataSource for testing
+final class {{ .FeatureName }}KeychainDataSourceMock: {{ .FeatureName }}KeychainDataSource, @unchecked Sendable {
+    // MARK: - Properties
+
+    var saveResult: Result<Void, Error> = .success(())
+    var savedValues: [String: String] = [:]
+    var readResult: Result<String?, Error> = .success(nil)
+    var readCallCount = 0
+    var deleteResult: Result<Void, Error> = .success(())
+    var deleteCallCount = 0
+
+    // MARK: - {{ .FeatureName }}KeychainDataSource
+
+    func save(_ value: String, forKey key: String) throws {
+        try saveResult.get()
+        savedValues[key] = value
+    }
+
+    func read(forKey key: String) throws -> String? {
+        readCallCount += 1
+        return try readResult.get()
+    }
+
+    func delete(forKey key: String) throws {
+        deleteCallCount += 1
+        try deleteResult.get()
+    }
+}

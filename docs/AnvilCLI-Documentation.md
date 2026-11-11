@@ -554,8 +554,8 @@ Tests/Mocks/
 
 | Flag | File Generated |
 |------|---------------|
-| `IncludeLocalDataSource` | `<Feature>LocalDataSource.swift` |
-| `IncludeKeychain` | `<Feature>KeychainDataSource.swift` |
+| `IncludeLocalDataSource` | `<Feature>LocalDataSource.swift`, `<Feature>LocalDataSourceMock.swift`, `<Feature>LocalDataSourceTests.swift` |
+| `IncludeKeychain` | `<Feature>KeychainDataSource.swift`, `<Feature>KeychainDataSourceMock.swift` |
 | `IncludeRouteResolver` | `<Feature>RouteResolver.swift` |
 | `IncludeUITests` | `Shared/AccessibilityIDs/<Feature>AccessibilityID.swift`, `Data/<Feature>/DataStubs/` (Stub and Fixture), `<ProjectName>UITests/` Page Object and Screen tests, and an entry in `App/Navigation/UITestScreenRegistry.swift` |
 

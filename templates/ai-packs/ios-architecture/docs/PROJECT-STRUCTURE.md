@@ -66,7 +66,7 @@ Sources live in `[Project]/` (one app target), unit tests in `[Project]Tests/` a
 +- Data/<Feature>/Mappers/<Feature>DTOMapperTests.swift
 +- Features/<Feature>/Presentation/ViewModels/<Feature>ViewModelTests.swift
 +- Features/<Feature>/Presentation/Mappers/<Feature>DecoratorMapperTests.swift
-+- Mocks/<Feature><Type>Mock.swift      # UseCase, Repository, Router, RemoteDataSource, DTOMapper, DecoratorMapper
++- Mocks/<Feature><Type>Mock.swift      # UseCase, Repository, Router, RemoteDataSource, DTOMapper, DecoratorMapper; Local/KeychainDataSource if chosen
 
 [Project]UITests/                       # UI Testing Bundle target
 +- Support/XCUIApplication+UITesting.swift  # launchForUITesting(screen:fixture:)
