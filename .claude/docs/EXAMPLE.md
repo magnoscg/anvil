@@ -20,6 +20,9 @@ Consequences in `Example/` (see the isolation table in `swift-concurrency.md`):
 - A `nonisolated async` function stays on the caller's actor. Work that must leave the main actor is marked
   `@concurrent` and lives in a DataSource.
 - Test suites are main-actor isolated by default, so an unannotated suite is not evidence of anything.
+- A mock of an unannotated protocol is `@MainActor` like its caller, so `await mock.execute()` never
+  suspends. A test that needs a call in flight (a second `load()` while `.loading`) sets the mock's one-shot
+  `onExecute` hook and re-enters the ViewModel from it, instead of racing two calls with `async let`.
 
 ## Code shape
 
@@ -35,17 +38,11 @@ Consequences in `Example/` (see the isolation table in `swift-concurrency.md`):
 | Networking extras | `RetryInterceptor` only | also `LoggingInterceptor`, per-request `decoderFactory` |
 | Persistence | optional SwiftData stack | none (only the navigation path, in `@SceneStorage`) |
 | Domain folders | one per feature until merged | by concept (`Domain/Pokemon` serves two screens) |
+| Test mocks of UseCases, Repositories and DataSources | `final class ..., @unchecked Sendable` | `final class`, main-actor isolated by default, no `@unchecked Sendable` |
 
-## Known gaps to close in `Example/`
+## Known gap to close in `Example/`
 
-These contradict the pack docs and are not intentional. Fix them here, not in the docs.
+This contradicts the pack docs and is not intentional. Fix it here, not in the docs.
 
-- Views store the ViewModel with `self._viewModel = State(initialValue:)` and retry through
-  `.task(id:)` plus a toggled flag. The docs and the generator assign `self.viewModel = viewModel` last in
-  `init`, load with `.task { }` and retry with a `Task` from the button action.
-- Test mocks are named `Mock<Feature><Type>` and most are `actor`s. The docs and the generator use
-  `<Feature><Type>Mock`, `final class ... @unchecked Sendable`.
-- Test bodies carry `// Given`, `// When`, `// Then` comments, and use `guard case` with `Issue.record`
-  where `#expect` and `try #require` apply.
 - There is no UI test code, no `Shared/` group, no `UITestScreenRegistry` and no `accessibilityIdentifier`
   in the app, so `ui-testing.md` is not exercised here.
