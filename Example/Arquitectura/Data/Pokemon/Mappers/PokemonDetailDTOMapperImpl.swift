@@ -59,9 +59,7 @@ struct PokemonDetailDTOMapperImpl: PokemonDetailDTOMapper {
     /// Extracts and cleans the English flavor text description from species data.
     /// Returns nil if species data is unavailable or no English entry exists.
     private nonisolated func mapDescription(from speciesDTO: PokemonSpeciesDTO?) -> String? {
-        guard let speciesDTO else { return nil }
-
-        guard let entry = speciesDTO.flavorTextEntries.first(where: { $0.language.name == "en" }) else {
+        guard let speciesDTO, let entry = speciesDTO.flavorTextEntries.first(where: { $0.language.name == "en" }) else {
             return nil
         }
 

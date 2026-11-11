@@ -1,11 +1,11 @@
 import Foundation
 @testable import Arquitectura
 
-// MARK: - MockArchitectureRouter
+// MARK: - ArchitectureRouterMock
 
 /// Mock implementation of ArchitectureRouter for testing
 @MainActor
-final class MockArchitectureRouter: ArchitectureRouter {
+final class ArchitectureRouterMock: ArchitectureRouter {
     // MARK: - Properties
 
     var navigateToDetailFeatureId: String?

@@ -1,11 +1,11 @@
 import Foundation
 @testable import Arquitectura
 
-// MARK: - MockPokemonDetailRouter
+// MARK: - PokemonDetailRouterMock
 
 /// Mock implementation of PokemonDetailRouter for testing
 @MainActor
-final class MockPokemonDetailRouter: PokemonDetailRouter {
+final class PokemonDetailRouterMock: PokemonDetailRouter {
     // MARK: - Properties
 
     private(set) var goBackCallCount = 0

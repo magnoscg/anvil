@@ -8,13 +8,10 @@ struct ArchitectureView: View {
     @State
     private var viewModel: ArchitectureViewModel
 
-    @State
-    private var retryTrigger = false
-
     // MARK: - Init
 
     init(viewModel: ArchitectureViewModel) {
-        self._viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
     }
 
     // MARK: - Body
@@ -38,7 +35,7 @@ struct ArchitectureView: View {
         .navigationTitle(String(localized: "home.title"))
         .navigationBarTitleDisplayMode(.large)
         .background(AppColors.surface)
-        .task(id: retryTrigger) {
+        .task {
             await viewModel.loadFeatures()
         }
     }
@@ -79,7 +76,7 @@ private extension ArchitectureView {
 
     func errorView(error: ErrorDecorator) -> some View {
         ErrorView(error: error) {
-            retryTrigger.toggle()
+            Task { await viewModel.loadFeatures() }
         }
     }
 }

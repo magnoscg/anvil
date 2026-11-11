@@ -10,21 +10,16 @@ struct PokemonDetailRepositoryTests {
 
     @Test("Fetch with both endpoints successful returns complete model")
     func fetchWithBothEndpointsSuccessful() async throws {
-        // Given
         let detailDTO = makeDetailDTO()
         let speciesDTO = makeSpeciesDTO()
-
-        let mockDataSource = MockPokemonDetailRemoteDataSource()
-        await mockDataSource.setFetchDetailResult(.success(detailDTO))
-        await mockDataSource.setFetchSpeciesResult(.success(speciesDTO))
-
+        let mockDataSource = PokemonDetailRemoteDataSourceMock()
+        mockDataSource.fetchDetailResult = .success(detailDTO)
+        mockDataSource.fetchSpeciesResult = .success(speciesDTO)
         let repository = PokemonDetailRepositoryImpl(remoteDataSource: mockDataSource,
                                                      dtoMapper: PokemonDetailDTOMapperImpl())
 
-        // When
         let model = try await repository.fetchPokemonDetail(id: 25)
 
-        // Then
         #expect(model.id == 25)
         #expect(model.name == "Pikachu")
         #expect(model.description != nil)
@@ -33,20 +28,15 @@ struct PokemonDetailRepositoryTests {
 
     @Test("Fetch with species failure returns model without description or genus")
     func fetchWithSpeciesFailure() async throws {
-        // Given
         let detailDTO = makeDetailDTO()
-
-        let mockDataSource = MockPokemonDetailRemoteDataSource()
-        await mockDataSource.setFetchDetailResult(.success(detailDTO))
-        await mockDataSource.setFetchSpeciesResult(.failure(NSError(domain: "test", code: 404)))
-
+        let mockDataSource = PokemonDetailRemoteDataSourceMock()
+        mockDataSource.fetchDetailResult = .success(detailDTO)
+        mockDataSource.fetchSpeciesResult = .failure(NSError(domain: "test", code: 404))
         let repository = PokemonDetailRepositoryImpl(remoteDataSource: mockDataSource,
                                                      dtoMapper: PokemonDetailDTOMapperImpl())
 
-        // When
         let model = try await repository.fetchPokemonDetail(id: 25)
 
-        // Then
         #expect(model.id == 25)
         #expect(model.name == "Pikachu")
         #expect(model.description == nil)
@@ -55,61 +45,36 @@ struct PokemonDetailRepositoryTests {
 
     @Test("Fetch with detail failure throws the mapped DomainError")
     func fetchWithDetailFailure() async {
-        // Given
         let expectedError = APIError.httpError(statusCode: 500, data: nil)
-
-        let mockDataSource = MockPokemonDetailRemoteDataSource()
-        await mockDataSource.setFetchDetailResult(.failure(expectedError))
-        await mockDataSource.setFetchSpeciesResult(.success(makeSpeciesDTO()))
-
+        let mockDataSource = PokemonDetailRemoteDataSourceMock()
+        mockDataSource.fetchDetailResult = .failure(expectedError)
+        mockDataSource.fetchSpeciesResult = .success(makeSpeciesDTO())
         let repository = PokemonDetailRepositoryImpl(remoteDataSource: mockDataSource,
                                                      dtoMapper: PokemonDetailDTOMapperImpl())
 
-        // When/Then
-        do {
-            _ = try await repository.fetchPokemonDetail(id: 25)
-            #expect(Bool(false), "Expected error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .server)
-        }
+        await #expect(throws: DomainError.server) { try await repository.fetchPokemonDetail(id: 25) }
     }
 
     @Test("Fetch with detail cancellation propagates CancellationError")
     func fetchWithDetailCancellation() async {
-        // Given
-        let mockDataSource = MockPokemonDetailRemoteDataSource()
-        await mockDataSource.setFetchDetailResult(.failure(CancellationError()))
-        await mockDataSource.setFetchSpeciesResult(.success(makeSpeciesDTO()))
-
+        let mockDataSource = PokemonDetailRemoteDataSourceMock()
+        mockDataSource.fetchDetailResult = .failure(CancellationError())
+        mockDataSource.fetchSpeciesResult = .success(makeSpeciesDTO())
         let repository = PokemonDetailRepositoryImpl(remoteDataSource: mockDataSource,
                                                      dtoMapper: PokemonDetailDTOMapperImpl())
 
-        // When/Then
-        do {
-            _ = try await repository.fetchPokemonDetail(id: 25)
-            #expect(Bool(false), "Expected CancellationError to be thrown")
-        } catch {
-            #expect(error is CancellationError)
-        }
+        await #expect(throws: CancellationError.self) { try await repository.fetchPokemonDetail(id: 25) }
     }
 
     @Test("Fetch with species cancellation propagates CancellationError")
     func fetchWithSpeciesCancellation() async {
-        // Given
-        let mockDataSource = MockPokemonDetailRemoteDataSource()
-        await mockDataSource.setFetchDetailResult(.success(makeDetailDTO()))
-        await mockDataSource.setFetchSpeciesResult(.failure(CancellationError()))
-
+        let mockDataSource = PokemonDetailRemoteDataSourceMock()
+        mockDataSource.fetchDetailResult = .success(makeDetailDTO())
+        mockDataSource.fetchSpeciesResult = .failure(CancellationError())
         let repository = PokemonDetailRepositoryImpl(remoteDataSource: mockDataSource,
                                                      dtoMapper: PokemonDetailDTOMapperImpl())
 
-        // When/Then
-        do {
-            _ = try await repository.fetchPokemonDetail(id: 25)
-            #expect(Bool(false), "Expected CancellationError to be thrown from species")
-        } catch {
-            #expect(error is CancellationError)
-        }
+        await #expect(throws: CancellationError.self) { try await repository.fetchPokemonDetail(id: 25) }
     }
 
     // MARK: - Test Helpers

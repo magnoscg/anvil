@@ -11,8 +11,7 @@ struct InterceptorChainTests {
     @Test("Chain executes through logging and retry to core executor")
     func chainExecutesThroughAllInterceptors() async throws {
         let chain = DefaultInterceptorChain()
-
-        let expectedData = "test".data(using: .utf8)!
+        let expectedData = try #require("test".data(using: .utf8))
         let url = try #require(URL(string: "https://example.com"))
         let expectedResponse = try #require(HTTPURLResponse(url: url,
                                                             statusCode: 200,
@@ -30,7 +29,6 @@ struct InterceptorChainTests {
 
     @Test("Chain is reused across multiple requests without recreation")
     func chainIsReusedAcrossRequests() async throws {
-        // Same chain instance used for both requests
         let chain = DefaultInterceptorChain()
         let firstURL = try #require(URL(string: "https://example.com/1"))
         let secondURL = try #require(URL(string: "https://example.com/2"))
@@ -42,7 +40,6 @@ struct InterceptorChainTests {
                                                             httpVersion: nil,
                                                             headerFields: nil)!)
             }
-
         let response2 = try await chain
             .execute(URLRequest(url: secondURL)) { _ in
                 ("two".data(using: .utf8)!, HTTPURLResponse(url: secondURL,

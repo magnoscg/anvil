@@ -227,7 +227,7 @@ struct SSLPinningDelegateTests {
 // MARK: - IgnoringChallengeSender
 
 /// Challenge sender that ignores every call: the delegate under test returns its decision instead.
-private nonisolated final class IgnoringChallengeSender: NSObject, URLAuthenticationChallengeSender {
+private final nonisolated class IgnoringChallengeSender: NSObject, URLAuthenticationChallengeSender {
     // MARK: - URLAuthenticationChallengeSender
 
     func use(_ credential: URLCredential, for challenge: URLAuthenticationChallenge) {}

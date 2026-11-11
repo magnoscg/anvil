@@ -8,16 +8,10 @@ struct PokemonListView: View {
     @State
     private var viewModel: PokemonListViewModel
 
-    @State
-    private var retryTrigger = false
-
-    @State
-    private var paginationRetryTrigger = 0
-
     // MARK: - Init
 
     init(viewModel: PokemonListViewModel) {
-        self._viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
     }
 
     // MARK: - Body
@@ -41,7 +35,7 @@ struct PokemonListView: View {
         .navigationTitle(String(localized: "pokemonList.title"))
         .navigationBarTitleDisplayMode(.large)
         .background(AppColors.background)
-        .task(id: retryTrigger) {
+        .task {
             await viewModel.loadPokemon()
         }
     }
@@ -94,20 +88,16 @@ private extension PokemonListView {
                 .multilineTextAlignment(.center)
 
             Button(String(localized: "error.button.retry")) {
-                paginationRetryTrigger += 1
+                Task { await viewModel.loadMore() }
             }
             .font(AppTypography.footnote.font)
         }
         .padding(Spacing.md)
-        .task(id: paginationRetryTrigger) {
-            guard paginationRetryTrigger > 0 else { return }
-            await viewModel.loadMore()
-        }
     }
 
     func errorView(error: ErrorDecorator) -> some View {
         ErrorView(error: error) {
-            retryTrigger.toggle()
+            Task { await viewModel.loadPokemon() }
         }
     }
 }
@@ -143,21 +133,21 @@ private extension PokemonListView {
 private struct PreviewPokemonListUseCase: PokemonListUseCase {
     func execute(page: Int, pageSize: Int) async throws -> PokemonListResult {
         PokemonListResult(pokemon: [PokemonSummaryModel(id: 1,
-                                                     name: "bulbasaur",
-                                                     imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png"),
-                                                     types: [.grass, .poison]),
+                                                        name: "bulbasaur",
+                                                        imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png"),
+                                                        types: [.grass, .poison]),
                                     PokemonSummaryModel(id: 4,
-                                                     name: "charmander",
-                                                     imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png"),
-                                                     types: [.fire]),
+                                                        name: "charmander",
+                                                        imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png"),
+                                                        types: [.fire]),
                                     PokemonSummaryModel(id: 7,
-                                                     name: "squirtle",
-                                                     imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png"),
-                                                     types: [.water]),
+                                                        name: "squirtle",
+                                                        imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png"),
+                                                        types: [.water]),
                                     PokemonSummaryModel(id: 25,
-                                                     name: "pikachu",
-                                                     imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"),
-                                                     types: [.electric])],
+                                                        name: "pikachu",
+                                                        imageURL: URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png"),
+                                                        types: [.electric])],
                           hasMore: true,
                           totalCount: 1302)
     }
