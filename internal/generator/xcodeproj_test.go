@@ -263,3 +263,49 @@ func isXcodeProjectError(err error, target *config.XcodeProjectError) bool {
 	}
 	return false
 }
+
+func TestXcodeProjGeneratorUITestTarget(t *testing.T) {
+	dir := t.TempDir()
+	projectDir := filepath.Join(dir, "TestApp")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	memFS := xcodeprojTemplateFS()
+	writer := NewDiskWriter()
+	renderer := NewRenderer(memFS, writer)
+	gen := NewXcodeProjGenerator(renderer, writer, memFS)
+
+	cfg := xcodeprojCfg()
+	if _, err := gen.Generate(context.Background(), projectDir, cfg); err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	pbxproj, err := os.ReadFile(filepath.Join(projectDir, "TestApp.xcodeproj", "project.pbxproj"))
+	if err != nil {
+		t.Fatalf("reading pbxproj: %v", err)
+	}
+	uuids := NewPbxprojContext(cfg).UUIDs
+	for _, want := range []string{
+		`productType = "com.apple.product-type.bundle.ui-testing";`,
+		`TEST_TARGET_NAME = "TestApp";`,
+		`path = TestAppUITests;`,
+		`path = Shared;`,
+		`name = "TestAppUITests";`,
+	} {
+		if !strings.Contains(string(pbxproj), want) {
+			t.Errorf("pbxproj should contain %s", want)
+		}
+	}
+	if got := strings.Count(string(pbxproj), uuids.SharedGroup+" /* Shared */,"); got != 3 {
+		t.Errorf("Shared group should be listed in the main group, the app target and the UI test target; found %d references", got)
+	}
+
+	scheme, err := os.ReadFile(filepath.Join(projectDir, "TestApp.xcodeproj", "xcshareddata", "xcschemes", "TestApp-Dev.xcscheme"))
+	if err != nil {
+		t.Fatalf("reading scheme: %v", err)
+	}
+	if !strings.Contains(string(scheme), `BlueprintIdentifier = "`+uuids.UITestTarget+`"`) {
+		t.Error("scheme should list the UI test target as a testable")
+	}
+}

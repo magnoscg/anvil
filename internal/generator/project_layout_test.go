@@ -315,6 +315,9 @@ func TestMapToProjectPath(t *testing.T) {
 		{"App/Config/AppEnvironment.swift", "MyApp", "MyApp/App/Config/AppEnvironment.swift"},
 		{"Core/Networking/APIClient.swift", "MyApp", "MyApp/Core/Networking/APIClient.swift"},
 		{"Domain/Common/DomainError.swift", "MyApp", "MyApp/Domain/Common/DomainError.swift"},
+		{"Tests/Mocks/APIClientMock.swift", "MyApp", "MyAppTests/Mocks/APIClientMock.swift"},
+		{"UITests/Support/XCUIApplication+UITesting.swift", "MyApp", "MyAppUITests/Support/XCUIApplication+UITesting.swift"},
+		{"Shared/UITestLaunch.swift", "MyApp", "Shared/UITestLaunch.swift"},
 		// Claude paths (empty projectName passed for claude)
 		{"CLAUDE.md", "", "CLAUDE.md"},
 		{"docs/ARCHITECTURE.md", "", ".claude/docs/ARCHITECTURE.md"},

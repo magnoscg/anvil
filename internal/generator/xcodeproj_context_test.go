@@ -49,6 +49,16 @@ func TestNewPbxprojContextPopulatesAllUUIDs(t *testing.T) {
 		"DependencyProxy":        ctx.UUIDs.DependencyProxy,
 		"TargetDependency":       ctx.UUIDs.TargetDependency,
 		"ContainerItemProxy":     ctx.UUIDs.ContainerItemProxy,
+		"UITestTarget":           ctx.UUIDs.UITestTarget,
+		"UITestProduct":          ctx.UUIDs.UITestProduct,
+		"UITestGroup":            ctx.UUIDs.UITestGroup,
+		"UITestSourcesPhase":     ctx.UUIDs.UITestSourcesPhase,
+		"UITestFrameworksPhase":  ctx.UUIDs.UITestFrameworksPhase,
+		"UITestResourcesPhase":   ctx.UUIDs.UITestResourcesPhase,
+		"BuildConfigListUITest":  ctx.UUIDs.BuildConfigListUITest,
+		"UITestTargetDependency": ctx.UUIDs.UITestTargetDependency,
+		"UITestContainerProxy":   ctx.UUIDs.UITestContainerProxy,
+		"SharedGroup":            ctx.UUIDs.SharedGroup,
 	}
 
 	for name, uuid := range staticUUIDs {
@@ -116,6 +126,16 @@ func TestNewPbxprojContextUUIDsAreUnique(t *testing.T) {
 	collectUUID("AppFrameworksPhase", ctx.UUIDs.AppFrameworksPhase)
 	collectUUID("TestSourcesPhase", ctx.UUIDs.TestSourcesPhase)
 	collectUUID("TestFrameworksPhase", ctx.UUIDs.TestFrameworksPhase)
+	collectUUID("UITestTarget", ctx.UUIDs.UITestTarget)
+	collectUUID("UITestProduct", ctx.UUIDs.UITestProduct)
+	collectUUID("UITestGroup", ctx.UUIDs.UITestGroup)
+	collectUUID("UITestSourcesPhase", ctx.UUIDs.UITestSourcesPhase)
+	collectUUID("UITestFrameworksPhase", ctx.UUIDs.UITestFrameworksPhase)
+	collectUUID("UITestResourcesPhase", ctx.UUIDs.UITestResourcesPhase)
+	collectUUID("BuildConfigListUITest", ctx.UUIDs.BuildConfigListUITest)
+	collectUUID("UITestTargetDependency", ctx.UUIDs.UITestTargetDependency)
+	collectUUID("UITestContainerProxy", ctx.UUIDs.UITestContainerProxy)
+	collectUUID("SharedGroup", ctx.UUIDs.SharedGroup)
 
 	for scheme, uuid := range ctx.UUIDs.DebugConfigsProject {
 		collectUUID("DebugConfigsProject:"+scheme, uuid)
@@ -134,6 +154,12 @@ func TestNewPbxprojContextUUIDsAreUnique(t *testing.T) {
 	}
 	for scheme, uuid := range ctx.UUIDs.ReleaseConfigsTest {
 		collectUUID("ReleaseConfigsTest:"+scheme, uuid)
+	}
+	for scheme, uuid := range ctx.UUIDs.DebugConfigsUITest {
+		collectUUID("DebugConfigsUITest:"+scheme, uuid)
+	}
+	for scheme, uuid := range ctx.UUIDs.ReleaseConfigsUITest {
+		collectUUID("ReleaseConfigsUITest:"+scheme, uuid)
 	}
 }
 
@@ -228,6 +254,12 @@ func TestNewXcschemeContextsCreatesOnePerScheme(t *testing.T) {
 		}
 		if sc.TestTargetUUID != ctx.UUIDs.TestTarget {
 			t.Errorf("scheme[%d].TestTargetUUID mismatch", i)
+		}
+		if sc.UITestTargetName != cfg.Name+"UITests" {
+			t.Errorf("scheme[%d].UITestTargetName = %q, want %q", i, sc.UITestTargetName, cfg.Name+"UITests")
+		}
+		if sc.UITestTargetUUID != ctx.UUIDs.UITestTarget {
+			t.Errorf("scheme[%d].UITestTargetUUID mismatch", i)
 		}
 	}
 }

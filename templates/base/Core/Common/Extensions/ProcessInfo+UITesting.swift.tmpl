@@ -1,0 +1,22 @@
+#if DEBUG
+import Foundation
+
+// MARK: - ProcessInfo + UI Testing
+
+extension ProcessInfo {
+    /// True when a UI test launched the app with `UITestLaunch.argument`.
+    static var isUITestMode: Bool {
+        processInfo.arguments.contains(UITestLaunch.argument)
+    }
+
+    /// Name of the screen the UI test opens as the root view.
+    static var uiTestScreen: String? {
+        processInfo.environment[UITestLaunch.screenKey]
+    }
+
+    /// Fixture scenario the UI test selected for `screen`, or nil for its default scenario.
+    static func uiTestFixture(screen: String) -> String? {
+        processInfo.environment[UITestLaunch.fixtureKey(screen: screen)]
+    }
+}
+#endif

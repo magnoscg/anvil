@@ -1,0 +1,19 @@
+import XCTest
+
+// MARK: - XCUIApplication + UI Testing
+
+@MainActor
+extension XCUIApplication {
+    /// Launches the app in UI test mode with `screen` as the root view.
+    /// `fixture` selects the stub scenario of that screen; nil keeps its default scenario.
+    static func launchForUITesting(screen: String, fixture: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [UITestLaunch.argument]
+        app.launchEnvironment[UITestLaunch.screenKey] = screen
+        if let fixture {
+            app.launchEnvironment[UITestLaunch.fixtureKey(screen: screen)] = fixture
+        }
+        app.launch()
+        return app
+    }
+}
