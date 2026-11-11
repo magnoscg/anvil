@@ -12,38 +12,77 @@ enum KeychainError: Error, Sendable {
     case unexpectedStatus(OSStatus)
 }
 
+// MARK: - KeychainAccessibility
+
+/// When a Keychain item can be read. Both levels keep the item out of backups and off other devices.
+enum KeychainAccessibility: Sendable {
+    /// Readable only while the device is unlocked. The default: credentials used from the UI.
+    case whenUnlocked
+    /// Readable in the background after the first unlock. Only for items read by background work.
+    case afterFirstUnlock
+
+    var attributeValue: CFString {
+        switch self {
+        case .whenUnlocked:
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        case .afterFirstUnlock:
+            kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        }
+    }
+}
+
 // MARK: - KeychainHelper
 
-/// Generic Keychain wrapper using the Security framework directly.
-/// Stores data with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` for security.
+/// Generic-password Keychain wrapper using the Security framework directly.
+/// Items are identified by `service` plus `key`; `service` defaults to the bundle identifier.
 struct KeychainHelper: Sendable {
+    // MARK: - Properties
+
+    let service: String
+
+    // MARK: - Init
+
+    init(service: String = Bundle.main.bundleIdentifier ?? "{{ .BundleID }}") {
+        self.service = service
+    }
+
     // MARK: - Save
 
-    func save(_ data: Data, for key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
+    /// Updates the item if it exists and adds it otherwise, keeping its metadata.
+    func save(_ data: Data, for key: String, accessibility: KeychainAccessibility = .whenUnlocked) throws {
+        let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: accessibility.attributeValue
         ]
 
-        SecItemDelete(query as CFDictionary)
+        let updateStatus = SecItemUpdate(baseQuery(for: key) as CFDictionary, attributes as CFDictionary)
+        switch updateStatus {
+        case errSecSuccess:
+            return
+        case errSecItemNotFound:
+            break
+        default:
+            throw KeychainError.unexpectedStatus(updateStatus)
+        }
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.unexpectedStatus(status)
+        let addQuery = baseQuery(for: key).merging(attributes) { _, new in new }
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        switch addStatus {
+        case errSecSuccess:
+            return
+        case errSecDuplicateItem:
+            throw KeychainError.duplicateItem
+        default:
+            throw KeychainError.unexpectedStatus(addStatus)
         }
     }
 
     // MARK: - Retrieve
 
     func retrieve(for key: String) throws -> Data {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        var query = baseQuery(for: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -61,29 +100,34 @@ struct KeychainHelper: Sendable {
     // MARK: - Delete
 
     func delete(for key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key
-        ]
-
-        let status = SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(baseQuery(for: key) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.unexpectedStatus(status)
         }
+    }
+
+    // MARK: - Private
+
+    private func baseQuery(for key: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key
+        ]
     }
 }
 
 // MARK: - Codable Convenience
 
 extension KeychainHelper {
-    func save<T: Encodable>(_ item: T, for key: String) throws {
+    func save<T: Encodable>(_ item: T, for key: String, accessibility: KeychainAccessibility = .whenUnlocked) throws {
         let data: Data
         do {
             data = try JSONEncoder().encode(item)
         } catch {
             throw KeychainError.encodingFailed
         }
-        try save(data, for: key)
+        try save(data, for: key, accessibility: accessibility)
     }
 
     func read<T: Decodable>(for key: String) throws -> T {

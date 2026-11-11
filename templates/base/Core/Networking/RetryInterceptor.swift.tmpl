@@ -79,17 +79,20 @@ struct RetryInterceptor: RequestInterceptor {
         if let seconds = Int(value) {
             return seconds >= 0 ? TimeInterval(seconds) : nil
         }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "GMT")
-        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        guard let date = formatter.date(from: value) else {
+        guard let date = try? Date(value, strategy: httpDateStrategy) else {
             return nil
         }
         return max(0, date.timeIntervalSince(now))
     }
 
     // MARK: - Private
+
+    /// RFC 9110 IMF-fixdate, e.g. "Sun, 06 Nov 1994 08:49:37 GMT". A value type, so it is shared without locking.
+    private static let httpDateStrategy = Date.ParseStrategy(
+        format: "\(weekday: .abbreviated), \(day: .twoDigits) \(month: .abbreviated) \(year: .defaultDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)):\(minute: .twoDigits):\(second: .twoDigits) GMT",
+        locale: Locale(identifier: "en_US_POSIX"),
+        timeZone: .gmt
+    )
 
     private static let idempotentMethods: Set<String> = ["GET", "HEAD", "PUT", "DELETE", "OPTIONS", "TRACE"]
     private static let idempotencyKeyHeader = "Idempotency-Key"

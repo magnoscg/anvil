@@ -65,7 +65,7 @@ Sources live in `[Project]/` (one app target) and tests in `[Project]Tests/`. La
 +- Data/<Feature>/Mappers/<Feature>DTOMapperTests.swift
 +- Features/<Feature>/Presentation/ViewModels/<Feature>ViewModelTests.swift
 +- Features/<Feature>/Presentation/Mappers/<Feature>DecoratorMapperTests.swift
-+- Mocks/<Feature><Type>Mock.swift      # UseCase, Repository, Router, RemoteDataSource, DTOMapper, DecoratorMapper
++- Mocks/<Feature><Type>Mock.swift      # UseCase, Repository, Router, RemoteDataSource, DTOMapper, DecoratorMapper; Local/KeychainDataSource if chosen
 +- DataStubs/<Feature>/                 # Optional (UI tests): Stub and Fixture <Feature>RemoteDataSource
 +- UITests/                             # Optional (UI tests): Screens/, Support/Screens/
 ```
