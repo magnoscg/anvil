@@ -23,20 +23,14 @@ struct {{ .FeatureName }}RepositoryImplTests {
 
     @Test("Given data source returns DTOs, when fetch, then returns mapped models")
     func fetch_success_returnsMappedModels() async throws {
-        // Given
-        let dtos = [
+        mockRemoteDataSource.fetchResult = .success([
             {{ .FeatureName }}DTO(id: "1", name: "First", description: "First item"),
             {{ .FeatureName }}DTO(id: "2", name: "Second", description: "Second item")
-        ]
-        mockRemoteDataSource.fetchResult = .success(dtos)
+        ])
+        mockDTOMapper.mapSingleResult = {{ .FeatureName }}Model(id: "mapped", name: "Mapped", description: "Mapped item")
 
-        let expectedModel = {{ .FeatureName }}Model(id: "mapped", name: "Mapped", description: "Mapped item")
-        mockDTOMapper.mapSingleResult = expectedModel
-
-        // When
         let result = try await sut.fetch()
 
-        // Then
         #expect(result.count == 2)
         #expect(mockRemoteDataSource.fetchCallCount == 1)
         #expect(mockDTOMapper.mapMultipleCallCount == 1)
@@ -44,20 +38,22 @@ struct {{ .FeatureName }}RepositoryImplTests {
 
     // MARK: - Error
 
-    @Test("Given data source throws APIError, when fetch, then throws the mapped DomainError")
+    @Test("Given data source throws HTTP 404, when fetch, then throws DomainError.notFound")
     func fetch_dataSourceThrows_throwsDomainError() async {
-        // Given
-        let expectedError = APIError.httpError(statusCode: 404, data: nil)
-        mockRemoteDataSource.fetchResult = .failure(expectedError)
+        mockRemoteDataSource.fetchResult = .failure(APIError.httpError(statusCode: 404, data: nil))
 
-        // When / Then
-        do {
-            _ = try await sut.fetch()
-            Issue.record("Expected error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .notFound)
-            #expect(mockRemoteDataSource.fetchCallCount == 1)
-            #expect(mockDTOMapper.mapMultipleCallCount == 0)
-        }
+        await #expect(throws: DomainError.notFound) { try await sut.fetch() }
+        #expect(mockRemoteDataSource.fetchCallCount == 1)
+        #expect(mockDTOMapper.mapMultipleCallCount == 0)
+    }
+
+    // MARK: - Cancellation
+
+    @Test("Given data source is cancelled, when fetch, then CancellationError propagates")
+    func fetch_cancelled_propagatesCancellationError() async {
+        mockRemoteDataSource.fetchResult = .failure(CancellationError())
+
+        await #expect(throws: CancellationError.self) { try await sut.fetch() }
+        #expect(mockDTOMapper.mapMultipleCallCount == 0)
     }
 }
