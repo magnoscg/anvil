@@ -94,19 +94,13 @@ private extension PokemonDetailStatsView {
                     .fill(AppColors.cardBorder.opacity(0.3))
 
                 Capsule()
-                    .fill(
-                        isBst
-                        ? LinearGradient(
-                            colors: [typeColor.opacity(0.5), typeColor, typeColor.opacity(0.8)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                          )
-                        : LinearGradient(
-                            colors: [typeColor.opacity(0.6), typeColor],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                          )
-                    )
+                    .fill(isBst
+                        ? LinearGradient(colors: [typeColor.opacity(0.5), typeColor, typeColor.opacity(0.8)],
+                                         startPoint: .leading,
+                                         endPoint: .trailing)
+                        : LinearGradient(colors: [typeColor.opacity(0.6), typeColor],
+                                         startPoint: .leading,
+                                         endPoint: .trailing))
                     .frame(width: max(0, geometry.size.width * (isAnimated ? progress : 0)))
             }
         }

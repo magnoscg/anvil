@@ -25,8 +25,8 @@ struct AppRootView: View {
         let appRouter = AppRouterImpl()
         self._launchState = launchState
         self.dependencies = dependencies
-        self._appRouter = State(initialValue: appRouter)
-        self._coordinator = State(initialValue: AppNavigationCoordinator(appRouter: appRouter))
+        self.appRouter = appRouter
+        self.coordinator = AppNavigationCoordinator(appRouter: appRouter)
     }
 
     // MARK: - Body

@@ -11,7 +11,6 @@ struct ArchitectureUseCaseTests {
 
     @Test("Execute returns features sorted by category")
     func executeReturnsSortedFeatures() async throws {
-        // Given
         let unsortedFeatures = [ArchitectureModel(id: "3",
                                                   name: "SwiftUI",
                                                   description: "UI",
@@ -30,16 +29,12 @@ struct ArchitectureUseCaseTests {
                                                   category: .security,
                                                   isImplemented: true,
                                                   customIcon: nil)]
-
-        let mockRepository = MockArchitectureRepository()
-        await mockRepository.setGetFeaturesResult(.success(unsortedFeatures))
-
+        let mockRepository = ArchitectureRepositoryMock()
+        mockRepository.getFeaturesResult = .success(unsortedFeatures)
         let useCase = ArchitectureUseCaseImpl(repository: mockRepository)
 
-        // When
         let result = try await useCase.execute()
 
-        // Then
         #expect(result.count == 3)
         #expect(result[0].category == .architecture)
         #expect(result[1].category == .security)
@@ -48,34 +43,21 @@ struct ArchitectureUseCaseTests {
 
     @Test("Execute calls repository once")
     func executeCallsRepositoryOnce() async throws {
-        // Given
-        let mockRepository = MockArchitectureRepository()
-        await mockRepository.setGetFeaturesResult(.success([]))
-
+        let mockRepository = ArchitectureRepositoryMock()
+        mockRepository.getFeaturesResult = .success([])
         let useCase = ArchitectureUseCaseImpl(repository: mockRepository)
 
-        // When
         _ = try await useCase.execute()
 
-        // Then
-        let callCount = await mockRepository.getFeaturesCallCount
-        #expect(callCount == 1)
+        #expect(mockRepository.getFeaturesCallCount == 1)
     }
 
     @Test("Execute propagates the repository's DomainError")
     func executePropagatesError() async {
-        // Given
-        let mockRepository = MockArchitectureRepository()
-        await mockRepository.setGetFeaturesResult(.failure(DomainError.network))
-
+        let mockRepository = ArchitectureRepositoryMock()
+        mockRepository.getFeaturesResult = .failure(DomainError.network)
         let useCase = ArchitectureUseCaseImpl(repository: mockRepository)
 
-        // When/Then
-        do {
-            _ = try await useCase.execute()
-            #expect(Bool(false), "Expected error to be thrown")
-        } catch {
-            #expect(error as? DomainError == .network)
-        }
+        await #expect(throws: DomainError.network) { try await useCase.execute() }
     }
 }

@@ -1,11 +1,11 @@
 import Foundation
 @testable import Arquitectura
 
-// MARK: - MockArchitectureDetailRouter
+// MARK: - ArchitectureDetailRouterMock
 
 /// Mock implementation of ArchitectureDetailRouter for testing
 @MainActor
-final class MockArchitectureDetailRouter: ArchitectureDetailRouter {
+final class ArchitectureDetailRouterMock: ArchitectureDetailRouter {
     // MARK: - Properties
 
     var navigateToPokemonListCallCount = 0

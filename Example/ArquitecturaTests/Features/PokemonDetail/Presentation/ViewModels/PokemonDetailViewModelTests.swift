@@ -11,111 +11,87 @@ struct PokemonDetailViewModelTests {
 
     @Test("loadDetail success sets state to loaded")
     func loadDetailSuccess() async {
-        // Given
         let model = makeModel()
         let decorator = makeDecorator()
-
-        let mockUseCase = MockPokemonDetailUseCase()
-        await mockUseCase.setExecuteResult(.success(model))
-
-        let mockMapper = MockPokemonDetailDecoratorMapper(mapResult: decorator)
-        let mockRouter = MockPokemonDetailRouter()
+        let mockUseCase = PokemonDetailUseCaseMock()
+        mockUseCase.executeResult = .success(model)
+        let mockMapper = PokemonDetailDecoratorMapperMock(mapResult: decorator)
+        let mockRouter = PokemonDetailRouterMock()
         let viewModel = PokemonDetailViewModel(pokemonId: 25,
                                                useCase: mockUseCase,
                                                decoratorMapper: mockMapper,
                                                router: mockRouter)
 
-        // When
         await viewModel.loadDetail()
 
-        // Then
         #expect(viewModel.state == .loaded(decorator))
     }
 
     @Test("loadDetail error sets state to error")
     func loadDetailError() async {
-        // Given
-        let mockUseCase = MockPokemonDetailUseCase()
-        await mockUseCase.setExecuteResult(.failure(DomainError.network))
-
-        let mockMapper = MockPokemonDetailDecoratorMapper(mapResult: makeDecorator())
-        let mockRouter = MockPokemonDetailRouter()
+        let mockUseCase = PokemonDetailUseCaseMock()
+        mockUseCase.executeResult = .failure(DomainError.network)
+        let mockMapper = PokemonDetailDecoratorMapperMock(mapResult: makeDecorator())
+        let mockRouter = PokemonDetailRouterMock()
         let viewModel = PokemonDetailViewModel(pokemonId: 25,
                                                useCase: mockUseCase,
                                                decoratorMapper: mockMapper,
                                                router: mockRouter)
 
-        // When
         await viewModel.loadDetail()
 
-        // Then
         #expect(viewModel.state == .error(ErrorDecorator.from(.network)))
     }
 
     @Test("loadDetail cancellation restores previous state")
     func loadDetailCancellation() async {
-        // Given
-        let mockUseCase = MockPokemonDetailUseCase()
-        await mockUseCase.setExecuteResult(.failure(CancellationError()))
-
-        let mockMapper = MockPokemonDetailDecoratorMapper(mapResult: makeDecorator())
-        let mockRouter = MockPokemonDetailRouter()
+        let mockUseCase = PokemonDetailUseCaseMock()
+        mockUseCase.executeResult = .failure(CancellationError())
+        let mockMapper = PokemonDetailDecoratorMapperMock(mapResult: makeDecorator())
+        let mockRouter = PokemonDetailRouterMock()
         let viewModel = PokemonDetailViewModel(pokemonId: 25,
                                                useCase: mockUseCase,
                                                decoratorMapper: mockMapper,
                                                router: mockRouter)
 
-        // When
         await viewModel.loadDetail()
 
-        // Then — state should be restored to idle (the previous state)
         #expect(viewModel.state == .idle)
     }
 
     @Test("loadDetail does not duplicate when already loading")
     func loadDetailNoDuplicate() async {
-        // Given
         let model = makeModel()
         let decorator = makeDecorator()
-
-        let mockUseCase = MockPokemonDetailUseCase()
-        await mockUseCase.setExecuteResult(.success(model))
-
-        let mockMapper = MockPokemonDetailDecoratorMapper(mapResult: decorator)
-        let mockRouter = MockPokemonDetailRouter()
+        let mockUseCase = PokemonDetailUseCaseMock()
+        mockUseCase.executeResult = .success(model)
+        let mockMapper = PokemonDetailDecoratorMapperMock(mapResult: decorator)
+        let mockRouter = PokemonDetailRouterMock()
         let viewModel = PokemonDetailViewModel(pokemonId: 25,
                                                useCase: mockUseCase,
                                                decoratorMapper: mockMapper,
                                                router: mockRouter)
 
-        // When — call loadDetail twice concurrently
         await viewModel.loadDetail()
         await viewModel.loadDetail()
 
-        // Then — use case should only be called twice (both calls complete,
-        // but the second call's guard passes because first already completed)
-        let callCount = await mockUseCase.executeCallCount
-        #expect(callCount == 2)
+        #expect(mockUseCase.executeCallCount == 2)
         #expect(viewModel.state == .loaded(decorator))
     }
 
     @Test("loadDetail with generic error sets generic error state")
     func loadDetailGenericError() async {
-        // Given
-        let mockUseCase = MockPokemonDetailUseCase()
-        await mockUseCase.setExecuteResult(.failure(NSError(domain: "test", code: 999)))
-
-        let mockMapper = MockPokemonDetailDecoratorMapper(mapResult: makeDecorator())
-        let mockRouter = MockPokemonDetailRouter()
+        let mockUseCase = PokemonDetailUseCaseMock()
+        mockUseCase.executeResult = .failure(NSError(domain: "test", code: 999))
+        let mockMapper = PokemonDetailDecoratorMapperMock(mapResult: makeDecorator())
+        let mockRouter = PokemonDetailRouterMock()
         let viewModel = PokemonDetailViewModel(pokemonId: 25,
                                                useCase: mockUseCase,
                                                decoratorMapper: mockMapper,
                                                router: mockRouter)
 
-        // When
         await viewModel.loadDetail()
 
-        // Then
         #expect(viewModel.state == .error(.generic))
     }
 

@@ -1,10 +1,10 @@
 import Foundation
 @testable import Arquitectura
 
-// MARK: - MockPokemonListRouter
+// MARK: - PokemonListRouterMock
 
 @MainActor
-final class MockPokemonListRouter: PokemonListRouter {
+final class PokemonListRouterMock: PokemonListRouter {
     // MARK: - Properties
 
     private(set) var navigateToDetailCallCount = 0

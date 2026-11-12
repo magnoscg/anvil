@@ -10,15 +10,12 @@ struct PokemonDetailView: View {
     private var viewModel: PokemonDetailViewModel
 
     @State
-    private var retryTrigger = false
-
-    @State
     private var selectedTab: DetailTab = .about
 
     // MARK: - Init
 
     init(viewModel: PokemonDetailViewModel) {
-        self._viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
     }
 
     // MARK: - Body
@@ -41,7 +38,7 @@ struct PokemonDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .background(AppColors.background)
-        .task(id: retryTrigger) {
+        .task {
             await viewModel.loadDetail()
         }
     }
@@ -72,19 +69,15 @@ private extension PokemonDetailView {
             }
             .padding(.bottom, Spacing.xl)
         }
-        .background(
-            ZStack(alignment: .top) {
-                AppColors.background
-                    .ignoresSafeArea()
-                LinearGradient(
-                    colors: [typeColor.opacity(0.55), typeColor.opacity(0.0)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+        .background(ZStack(alignment: .top) {
+            AppColors.background
+                .ignoresSafeArea()
+            LinearGradient(colors: [typeColor.opacity(0.55), typeColor.opacity(0.0)],
+                           startPoint: .top,
+                           endPoint: .bottom)
                 .frame(height: 400)
                 .ignoresSafeArea(edges: .top)
-            }
-        )
+        })
         .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -139,25 +132,21 @@ private extension PokemonDetailView {
         switch selectedTab {
         case .about:
             PokemonDetailAboutView(decorator: decorator)
-                .transition(.asymmetric(
-                    insertion: .move(edge: .leading).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
+                .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)))
                 .id(DetailTab.about)
 
         case .stats:
             PokemonDetailStatsView(decorator: decorator)
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .trailing).combined(with: .opacity)
-                ))
+                .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .trailing).combined(with: .opacity)))
                 .id(DetailTab.stats)
         }
     }
 
     func errorView(error: ErrorDecorator) -> some View {
         ErrorView(error: error) {
-            retryTrigger.toggle()
+            Task { await viewModel.loadDetail() }
         }
     }
 }
@@ -168,7 +157,9 @@ private enum DetailTab: String, CaseIterable, Identifiable {
     case about
     case stats
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {

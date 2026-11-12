@@ -45,7 +45,7 @@ struct APIClientImplTests {
 // MARK: - SessionInvalidationObserver
 
 /// Records whether the URLSession it delegates for has been invalidated.
-nonisolated final class SessionInvalidationObserver: NSObject, URLSessionDelegate, Sendable {
+final nonisolated class SessionInvalidationObserver: NSObject, URLSessionDelegate, Sendable {
     // MARK: - Properties
 
     private let state = OSAllocatedUnfairLock(initialState: false)

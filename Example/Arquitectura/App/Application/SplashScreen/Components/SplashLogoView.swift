@@ -23,22 +23,21 @@ struct SplashLogoView: View {
 
     // MARK: - Private Views
 
+    @ViewBuilder
     private var glowLayers: some View {
-        Group {
-            Circle()
-                .fill(AppColors.swiftOrange.opacity(0.15))
-                .containerRelativeFrame(.horizontal) { length, _ in
-                    length * 0.7
-                }
-                .blur(radius: 60)
-                .scaleEffect(glowIntensity)
+        Circle()
+            .fill(AppColors.swiftOrange.opacity(0.15))
+            .containerRelativeFrame(.horizontal) { length, _ in
+                length * 0.7
+            }
+            .blur(radius: 60)
+            .scaleEffect(glowIntensity)
 
-            Circle()
-                .fill(AppColors.swiftOrange.opacity(0.3))
-                .frame(width: 150, height: 150)
-                .blur(radius: 30)
-                .scaleEffect(glowIntensity * 0.9)
-        }
+        Circle()
+            .fill(AppColors.swiftOrange.opacity(0.3))
+            .frame(width: 150, height: 150)
+            .blur(radius: 30)
+            .scaleEffect(glowIntensity * 0.9)
     }
 
     private var logoImage: some View {

@@ -28,7 +28,7 @@ struct SplashScreenView: View {
     // MARK: - Init
 
     init(viewModel: SplashScreenViewModel) {
-        self._viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
     }
 
     // MARK: - Body
