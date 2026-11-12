@@ -4,10 +4,13 @@
 
 ## When a UI test is worth it
 
-UI tests are optional per project. They are the slowest and most fragile tests, so they cover only what unit tests cannot: a user-visible journey through real navigation.
+UI tests are optional per project and off by default. They are the slowest and most fragile tests, so a screen gets one only when unit tests cannot protect it.
 
-- Write one for multi-step flows (onboarding, sign-in, purchase), forms with validation, tabs with nested stacks, and screens whose loaded, empty and error states matter. Skip it for read-only data display; ViewModel tests cover that (`testing.md`).
-- Rule of thumb: if breaking the flow would lose money or users, it gets a UI test.
+- Write one only when (1) the flow costs money or data if it breaks (purchase or subscription, sign-in, first launch, account deletion), (2) the screen already had a regression that a unit test would not have caught, or (3) the developer asks for it. Keep at most one smoke flow per app beyond those.
+- Everything else is covered by unit tests: ViewModel states and actions, navigation through `RouterMock` in the ViewModel tests, and deep links as a URL → route test (`testing.md`). Forms with validation and loaded, empty and error states belong there, not in Screen tests.
+- Layout is checked by eye: one `#Preview` per state, captured in light, dark, Dynamic Type `accessibility3` and the smallest supported iPhone (plus iPad and the longest language when the app supports them).
+- Existing UI tests run with `-only-testing` for the screen that changed, with stub data through launch arguments and without `sleep`. The full suite and `performAccessibilityAudit()` run on `release/*` branches.
+- `anvil feature` asks about UI tests: answer no unless the screen meets one of the conditions above.
 
 UI tests use XCTest (XCUIAutomation) while the toolchain is Xcode 27.2 or earlier; Swift Testing supports them from Xcode 27.3. Unit tests use Swift Testing (`testing.md`).
 
