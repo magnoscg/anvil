@@ -314,6 +314,7 @@ Contributions follow Gitflow: branch `feature/*` from `develop` and open the pul
 | **August 2026** | Transactional generation and pack installation, asset and skill provenance, release `0.6.0` |
 | **November 2026** | Generated projects follow the reference architecture: Domain and Data by concept, per-window navigation, hardened networking, release `0.7.0` |
 | **November 2026** | Generated projects ship a UI test target wired end to end, and the architecture pack is rewritten as 12 shorter documents, release `0.8.0` |
+| **November 2026** | The `Example/` app follows the pack again and its tests build with Xcode 27.2; UI tests become opt-in, for flows that cost money or data, release `0.8.1` |
 
 The private history was not carried over, which is why the first commit here is the `0.5.1` public edition.
 
